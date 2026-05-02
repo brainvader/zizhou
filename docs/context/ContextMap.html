@@ -26,11 +26,11 @@
     {
       "routing": { "currentPath": "/projects" },
       "projects": [
-        { "id": "1", "name": "地蔵 Core",      "description": "グラフベースのプロジェクト管理OS。AI Coding Protocol v7.00の実装基盤。" },
-        { "id": "2", "name": "Graph Renderer", "description": "ノード・エッジの依存関係をインタラクティブに可視化するビューエンジン。" },
-        { "id": "3", "name": "HITL Gate",      "description": "書き込みアクションの承認フローを実装するHuman-in-the-loop制御モジュール。" },
-        { "id": "4", "name": "Spec Extractor", "description": "実装完了時に最新コードと同期した仕様書を自動生成するエンジン。" },
-        { "id": "5", "name": "Auth Module",    "description": "ローカルファースト認証。Tauriキーチェーン連携によるセキュアなトークン管理。" }
+        { "id": "1", "name": "地蔵 Core",      "description": "グラフベースのプロジェクト管理OS。" },
+        { "id": "2", "name": "Graph Renderer", "description": "ノード・エッジの依存関係を可視化するビューエンジン。" },
+        { "id": "3", "name": "HITL Gate",      "description": "Human-in-the-loop の承認フロー制御モジュール。" },
+        { "id": "4", "name": "Spec Extractor", "description": "実装完了時にコードと同期した仕様書を自動生成する。" },
+        { "id": "5", "name": "Auth Module",    "description": "Tauriキーチェーン連携によるローカルファースト認証。" }
       ]
     }
   </script>
@@ -271,7 +271,6 @@
                 display: grid;
                 grid-template-columns: repeat(auto-fill, minmax(256px, 1fr));
                 gap: 10px;
-                flex: 1;
             }
 
             /* ── Card ── */
@@ -279,12 +278,13 @@
                 background: var(--card);
                 border: 1px solid var(--border);
                 border-radius: var(--radius);
-                padding: 20px;
+                padding: 16px 18px;
+                height: 100px;
                 cursor: pointer;
                 transition: all 0.18s;
                 display: flex;
                 flex-direction: column;
-                gap: 8px;
+                gap: 6px;
                 position: relative;
                 overflow: hidden;
             }
@@ -324,8 +324,12 @@
             .card-description {
                 font-size: 12px;
                 color: var(--muted-foreground);
-                line-height: 1.65;
+                line-height: 1.5;
                 padding-left: 10px;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
             }
 
             /* ── New card ── */
@@ -336,7 +340,7 @@
                 justify-content: center;
                 flex-direction: row;
                 gap: 8px;
-                min-height: 96px;
+                min-height: 60px;
                 opacity: 0.35;
             }
 
@@ -413,27 +417,27 @@
 
                 <div class="card">
                     <div class="card-title">地蔵 Core</div>
-                    <div class="card-description">グラフベースのプロジェクト管理OS。AI Coding Protocol v7.00の実装基盤。</div>
+                    <div class="card-description">グラフベースのプロジェクト管理OS。</div>
                 </div>
 
                 <div class="card">
                     <div class="card-title">Graph Renderer</div>
-                    <div class="card-description">ノード・エッジの依存関係をインタラクティブに可視化するビューエンジン。</div>
+                    <div class="card-description">ノード・エッジの依存関係を可視化するビューエンジン。</div>
                 </div>
 
                 <div class="card">
                     <div class="card-title">HITL Gate</div>
-                    <div class="card-description">書き込みアクションの承認フローを実装するHuman-in-the-loop制御モジュール。</div>
+                    <div class="card-description">Human-in-the-loop の承認フロー制御モジュール。</div>
                 </div>
 
                 <div class="card">
                     <div class="card-title">Spec Extractor</div>
-                    <div class="card-description">実装完了時に最新コードと同期した仕様書を自動生成するエンジン。</div>
+                    <div class="card-description">実装完了時にコードと同期した仕様書を自動生成する。</div>
                 </div>
 
                 <div class="card">
                     <div class="card-title">Auth Module</div>
-                    <div class="card-description">ローカルファースト認証。Tauriキーチェーン連携によるセキュアなトークン管理。</div>
+                    <div class="card-description">Tauriキーチェーン連携によるローカルファースト認証。</div>
                 </div>
 
                 <div class="card new">
