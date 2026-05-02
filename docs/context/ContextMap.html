@@ -388,12 +388,10 @@
                 </div>
             </div>
             <div class="topbar-spacer"></div>
-            <button class="btn btn-primary">＋ New Project</button>
             <button class="btn btn-ghost" title="Settings">⚙</button>
 
             <!--
-      [Feature] New Project  — ボタンクリックでプロジェクト作成フローを起動する
-      [Feature] Settings     — アイコンボタンで設定画面を開く
+      [Feature] Settings — アイコンボタンで設定画面を開く
     -->
         </header>
 
@@ -445,10 +443,11 @@
             </div>
 
             <!--
-      [Feature] Project List      — global-store の projects[] をカードグリッドで表示する
-      [Feature] Open Project      — カードクリックで /projects/:id へ遷移する
-      [Feature] New Project Card  — 末尾の破線カードから新規作成フローを起動する
-      [Logic]   Routing           — カード選択時に global-store.routing.currentPath を更新し、selectedProjectId をセットする
+      [Feature] Project List     — global-store の projects[] をカードグリッドで表示する
+      [Feature] Open Project     — カードクリックで /projects/:id へ遷移する
+      [Feature] New Project Card — 破線カードクリックで shadcn Dialog を開き name・description を入力して作成する
+      [Logic]   Empty State      — projects[] が空のとき破線カードのみを表示する
+      [Logic]   Routing          — TanStack Router の useNavigate() で /projects/:id へ遷移する
     -->
         </main>
 
