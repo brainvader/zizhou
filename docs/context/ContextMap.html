@@ -1,31 +1,61 @@
 <!DOCTYPE html>
 <html lang="ja">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>地蔵 ContextMap — Project Management</title>
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap');
+        <meta charset="UTF-8" />
+        <title>ContextMap: 地蔵 — Projects</title>
 
+        <!-- ============================================================
+       STACK
+       runtime:  Tauri 2
+       frontend: React 18 + TypeScript
+       bundler:  Vite
+       styling:  Tailwind CSS v4 + shadcn/ui
+       router:   TanStack Router
+       state:    Zustand
+       testing:  Vitest + RTL + Playwright
+       package:  pnpm
+  ============================================================ -->
+
+        <!-- ============================================================
+       GLOBAL STORE
+       アプリ全体で共有すべき状態。
+       この画面はプロジェクト一覧のみのシンプルな構成のため、
+       projects[] のみを持つ。routing は詳細画面への遷移で必要になる。
+  ============================================================ -->
+        <script id="global-store" type="application/json">
+    {
+      "routing": { "currentPath": "/projects" },
+      "projects": [
+        { "id": "1", "name": "地蔵 Core",      "description": "グラフベースのプロジェクト管理OS。AI Coding Protocol v7.00の実装基盤。" },
+        { "id": "2", "name": "Graph Renderer", "description": "ノード・エッジの依存関係をインタラクティブに可視化するビューエンジン。" },
+        { "id": "3", "name": "HITL Gate",      "description": "書き込みアクションの承認フローを実装するHuman-in-the-loop制御モジュール。" },
+        { "id": "4", "name": "Spec Extractor", "description": "実装完了時に最新コードと同期した仕様書を自動生成するエンジン。" },
+        { "id": "5", "name": "Auth Module",    "description": "ローカルファースト認証。Tauriキーチェーン連携によるセキュアなトークン管理。" }
+      ]
+    }
+  </script>
+
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500&family=DM+Mono:wght@300;400&family=Outfit:wght@400;500;600;700&display=swap');
+
+            /* ── 地蔵カラー: 石段・夜の石畳・よだれかけの朱 ── */
             :root {
-                --bg: #0d0e0f;
-                --surface: #141516;
-                --border: #252729;
-                --border-hi: #3a3d42;
-                --ink: #e8e6e1;
-                --ink-muted: #636870;
-                --ink-dim: #3a3d42;
-                --accent: #c8a96e;
-                --accent-lo: #c8a96e22;
-                --green: #6db88a;
-                --green-lo: #6db88a18;
-                --blue: #6a96c4;
-                --blue-lo: #6a96c418;
-                --amber-lo: #c8a96e18;
-                --radius: 6px;
-                --mono: 'DM Mono', monospace;
-                --serif: 'Noto Serif JP', serif;
-                --sans: 'Syne', sans-serif;
+                --background: #1c1e21;
+                --foreground: #dedad4;
+                --card: #22252a;
+                --card-foreground: #dedad4;
+                --muted: #2a2d32;
+                --muted-foreground: #707880;
+                --border: #30343a;
+                --primary: #c0392b;
+                --primary-soft: #a03020;
+                --primary-foreground: #f5ede8;
+                --primary-glow: #c0392b20;
+                --accent: #2a2d32;
+                --radius: 0.375rem;
+                --font-sans: 'Outfit', sans-serif;
+                --font-mono: 'DM Mono', monospace;
+                --font-serif: 'Noto Serif JP', serif;
             }
 
             *,
@@ -37,25 +67,25 @@
             }
 
             body {
-                background: var(--bg);
-                color: var(--ink);
-                font-family: var(--mono);
-                font-size: 13px;
-                line-height: 1.6;
+                background-color: var(--background);
+                color: var(--foreground);
+                font-family: var(--font-sans);
+                font-size: 14px;
+                line-height: 1.5;
                 height: 100vh;
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
             }
 
-            /* ── TITLEBAR (Tauri) ── */
+            /* ── Tauri titlebar ── */
             .titlebar {
-                height: 36px;
-                background: var(--surface);
+                height: 32px;
+                background: #161819;
                 border-bottom: 1px solid var(--border);
                 display: flex;
                 align-items: center;
-                padding: 0 16px;
+                padding: 0 14px;
                 flex-shrink: 0;
                 user-select: none;
             }
@@ -66,291 +96,272 @@
             }
 
             .dot {
-                width: 11px;
-                height: 11px;
+                width: 10px;
+                height: 10px;
                 border-radius: 50%;
-                background: var(--border-hi);
             }
 
             .dot.r {
-                background: #c46a5a;
+                background: #6b2a2a;
             }
 
             .dot.y {
-                background: #c8a96e;
+                background: #6b5a2a;
             }
 
             .dot.g {
-                background: #6db88a;
+                background: #2a4a35;
+            }
+
+            /* ── context-area: 構造を可視化するための枠（ContextMapのみ） ── */
+            .context-area {
+                outline: 1px dashed #30343a60;
+                position: relative;
+            }
+
+            .ctx-label {
+                position: absolute;
+                top: 4px;
+                left: 8px;
+                font-family: var(--font-mono);
+                font-size: 8px;
+                color: #454a52;
+                letter-spacing: 0.2em;
+                text-transform: uppercase;
+                pointer-events: none;
             }
 
             /* ── TOPBAR ── */
-            .topbar {
+            #ctx-topbar {
                 height: 52px;
+                background: var(--card);
                 border-bottom: 1px solid var(--border);
                 display: flex;
                 align-items: center;
-                padding: 0 24px;
-                gap: 20px;
+                padding: 0 22px;
+                gap: 16px;
                 flex-shrink: 0;
+                box-shadow: inset 0 1px 0 #c0392b28;
             }
 
             .logo {
                 display: flex;
-                align-items: baseline;
-                gap: 8px;
+                align-items: center;
+                gap: 12px;
             }
 
-            .logo-k {
-                font-family: var(--serif);
+            .logo-kanji-wrap {
+                position: relative;
+                display: inline-block;
+            }
+
+            .logo-kanji {
+                font-family: var(--font-serif);
                 font-size: 20px;
-                font-weight: 300;
-                color: var(--accent);
-                letter-spacing: 0.08em;
-                line-height: 1;
-            }
-
-            .logo-v {
-                font-size: 9px;
-                color: var(--ink-dim);
+                font-weight: 400;
+                color: var(--foreground);
                 letter-spacing: 0.15em;
+                line-height: 1;
+                text-shadow: 0 1px 3px #00000060;
             }
 
-            .divider {
+            .logo-kanji-wrap::after {
+                content: '';
+                position: absolute;
+                bottom: -3px;
+                left: 0;
+                right: 0;
+                height: 2px;
+                background: var(--primary);
+                border-radius: 1px;
+                opacity: 0.8;
+            }
+
+            .logo-sep {
                 width: 1px;
                 height: 18px;
                 background: var(--border);
             }
 
-            .topbar-title {
-                font-family: var(--sans);
-                font-size: 13px;
-                font-weight: 700;
-                color: var(--ink-muted);
-                letter-spacing: 0.05em;
-            }
-
-            .spacer {
-                flex: 1;
-            }
-
-            .topbar-actions {
+            .logo-sub {
                 display: flex;
-                align-items: center;
-                gap: 8px;
+                flex-direction: column;
+                gap: 1px;
+            }
+
+            .logo-romaji {
+                font-family: var(--font-mono);
+                font-size: 9px;
+                color: var(--muted-foreground);
+                letter-spacing: 0.25em;
+                text-transform: uppercase;
+            }
+
+            .logo-ver {
+                font-family: var(--font-mono);
+                font-size: 8px;
+                color: #454a52;
+                letter-spacing: 0.15em;
+            }
+
+            .topbar-spacer {
+                flex: 1;
             }
 
             .btn {
-                display: flex;
+                display: inline-flex;
                 align-items: center;
+                justify-content: center;
                 gap: 6px;
-                padding: 6px 14px;
                 border-radius: var(--radius);
-                font-family: var(--mono);
-                font-size: 11px;
+                font-family: var(--font-sans);
+                font-size: 12px;
+                font-weight: 500;
                 cursor: pointer;
-                border: 1px solid transparent;
                 transition: all 0.15s;
-                letter-spacing: 0.05em;
+                border: 1px solid transparent;
             }
 
             .btn-primary {
-                background: var(--accent);
-                border-color: var(--accent);
-                color: #0d0e0f;
-                font-weight: 500;
+                background: var(--primary);
+                color: var(--primary-foreground);
+                padding: 6px 16px;
+                height: 32px;
+                border-color: var(--primary-soft);
             }
 
             .btn-primary:hover {
-                background: #d4b87a;
-                box-shadow: 0 0 12px var(--accent-lo);
+                background: #d44030;
+                box-shadow: 0 0 14px var(--primary-glow);
             }
 
-            .btn-icon {
+            .btn-ghost {
+                background: transparent;
+                color: var(--muted-foreground);
                 width: 32px;
                 height: 32px;
-                padding: 0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border-radius: var(--radius);
-                background: transparent;
-                border: 1px solid transparent;
-                color: var(--ink-muted);
-                font-size: 15px;
-                cursor: pointer;
-                transition: all 0.15s;
+                font-size: 16px;
             }
 
-            .btn-icon:hover {
+            .btn-ghost:hover {
+                background: var(--accent);
+                color: var(--foreground);
                 border-color: var(--border);
-                color: var(--ink);
-                background: #ffffff05;
             }
 
-            /* ── CONTENT ── */
-            .content {
+            /* ── MAIN CONTENT ── */
+            #ctx-project-grid {
                 flex: 1;
                 overflow-y: auto;
-                padding: 32px 28px;
+                padding: 22px;
+                display: flex;
+                flex-direction: column;
             }
 
-            .content::-webkit-scrollbar {
-                width: 4px;
+            #ctx-project-grid::-webkit-scrollbar {
+                width: 3px;
             }
 
-            .content::-webkit-scrollbar-thumb {
+            #ctx-project-grid::-webkit-scrollbar-thumb {
                 background: var(--border);
                 border-radius: 2px;
             }
 
-            /* ── PROJECT GRID ── */
-            .project-grid {
+            .grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-                gap: 12px;
+                grid-template-columns: repeat(auto-fill, minmax(256px, 1fr));
+                gap: 10px;
+                flex: 1;
             }
 
-            /* ── PROJECT CARD ── */
-            .project-card {
-                background: var(--surface);
+            /* ── Card ── */
+            .card {
+                background: var(--card);
                 border: 1px solid var(--border);
                 border-radius: var(--radius);
-                padding: 22px;
+                padding: 20px;
                 cursor: pointer;
                 transition: all 0.18s;
-                position: relative;
-                overflow: hidden;
                 display: flex;
                 flex-direction: column;
                 gap: 8px;
+                position: relative;
+                overflow: hidden;
             }
 
-            .project-card::before {
+            .card::before {
                 content: '';
                 position: absolute;
-                top: 0;
                 left: 0;
-                right: 0;
-                height: 2px;
+                top: 12px;
+                bottom: 12px;
+                width: 2px;
+                background: var(--border);
+                border-radius: 1px;
+                transition: background 0.18s;
             }
 
-            .project-card.active::before {
-                background: var(--green);
+            .card:hover {
+                border-color: #3e4248;
+                box-shadow: 0 6px 24px #00000050;
+                translate: 0 -1px;
             }
 
-            .project-card.paused::before {
-                background: var(--accent);
+            .card:hover::before {
+                background: var(--primary);
+                opacity: 0.7;
             }
 
-            .project-card.done::before {
-                background: var(--blue);
-            }
-
-            .project-card:hover {
-                border-color: var(--border-hi);
-                transform: translateY(-2px);
-                box-shadow: 0 10px 28px #00000050;
-            }
-
-            .card-status {
-                display: inline-flex;
-                align-items: center;
-                gap: 5px;
-                font-size: 9px;
-                letter-spacing: 0.15em;
-                text-transform: uppercase;
-                padding: 3px 8px;
-                border-radius: 20px;
-                align-self: flex-start;
-            }
-
-            .card-status.active {
-                background: var(--green-lo);
-                color: var(--green);
-            }
-
-            .card-status.paused {
-                background: var(--amber-lo);
-                color: var(--accent);
-            }
-
-            .card-status.done {
-                background: var(--blue-lo);
-                color: var(--blue);
-            }
-
-            .pip {
-                width: 5px;
-                height: 5px;
-                border-radius: 50%;
-                background: currentColor;
-            }
-
-            .pip.pulse {
-                animation: pulse 2s infinite;
-            }
-
-            @keyframes pulse {
-
-                0%,
-                100% {
-                    opacity: 1;
-                }
-
-                50% {
-                    opacity: 0.3;
-                }
-            }
-
-            .card-name {
-                font-family: var(--sans);
-                font-size: 15px;
-                font-weight: 700;
-                color: var(--ink);
+            .card-title {
+                font-size: 14px;
+                font-weight: 600;
+                color: var(--card-foreground);
                 letter-spacing: 0.01em;
-                line-height: 1.2;
+                line-height: 1.3;
+                padding-left: 10px;
             }
 
-            .card-desc {
-                font-size: 11px;
-                color: var(--ink-muted);
-                line-height: 1.6;
+            .card-description {
+                font-size: 12px;
+                color: var(--muted-foreground);
+                line-height: 1.65;
+                padding-left: 10px;
             }
 
-            /* ── NEW CARD ── */
-            .project-card.new-card {
+            /* ── New card ── */
+            .card.new {
                 border-style: dashed;
-                min-height: 120px;
+                border-color: #30343a;
                 align-items: center;
                 justify-content: center;
                 flex-direction: row;
-                gap: 10px;
-                opacity: 0.5;
+                gap: 8px;
+                min-height: 96px;
+                opacity: 0.35;
             }
 
-            .project-card.new-card:hover {
-                opacity: 1;
-                border-color: var(--accent);
-                box-shadow: 0 0 20px var(--accent-lo);
-                transform: translateY(-2px);
+            .card.new::before {
+                display: none;
             }
 
-            .new-plus {
-                font-size: 18px;
-                color: var(--ink-dim);
+            .card.new:hover {
+                opacity: 0.9;
+                border-color: var(--primary);
+                box-shadow: 0 0 18px var(--primary-glow);
+                translate: 0 -1px;
             }
 
-            .new-label {
+            .new-text {
                 font-size: 11px;
-                color: var(--ink-muted);
-                letter-spacing: 0.1em;
+                color: var(--muted-foreground);
+                letter-spacing: 0.12em;
+                font-family: var(--font-mono);
             }
         </style>
     </head>
     <body>
 
-        <!-- TITLEBAR (Tauri drag region) -->
+        <!-- Tauri titlebar -->
         <div class="titlebar">
             <div class="dots">
                 <div class="dot r"></div>
@@ -359,62 +370,87 @@
             </div>
         </div>
 
-        <!-- TOPBAR -->
-        <div class="topbar">
+        <!-- ============================================================
+       CTX-1: TOPBAR
+       責務: アプリ識別・グローバルアクション（New Project / Settings）
+       注意: サイドバーなし。Settings はアイコンボタン一つ。
+  ============================================================ -->
+        <header id="ctx-topbar" class="context-area">
+            <span class="ctx-label">ctx-topbar</span>
             <div class="logo">
-                <span class="logo-k">地蔵</span>
-                <span class="logo-v">v7.00</span>
+                <div class="logo-kanji-wrap">
+                    <span class="logo-kanji">地蔵</span>
+                </div>
+                <div class="logo-sep"></div>
+                <div class="logo-sub">
+                    <span class="logo-romaji">Zizou</span>
+                    <span class="logo-ver">Protocol v7.00</span>
+                </div>
             </div>
-            <div class="divider"></div>
-            <span class="topbar-title">Projects</span>
-            <div class="spacer"></div>
-            <div class="topbar-actions">
-                <button class="btn btn-primary">＋ New Project</button>
-                <button class="btn-icon" title="Settings">⚙</button>
+            <div class="topbar-spacer"></div>
+            <button class="btn btn-primary">＋ New Project</button>
+            <button class="btn btn-ghost" title="Settings">⚙</button>
+
+            <!--
+      [Feature] New Project  — ボタンクリックでプロジェクト作成フローを起動する
+      [Feature] Settings     — アイコンボタンで設定画面を開く
+    -->
+        </header>
+
+        <!-- ============================================================
+       CTX-2: PROJECT-GRID
+       責務: global-store の projects[] を一覧表示・新規作成のエントリーポイント
+       注意: クリックで /projects/:id へ遷移（routing を更新）
+  ============================================================ -->
+        <main id="ctx-project-grid" class="context-area">
+            <span class="ctx-label">ctx-project-grid</span>
+
+            <script class="local-state" type="application/json">
+      {
+        "selectedProjectId": null
+      }
+    </script>
+
+            <div class="grid">
+
+                <div class="card">
+                    <div class="card-title">地蔵 Core</div>
+                    <div class="card-description">グラフベースのプロジェクト管理OS。AI Coding Protocol v7.00の実装基盤。</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Graph Renderer</div>
+                    <div class="card-description">ノード・エッジの依存関係をインタラクティブに可視化するビューエンジン。</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">HITL Gate</div>
+                    <div class="card-description">書き込みアクションの承認フローを実装するHuman-in-the-loop制御モジュール。</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Spec Extractor</div>
+                    <div class="card-description">実装完了時に最新コードと同期した仕様書を自動生成するエンジン。</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Auth Module</div>
+                    <div class="card-description">ローカルファースト認証。Tauriキーチェーン連携によるセキュアなトークン管理。</div>
+                </div>
+
+                <div class="card new">
+                    <span class="new-text">＋ new project</span>
+                </div>
+
             </div>
-        </div>
 
-        <!-- CONTENT -->
-        <div class="content">
-            <div class="project-grid">
-
-                <div class="project-card active">
-                    <span class="card-status active"><span class="pip pulse"></span>Active</span>
-                    <div class="card-name">地蔵 Core</div>
-                    <div class="card-desc">グラフベースのプロジェクト管理OS。AI Coding Protocol v7.00の実装基盤。</div>
-                </div>
-
-                <div class="project-card active">
-                    <span class="card-status active"><span class="pip pulse"></span>Active</span>
-                    <div class="card-name">Graph Renderer</div>
-                    <div class="card-desc">ノード・エッジの依存関係をインタラクティブに可視化するビューエンジン。</div>
-                </div>
-
-                <div class="project-card active">
-                    <span class="card-status active"><span class="pip pulse"></span>Active</span>
-                    <div class="card-name">HITL Gate</div>
-                    <div class="card-desc">書き込みアクションの承認フローを実装するHuman-in-the-loop制御モジュール。</div>
-                </div>
-
-                <div class="project-card paused">
-                    <span class="card-status paused"><span class="pip"></span>Paused</span>
-                    <div class="card-name">Spec Extractor</div>
-                    <div class="card-desc">実装完了時に最新コードと同期した仕様書を自動生成するエンジン。</div>
-                </div>
-
-                <div class="project-card done">
-                    <span class="card-status done"><span class="pip"></span>Done</span>
-                    <div class="card-name">Auth Module</div>
-                    <div class="card-desc">ローカルファースト認証。Tauriキーチェーン連携によるセキュアなトークン管理。</div>
-                </div>
-
-                <div class="project-card new-card">
-                    <span class="new-plus">＋</span>
-                    <span class="new-label">New Project</span>
-                </div>
-
-            </div>
-        </div>
+            <!--
+      [Feature] Project List      — global-store の projects[] をカードグリッドで表示する
+      [Feature] Open Project      — カードクリックで /projects/:id へ遷移する
+      [Feature] New Project Card  — 末尾の破線カードから新規作成フローを起動する
+      [Logic]   Routing           — カード選択時に global-store.routing.currentPath を更新し、selectedProjectId をセットする
+    -->
+        </main>
 
     </body>
 </html>
