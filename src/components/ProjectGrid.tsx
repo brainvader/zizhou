@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
 import { useProjectStore } from '@/store/useProjectStore'
-import { NewProjectFormSchema, type NewProjectForm } from '../../docs/bom/project'
+import { NewProjectFormSchema, type NewProjectForm } from '@/bom/project'
 import {
     Dialog,
     DialogContent,

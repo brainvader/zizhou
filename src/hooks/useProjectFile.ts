@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 import { readTextFile, writeTextFile, exists, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { toast } from 'sonner'
-import { useProjectStore } from '../store/useProjectStore'
-import type { UseProjectFileReturn } from '../../docs/bom/project'
+import { useProjectStore } from '@/store/useProjectStore'
+import type { UseProjectFileReturn } from '@/bom/project'
 
 /** projects.json のパスオプション（AppData に保存） */
 const FILE_OPTIONS = { baseDir: BaseDirectory.AppData } as const

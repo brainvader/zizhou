@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ProjectStore } from '../../docs/bom/project'
+import type { ProjectStore } from '@/bom/project'
 
 /**
  * useProjectStore
