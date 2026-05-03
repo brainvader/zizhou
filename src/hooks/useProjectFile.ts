@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { readTextFile, writeTextFile, exists, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { toast } from 'sonner'
 import { useProjectStore } from '@/store/useProjectStore'
@@ -24,11 +24,15 @@ const FILE_NAME = 'projects.json'
  *     saving.current が true の間は重複保存をスキップする（Race Condition 対策）。
  *     エラーは toast.error() で通知する（Store にエラー状態は持たない）。
  *
+ * isHydrated: loadProjects 完了後に true になる React state。
+ *     ProjectGrid 側でボタンの disabled 制御に使用する。
+ *
  * @see docs/bom/project.ts UseProjectFileReturn
  */
 export const useProjectFile = (): UseProjectFileReturn => {
     const hydrated = useRef(false)
     const saving = useRef(false)
+    const [isHydrated, setIsHydrated] = useState(false)
 
     const saveProjects = async (projects: ReturnType<typeof useProjectStore.getState>['projects']): Promise<void> => {
         if (saving.current) return
@@ -70,8 +74,9 @@ export const useProjectFile = (): UseProjectFileReturn => {
             toast.error('projects.json の読み込みに失敗しました')
         } finally {
             hydrated.current = true
+            setIsHydrated(true)
         }
     }
 
-    return { loadProjects, saveProjects }
+    return { isHydrated, loadProjects, saveProjects }
 }

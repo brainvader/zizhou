@@ -67,6 +67,7 @@ export type ProjectStore = {
 // ============================================================
 
 export type UseProjectFileReturn = {
+    isHydrated: boolean
     loadProjects: () => Promise<void>
     saveProjects: (projects: Project[]) => Promise<void>
 }

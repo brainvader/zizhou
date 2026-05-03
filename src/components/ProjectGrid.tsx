@@ -17,6 +17,11 @@ import { Label } from '@/components/ui/label'
 const INITIAL_FORM: NewProjectForm = { name: '', description: '' }
 const INITIAL_ERRORS = { name: null as string | null, description: null as string | null }
 
+type ProjectGridProps = {
+    /** loadProjects 完了後に true になる。false の間は「＋ new project」を disabled にする */
+    isHydrated: boolean
+}
+
 /**
  * ProjectGrid
  * global-store の projects[] をカードグリッドで表示し、新規作成のエントリーポイントを提供する。
@@ -27,7 +32,7 @@ const INITIAL_ERRORS = { name: null as string | null, description: null as strin
  * @see docs/bom/project.ts
  * @see docs/specs/project-list.spec.tsx
  */
-export const ProjectGrid = () => {
+export const ProjectGrid = ({ isHydrated }: ProjectGridProps) => {
     const { projects, addProject } = useProjectStore()
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [form, setForm] = useState<NewProjectForm>(INITIAL_FORM)
@@ -81,10 +86,11 @@ export const ProjectGrid = () => {
                     </article>
                 ))}
 
-                {/* ＋ new project 破線カード */}
+                {/* ＋ new project 破線カード — loadProjects 完了前は disabled */}
                 <button
                     onClick={handleOpenDialog}
-                    className="rounded-md border border-dashed border-border bg-transparent p-4 flex items-center justify-center hover:border-primary hover:shadow-[0_0_18px_var(--primary-glow)] transition-all cursor-pointer"
+                    disabled={!isHydrated}
+                    className="rounded-md border border-dashed border-border bg-transparent p-4 flex items-center justify-center hover:border-primary hover:shadow-[0_0_18px_var(--primary-glow)] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-border disabled:hover:shadow-none"
                 >
                     <span className="font-mono text-xs text-muted-foreground tracking-wider">＋ new project</span>
                 </button>

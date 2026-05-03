@@ -8,13 +8,13 @@ import { ProjectGrid } from '@/components/ProjectGrid'
  * @see docs/bom/project.ts useProjectFile hook の責務
  */
 function App() {
-  const { loadProjects } = useProjectFile()
+  const { loadProjects, isHydrated } = useProjectFile()
 
   useEffect(() => {
     loadProjects()
   }, [])
 
-  return <ProjectGrid />
+  return <ProjectGrid isHydrated={isHydrated} />
 }
 
 export default App
