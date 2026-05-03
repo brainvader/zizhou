@@ -49,3 +49,9 @@ export type ProjectStore = {
 // - saveProjects: projects[] 変化時に subscribe 経由で自動呼び出し
 // - エラーは toast.error() で通知する（Store にエラー状態は持たない）
 // ============================================================
+
+// 依存: @tauri-apps/plugin-fs / sonner
+export type UseProjectFileReturn = {
+    loadProjects: () => Promise<void>
+    saveProjects: (projects: Project[]) => Promise<void>
+}
