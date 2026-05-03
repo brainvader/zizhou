@@ -87,51 +87,50 @@ export const ProjectGrid = () => {
 
             {/* [B] New Project ダイアログ */}
             {isDialogOpen && (
-                <Dialog onOpenChange={(open) => !open && handleCancel()}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>New Project</DialogTitle>
-                        </DialogHeader>
+                <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleCancel()}>                    <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>New Project</DialogTitle>
+                    </DialogHeader>
 
-                        <div className="flex flex-col gap-4">
-                            {/* name フィールド */}
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="project-name" className="font-mono text-xs tracking-wide">
-                                    name *
-                                </Label>
-                                <Input
-                                    id="project-name"
-                                    placeholder="My Awesome App"
-                                    value={form.name}
-                                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                                    className={errors.name ? 'border-destructive' : ''}
-                                />
-                                {errors.name && (
-                                    <span className="font-mono text-xs text-destructive">{errors.name}</span>
-                                )}
-                            </div>
-
-                            {/* description フィールド */}
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="project-description" className="font-mono text-xs tracking-wide">
-                                    description
-                                </Label>
-                                <Input
-                                    id="project-description"
-                                    placeholder="このプロジェクトの説明（任意）"
-                                    value={form.description ?? ''}
-                                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                                />
-                            </div>
+                    <div className="flex flex-col gap-4">
+                        {/* name フィールド */}
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="project-name" className="font-mono text-xs tracking-wide">
+                                name *
+                            </Label>
+                            <Input
+                                id="project-name"
+                                placeholder="My Awesome App"
+                                value={form.name}
+                                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                                className={errors.name ? 'border-destructive' : ''}
+                            />
+                            {errors.name && (
+                                <span className="font-mono text-xs text-destructive">{errors.name}</span>
+                            )}
                         </div>
 
-                        <DialogFooter>
-                            <Button variant="outline" onClick={handleCancel}>
-                                キャンセル
-                            </Button>
-                            <Button onClick={handleSubmit}>作成</Button>
-                        </DialogFooter>
-                    </DialogContent>
+                        {/* description フィールド */}
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="project-description" className="font-mono text-xs tracking-wide">
+                                description
+                            </Label>
+                            <Input
+                                id="project-description"
+                                placeholder="このプロジェクトの説明（任意）"
+                                value={form.description ?? ''}
+                                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={handleCancel}>
+                            キャンセル
+                        </Button>
+                        <Button onClick={handleSubmit}>作成</Button>
+                    </DialogFooter>
+                </DialogContent>
                 </Dialog>
             )}
         </main>
