@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { readTextFile, writeTextFile, exists, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { toast } from 'sonner'
 import { useProjectStore } from '@/store/useProjectStore'
@@ -27,6 +27,9 @@ const FILE_NAME = 'projects.json'
  * isHydrated: loadProjects 完了後に true になる React state。
  *     ProjectGrid 側でボタンの disabled 制御に使用する。
  *
+ * loadProjects / saveProjects は useCallback でメモ化し、
+ * 関数参照を固定することで useEffect の依存配列に安全に含められる。
+ *
  * @see docs/bom/project.ts UseProjectFileReturn
  */
 export const useProjectFile = (): UseProjectFileReturn => {
@@ -34,7 +37,9 @@ export const useProjectFile = (): UseProjectFileReturn => {
     const saving = useRef(false)
     const [isHydrated, setIsHydrated] = useState(false)
 
-    const saveProjects = async (projects: ReturnType<typeof useProjectStore.getState>['projects']): Promise<void> => {
+    const saveProjects = useCallback(async (
+        projects: ReturnType<typeof useProjectStore.getState>['projects']
+    ): Promise<void> => {
         if (saving.current) return
         saving.current = true
         try {
@@ -44,7 +49,7 @@ export const useProjectFile = (): UseProjectFileReturn => {
         } finally {
             saving.current = false
         }
-    }
+    }, [])
 
     useEffect(() => {
         const unsubscribe = useProjectStore.subscribe((state) => {
@@ -52,9 +57,9 @@ export const useProjectFile = (): UseProjectFileReturn => {
             saveProjects(state.projects)
         })
         return () => unsubscribe()
-    }, [])
+    }, [saveProjects])
 
-    const loadProjects = async (): Promise<void> => {
+    const loadProjects = useCallback(async (): Promise<void> => {
         try {
             const fileExists = await exists(FILE_NAME, FILE_OPTIONS)
             if (!fileExists) {
@@ -76,7 +81,7 @@ export const useProjectFile = (): UseProjectFileReturn => {
             hydrated.current = true
             setIsHydrated(true)
         }
-    }
+    }, [])
 
     return { isHydrated, loadProjects, saveProjects }
 }
