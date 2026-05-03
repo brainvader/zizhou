@@ -75,7 +75,7 @@
                 height: 100vh;
                 display: flex;
                 flex-direction: column;
-                overflow: hidden;
+                position: relative;
             }
 
             /* ── Tauri titlebar ── */
@@ -361,6 +361,99 @@
                 letter-spacing: 0.12em;
                 font-family: var(--font-mono);
             }
+
+            /* ── CTX-3: NEW PROJECT DIALOG (shadcn Dialog) ── */
+            .dialog-overlay {
+                position: fixed;
+                inset: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0, 0, 0, 0.7);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+            }
+
+            .dialog {
+                all: unset;
+                display: flex;
+                flex-direction: column;
+                box-sizing: border-box;
+                background: var(--card);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                padding: 24px;
+                width: 400px;
+                gap: 16px;
+            }
+
+            .dialog-title {
+                font-size: 15px;
+                font-weight: 600;
+                color: var(--foreground);
+            }
+
+            .dialog-field {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .dialog-label {
+                font-size: 11px;
+                font-family: var(--font-mono);
+                color: var(--muted-foreground);
+                letter-spacing: 0.1em;
+            }
+
+            .dialog-input {
+                background: var(--background);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                padding: 8px 10px;
+                color: var(--foreground);
+                font-family: var(--font-sans);
+                font-size: 13px;
+                outline: none;
+            }
+
+            .dialog-input:focus {
+                border-color: var(--primary);
+            }
+
+            .dialog-input.error {
+                border-color: #8b3a3a;
+            }
+
+            .dialog-error {
+                font-size: 10px;
+                color: #c0392b;
+                font-family: var(--font-mono);
+            }
+
+            .dialog-footer {
+                display: flex;
+                justify-content: flex-end;
+                gap: 8px;
+                padding-top: 4px;
+            }
+
+            .btn-outline {
+                background: transparent;
+                border: 1px solid var(--border);
+                color: var(--muted-foreground);
+                padding: 6px 14px;
+                height: 32px;
+                font-size: 12px;
+                border-radius: var(--radius);
+                cursor: pointer;
+            }
+
+            .btn-outline:hover {
+                border-color: var(--border);
+                color: var(--foreground);
+            }
         </style>
     </head>
     <body>
@@ -409,7 +502,10 @@
 
             <script class="local-state" type="application/json">
       {
-        "selectedProjectId": null
+        "selectedProjectId": null,
+        "isDialogOpen": false,
+        "form": { "name": "", "description": "" },
+        "errors": { "name": null }
       }
     </script>
 
@@ -454,6 +550,44 @@
       [Logic]   Routing          — TanStack Router の useNavigate() で /projects/:id へ遷移する
     -->
         </main>
+
+        <!-- ============================================================
+       CTX-3: NEW PROJECT DIALOG
+       責務: プロジェクトの新規作成フォーム
+       トリガー: 破線カード（＋ new project）クリック
+       使用コンポーネント: shadcn Dialog / Input / Button
+  ============================================================ -->
+        <div class="dialog-overlay">
+            <dialog id="ctx-new-project-dialog" class="dialog" open>
+
+                <div class="dialog-title">New Project</div>
+
+                <div class="dialog-field">
+                    <label class="dialog-label">name *</label>
+                    <input class="dialog-input" type="text" placeholder="My Awesome App" />
+                    <!-- バリデーション: 未入力で送信した場合にエラー表示 -->
+                    <span class="dialog-error">name は必須です</span>
+                </div>
+
+                <div class="dialog-field">
+                    <label class="dialog-label">description</label>
+                    <input class="dialog-input" type="text" placeholder="このプロジェクトの説明（任意）" />
+                </div>
+
+                <div class="dialog-footer">
+                    <button class="btn-outline">キャンセル</button>
+                    <button class="btn btn-primary">作成</button>
+                </div>
+
+                <!--
+        [Feature] Create Project  — name・description を入力して「作成」で projects[] に追加する
+        [Feature] Cancel          — 「キャンセル」または overlay クリックでダイアログを閉じる
+        [Logic]   Validation      — name が空のとき「作成」ボタンを押すとエラーメッセージを表示し送信しない
+        [Logic]   Submit          — バリデーション通過後、Zustand の projects[] に新規 Project を追加し dialog を閉じる
+        [Logic]   ID生成          — 新規プロジェクトの id は nanoid() で生成する
+      -->
+            </dialog>
+        </div>
 
     </body>
 </html>
