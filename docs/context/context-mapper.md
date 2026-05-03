@@ -74,11 +74,46 @@ description:
 </script>
 ```
 
+**コンテキストタグとの対応関係:**
+
+`<head>` 内の `local-state` スクリプトと `<body>` 内のUI要素は、同じ値を持つキーで紐付けられる。
+
+```
+<head>
+  <script data-context="ctx-main" class="local-state"> ← 定義側
+<body>
+  <main id="ctx-main">                                 ← UI側
+```
+
+- 定義側: `script[data-context="ctx-main"]`
+- UI側: `#ctx-main`
+- 紐付けキー: `"ctx-main"`（両者で一致する）
+
+UI要素側（`<body>`）は `id` のみでよい。`data-context` の重複付与は不要。
+構造タグは `id` で一意に識別できるため。
+
+**パーサーによる取得方法:**
+
+```js
+// UI要素からその local-state を取得する
+const ui = document.getElementById("ctx-main");
+const state = document.querySelector(
+  `script.local-state[data-context="${ui.id}"]`,
+);
+const localState = JSON.parse(state.textContent);
+
+// 逆引き: local-state から対応するUI要素を取得する
+const scripts = document.querySelectorAll("script.local-state");
+scripts.forEach((script) => {
+  const ctxId = script.dataset.context;
+  const ui = document.getElementById(ctxId);
+  const localState = JSON.parse(script.textContent);
+});
+```
+
 **注意:**
 
-- `<script>` に `id` は付与しない。`data-context` を検索キーとして使用する
-- UI要素側（`<body>`）は `id` のみでよい。`data-context` の重複付与は不要
-  （構造タグは `id` で一意なため）
+- `<script>` に `id` は付与しない。HTMLの仕様上 `id` はページ内で一意でなければならず、UI要素の `id` と重複するため
 - `local-state` を持たないコンテキストにはスクリプトタグを作らない
 
 #### 拡張フィールド（必要な場合のみ追加する）
