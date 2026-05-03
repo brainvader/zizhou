@@ -111,6 +111,22 @@ scripts.forEach((script) => {
 });
 ```
 
+**定義のコツ:**
+
+- `form` と `errors` はセットで定義する。ZodによるバリデーションでAIがエラー表示のロジックを組み込みやすくなる
+- 未選択・未入力の初期状態は `null` で明示する。条件付きレンダリング（Empty State）の実装漏れを防げる
+
+```html
+<script data-context="ctx-[name]" class="local-state" type="application/json">
+  {
+    "selectedProjectId": null,
+    "isDialogOpen": false,
+    "form": { "name": "", "description": "" },
+    "errors": { "name": null }
+  }
+</script>
+```
+
 **注意:**
 
 - `<script>` に `id` は付与しない。HTMLの仕様上 `id` はページ内で一意でなければならず、UI要素の `id` と重複するため
@@ -174,8 +190,26 @@ AIはHTMLコメントも読める。
 
 ```html
 <!--
-  [Feature] [機能名]    — ユーザーに見える機能。具体的な操作と結果を書く
-  [Logic]   [ロジック名] — システム内部の振る舞い。使用するAPIやライブラリを明記する
+  [Feature] [機能名]    — ユーザーが観測できる振る舞い。具体的な操作と結果を書く
+  [Logic]   [ロジック名] — STACKに基づく具体的な内部処理。使用するライブラリ・APIを明記する
+-->
+```
+
+**`[Feature]` と `[Logic]` の書き分け:**
+
+- `[Feature]` はユーザー視点で観測できる振る舞いを記述する
+- `[Logic]` は STACKコメントに書いた技術を具体的に反映する。ライブラリ名・API名を明記することでAIが適切な実装を推論できる
+
+```html
+<!--
+  STACKに router: TanStack Router と書いたなら:
+  [Logic] Routing — TanStack Router の <Link> でラップする
+
+  STACKに persist: Tauri fs プラグイン と書いたなら:
+  [Logic] Persist — Tauri fs で projects.json に書き出す
+
+  STACKに state: Zustand と書いたなら:
+  [Logic] Submit  — Zustand の addProject() を呼び出す
 -->
 ```
 
