@@ -5,11 +5,14 @@ export default defineConfig({
     testMatch: '**/*.e2e.spec.ts',
     outputDir: './evidence',
     use: {
-        baseURL: 'http://localhost:5173',
+        baseURL: 'http://localhost:1420',
+        launchOptions: {
+            slowMo: 1000,
+        },
     },
     webServer: {
         command: 'pnpm dev',
-        url: 'http://localhost:5173',
+        url: 'http://localhost:1420',
         reuseExistingServer: !process.env.CI,
     },
 });
