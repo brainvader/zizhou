@@ -35,6 +35,16 @@
     }
   </script>
 
+        <!-- ctx-project-grid のローカル状態 -->
+        <script data-context="ctx-project-grid" class="local-state" type="application/json">
+    {
+      "selectedProjectId": null,
+      "isDialogOpen": false,
+      "form": { "name": "", "description": "" },
+      "errors": { "name": null }
+    }
+  </script>
+
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500&family=DM+Mono:wght@300;400&family=Outfit:wght@400;500;600;700&display=swap');
 
@@ -497,17 +507,8 @@
        責務: global-store の projects[] を一覧表示・新規作成のエントリーポイント
        注意: クリックで /projects/:id へ遷移（routing を更新）
   ============================================================ -->
-        <main id="ctx-project-grid" class="context-area">
+        <main id="ctx-project-grid" data-context="ctx-project-grid" class="context-area">
             <span class="ctx-label">ctx-project-grid</span>
-
-            <script class="local-state" type="application/json">
-      {
-        "selectedProjectId": null,
-        "isDialogOpen": false,
-        "form": { "name": "", "description": "" },
-        "errors": { "name": null }
-      }
-    </script>
 
             <div class="grid">
 
