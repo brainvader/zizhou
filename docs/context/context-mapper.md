@@ -1,16 +1,19 @@
 ---
 name: context-mapping
-description: アプリのUI構成を示すHTMLファイルを用いて、AIにアプリの概要と画面構成を説明するためのガイドライン。
-　- **目的:** 画面構成のイメージを示す「ContextMap.html」（アプリのUI構成を示すHTMLファイル）等を用いて、AIにアプリの概要と画面構成を説明する。
+description:
+  アプリのUI構成を示すHTMLファイルを用いて、AIにアプリの概要と画面構成を説明するためのガイドライン。
+  - **目的:** 画面構成のイメージを示す「ContextMap.html」を用いて、AIにアプリの概要と画面構成を説明する。
 ---
 
 # context-mapping
 
-ユーザーとのやり取りからアプリの画面構成と必要な機能を抽出しコンテクスト・マップを作成するための手順を示すガイドライン。
+ユーザーとのやり取りからアプリの画面構成と必要な機能を抽出し、ContextMap.htmlを作成するための手順を示すガイドライン。
 
 ## Prerequisites
 
 - アプリケーションの概要、または主要な機能のラフな記述。
+
+---
 
 ## Logic / Procedure
 
@@ -30,16 +33,55 @@ description: アプリのUI構成を示すHTMLファイルを用いて、AIに�
 ============================================================ -->
 ```
 
+---
+
 ### 2. State Hierarchy Planning
 
-**Global Store** (`script#global-store`):
+#### Global Store（`script#global-store`）
 
-- 複数のコンテキストをまたいで共有すべき状態のみを `<head>` 内に配置する
-- 何を共有すべきかはアプリの性質による（例: セッション、選択状態、ルーティング）
+複数のコンテキストをまたいで共有すべき状態のみを `<head>` 内に配置する。
+
+```html
+<!-- ============================================================
+     GLOBAL STORE
+     複数のコンテキストをまたいで共有すべき状態のみを定義する。
+     routing を router ライブラリに委譲する場合は持たない。
+     永続化の方針もコメントで明記する。
+============================================================ -->
+<script id="global-store" type="application/json">
+  { "activeProjectId": null }
+</script>
+```
+
+**注意:**
+
 - 完全にローカルで動作するアプリや、コンテキスト間で共有すべき状態がない場合は省略してよい
-  **Local State** (`script.local-state`):
-- 各コンテキスト内に閉じる状態を、該当エリア内の `script` タグに配置する
-  **拡張フィールド（必要な場合のみ追加する）:**
+- routing を TanStack Router 等に委譲する場合は `global-store` に持たない
+- SSOTはZustand等のstateライブラリ。`global-store` のJSONは実装時にパースしない
+
+#### Local State（`script.local-state`）
+
+各コンテキスト内に閉じる状態は `<head>` 内に定義する。`data-context` で対応するコンテキストと紐付ける。
+
+```html
+<!-- data-context に対応するコンテキストの id を指定する -->
+<script data-context="ctx-[name]" class="local-state" type="application/json">
+  {
+    "isDialogOpen": false,
+    "form": { "name": "", "description": "" },
+    "errors": { "name": null }
+  }
+</script>
+```
+
+**注意:**
+
+- `<script>` に `id` は付与しない。`data-context` を検索キーとして使用する
+- UI要素側（`<body>`）は `id` のみでよい。`data-context` の重複付与は不要
+  （構造タグは `id` で一意なため）
+- `local-state` を持たないコンテキストにはスクリプトタグを作らない
+
+#### 拡張フィールド（必要な場合のみ追加する）
 
 | フィールド        | 用途                             | 追加条件                       |
 | ----------------- | -------------------------------- | ------------------------------ |
@@ -48,9 +90,32 @@ description: アプリのUI構成を示すHTMLファイルを用いて、AIに�
 | `actionRegistry`  | LLMが呼び出せる関数の定義        | LLMにツールを使わせる場合      |
 | `operationPolicy` | 操作の危険度分類                 | 外部DBへの書き込みを伴う場合   |
 
-### 3. Data Flow の定義（必要な場合）
+---
 
-コンテキスト間にデータの流れがある場合、`uiDataFlows` として明示する。
+### 3. Stack の定義
+
+技術スタックは `<head>` 内にコメントとして記述する。実行時データではないため `<script>` タグは使わない。
+
+```html
+<!-- ============================================================
+     STACK
+     runtime:  [例: Tauri 2]
+     frontend: [例: React 18 + TypeScript]
+     bundler:  [例: Vite]
+     styling:  [例: Tailwind CSS v4 + shadcn/ui]
+     router:   [例: TanStack Router（routing の SSOT）]
+     state:    [例: Zustand]
+     persist:  [例: Tauri fs プラグイン]
+     testing:  [例: Vitest + RTL + Playwright]
+     package:  [例: pnpm]
+============================================================ -->
+```
+
+---
+
+### 4. Data Flow の定義（必要な場合）
+
+コンテキスト間にデータの流れがある場合、`uiDataFlows` として `global-store` 内に明示する。
 **UIイベント起点のフローのみ**を記述する。DBアクセスは各コンテキストの責務コメントに記述する。
 
 ```json
@@ -64,32 +129,64 @@ description: アプリのUI構成を示すHTMLファイルを用いて、AIに�
 ]
 ```
 
-### 4. Feature Extraction
+---
 
-各コンテキストの役割を以下の形式で箇条書きに変換する。
+### 5. Feature Extraction
 
-- `[Feature]` — ユーザーに見える機能
-- `[Logic]` — システム内部の振る舞い
+各コンテキストの役割を `[Feature]` / `[Logic]` の形式でHTMLコメントとして記述する。
+UIに書き込まない（表示が崩れ、ContextMapとしての視認性が損なわれるため）。
+AIはHTMLコメントも読める。
 
 ```html
-<ul class="features">
-  <li>
-    <b>[Feature] [機能名]</b>
-    <p>具体的な説明。</p>
-  </li>
-  <li>
-    <b>[Logic] [ロジック名]</b>
-    <p>具体的な説明。</p>
-  </li>
-</ul>
+<!--
+  [Feature] [機能名]    — ユーザーに見える機能。具体的な操作と結果を書く
+  [Logic]   [ロジック名] — システム内部の振る舞い。使用するAPIやライブラリを明記する
+-->
 ```
 
-### 5. HTML Construction
+**Spec との関係:**
+
+- `[Feature]` / `[Logic]` は BOM・Spec の `@story` の種になる
+- 未承認のContextMapに依存するFeatureは、そのSpecが存在しないため自動的に実装されない
+- 将来追加される機能はContextMapが承認されてから追記する
+
+---
+
+### 6. HTML Construction
 
 - セマンティックなHTMLタグ（`nav`, `main`, `aside`等）で構造化する
 - 主要なUIのモックアップ（ダミーデータ・ボタン等）を埋め込み、実装イメージを伝える
-- デザイン上のこだわりはHTMLコメントとして記述する
 - CSSはContextMapの視認性のために最低限定義する（実装への制約ではない）
+
+#### Overlay（Dialog / Modal）の配置
+
+`position: fixed` が親要素の `overflow` に封じられないよう、**必ず `</body>` 直前**（構造タグの外）に配置する。
+
+```html
+  <!-- ============================================================
+       CTX-N: [DIALOG NAME]
+       責務: [トリガーとなる操作・表示条件]
+  ============================================================ -->
+  <div class="overlay">
+    <!-- <dialog> 要素はブラウザデフォルトスタイルを all:unset でリセットする -->
+    <dialog style="all:unset; display:flex; flex-direction:column; box-sizing:border-box;">
+
+      <!-- モックアップ -->
+
+      <!--
+        [Feature] [機能名]    — 説明
+        [Logic]   [ロジック名] — 説明
+      -->
+    </dialog>
+  </div>
+
+</body>
+```
+
+**`<dialog>` 要素の注意点:**
+
+- ブラウザ標準の `<dialog>` は `margin: auto` 等のデフォルトスタイルを持つため `all: unset` でリセットする
+- React実装時は `isDialogOpen && <Dialog/>` の条件付きレンダリングで制御する
 
 ---
 
@@ -99,9 +196,9 @@ description: アプリのUI構成を示すHTMLファイルを用いて、AIに�
 
 - ブラウザで表示可能なプロトタイプ
 - 各コンテキストの責務コメント
-- `[Feature]` / `[Logic]` による機能リスト（BOM・Specの種）
-- 必要に応じた `script#global-store` による状態定義
-- AIエージェントがパース可能な `script` タグによる状態定義を内包
+- `[Feature]` / `[Logic]` による機能リスト（HTMLコメント形式）
+- `<head>` 内の `script#global-store` および `script.local-state` による状態定義
+- STACKコメントによる技術スタック定義
 
 ---
 
@@ -112,38 +209,40 @@ description: アプリのUI構成を示すHTMLファイルを用いて、AIに�
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <title>Mockup: [Context Name]</title>
-    <!-- アプリ全体で共有すべき状態はここに定義する。AIはこれをもとにGlobal
-    Storeの構造を提案する。 -->
+    <title>ContextMap: [アプリ名]</title>
+
+    <!-- ============================================================
+         STACK
+         runtime:  Tauri 2
+         frontend: React 18 + TypeScript
+         router:   TanStack Router（routing の SSOT）
+         state:    Zustand
+         testing:  Vitest + RTL + Playwright
+         package:  pnpm
+    ============================================================ -->
+
+    <!-- ============================================================
+         GLOBAL STORE
+         複数のコンテキストをまたいで共有すべき状態のみを定義する。
+         routing は TanStack Router に委譲するため持たない。
+    ============================================================ -->
     <script id="global-store" type="application/json">
-      {
-        "session": { "user": "Guest", "isLoggedIn": false },
-        "theme": "light",
-        "routing": { "currentPath": "/dashboard" }
-      }
+      { "activeProjectId": null }
+    </script>
+
+    <!-- ctx-main の local-state（local-stateを持つコンテキストのみ定義する） -->
+    <script data-context="ctx-main" class="local-state" type="application/json">
+      { "isDialogOpen": false }
     </script>
 
     <style>
-      :root {
-        --primary: #2563eb;
-        --gap: 1rem;
-      }
       .context-area {
-        border: 2px solid #eee;
-        padding: var(--gap);
-        margin: var(--gap);
-        border-radius: 8px;
-      }
-      .features {
-        color: var(--primary);
-        font-family: monospace;
-        background: #f8fafc;
-        padding: 1rem;
-        list-style: none;
+        border: 1px dashed #ccc;
+        padding: 20px;
+        margin: 10px;
       }
     </style>
   </head>
-
   <body>
     <!-- ============================================================
          CTX-1: SIDEBAR
@@ -151,45 +250,48 @@ description: アプリのUI構成を示すHTMLファイルを用いて、AIに�
     ============================================================ -->
     <nav id="ctx-sidebar" class="context-area">
       <h2>Navigation</h2>
-      <!-- コンテクスト内で閉じる状態はここに定義する。AIはこれをもとにLocal
-      Stateの構造を提案する。 -->
-      <script class="local-state" type="application/json">
-        { "items": ["Home", "Settings"], "activeIdx": 0 }
-      </script>
+      <!-- モックアップ -->
 
-      <ul class="features">
-        <li>[Feature] itemsをループで描画し、activeIdxを強調表示する</li>
-        <li>[Logic] クリック時に global-store の routing を更新する</li>
-      </ul>
+      <!--
+        [Feature] Project List     — プロジェクト一覧を表示し、選択可能にする
+        [Logic]   Selection Update — クリック時に global-store の activeProjectId を更新する
+      -->
     </nav>
 
     <!-- ============================================================
          CTX-2: MAIN
-         責務: 選択中のルートに応じたコンテンツ表示
+         責務: 選択中のプロジェクトの詳細を表示する
     ============================================================ -->
     <main id="ctx-main" class="context-area">
-      <h2>Main Display</h2>
-      <ul class="features">
-        <li>[Feature] 選択されたPathに応じたコンテンツを動的に表示する</li>
-        <li>
-          [Logic] ログイン状態(global-store)に応じて表示内容を認可制御する
-        </li>
-      </ul>
+      <h2>Main Content</h2>
+      <!-- モックアップ -->
+
+      <!--
+        [Feature] Project Detail — 選択中のプロジェクトの詳細をカード形式で表示する
+        [Feature] Data Form      — データの追加・削除ができるフォームを置く
+      -->
     </main>
 
-    <!--
-    追加のコンテクストがあれば同様に定義する。必要に応じて、コンテクスト間のデータフローを
-    script#global-store 内の uiDataFlows で定義する。
-    例:
-    "uiDataFlows": [
-        {
-            "from": "ctx-sidebar",
-            "to": "ctx-main",
-            "data": "activeIdx",
-            "trigger": "クリックイベント"
-        }
-    ]
-    -->
+    <!-- ============================================================
+         CTX-3: NEW ITEM DIALOG
+         責務: 新規アイテム作成フォーム
+         トリガー: 「＋ 追加」ボタンクリック
+         注意: </body> 直前に配置（position:fixed のため）
+    ============================================================ -->
+    <div class="overlay">
+      <dialog
+        style="all:unset; display:flex; flex-direction:column; box-sizing:border-box;"
+      >
+        <!-- モックアップ -->
+
+        <!--
+          [Feature] Create Item — name を入力して「作成」でリストに追加する
+          [Feature] Cancel      — 「キャンセル」でダイアログを閉じる
+          [Logic]   Validation  — name が空のとき送信しない（Zod）
+          [Logic]   ID生成      — id は nanoid() で生成する
+        -->
+      </dialog>
+    </div>
   </body>
 </html>
 ```
@@ -200,11 +302,23 @@ description: アプリのUI構成を示すHTMLファイルを用いて、AIに�
 
 **アプリの性質に応じて取捨選択する:**
 
-- シンプルなローカルアプリ → global-storeは最小限またはなし
-- LLMを使うアプリ → `agent`・`actionRegistry`等をglobal-storeに追加
-- 外部DBへの書き込みを伴うアプリ → `operationPolicy`をglobal-storeに追加
-- コンテキスト間の連動が多いアプリ → `uiDataFlows`を追加
-  **曖昧でよいもの:**
+- シンプルなローカルアプリ → `global-store` は最小限またはなし
+- LLMを使うアプリ → `agent`・`actionRegistry` 等を `global-store` に追加
+- 外部DBへの書き込みを伴うアプリ → `operationPolicy` を `global-store` に追加
+- コンテキスト間の連動が多いアプリ → `uiDataFlows` を追加
+
+**曖昧でよいもの:**
+
 - 型定義の詳細（LLMが推論する）
 - バックエンドの実装詳細（Specで定義する）
 - 将来追加される機能（育ってから追加する）
+
+**チェックリスト:**
+
+- [ ] STACKコメントに技術スタックが網羅されている
+- [ ] `global-store` に routing が混入していない
+- [ ] `local-state` は `<head>` 内に `data-context` で定義されている
+- [ ] UI要素側（`<body>`）に `data-context` が付与されていない
+- [ ] `[Feature]` / `[Logic]` はHTMLコメントで記述されている
+- [ ] Overlay は `</body>` 直前に配置されている
+- [ ] ダミーデータが実際の使用に近い内容になっている

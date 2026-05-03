@@ -70,8 +70,8 @@
     <!-- ============================================================
          LOCAL STATE
          各コンテキスト内に閉じる状態を定義する。
-         id は持たず data-context でコンテキストと紐付ける。
-         （<body> 内の id と重複しないよう data-context を共通キーとする）
+         data-context に対応するコンテキストの id を指定する。
+         UI要素側（<body>）は id のみでよい。data-context は不要。
     ============================================================ -->
     <script
       data-context="ctx-[name]"
@@ -96,9 +96,8 @@
          CTX-1: [NAME]
          責務: [このエリアが担う役割]
     ============================================================ -->
-    <nav id="ctx-sidebar" data-context="ctx-sidebar" class="context-area">
+    <nav id="ctx-sidebar" class="context-area">
       <h2>Side Navigation</h2>
-      <!-- モックアップ: ダミーデータ・ボタン等で実装イメージを伝える -->
 
       <!--
         [Feature] Project List     — プロジェクト一覧を表示し、選択可能にする
@@ -110,7 +109,7 @@
          CTX-2: [NAME]
          責務: [このエリアが担う役割]
     ============================================================ -->
-    <main id="ctx-main" data-context="ctx-main" class="context-area">
+    <main id="ctx-main" class="context-area">
       <h2>Main Content</h2>
 
       <!--

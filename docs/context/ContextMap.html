@@ -124,24 +124,6 @@
                 background: #2a4a35;
             }
 
-            /* ── context-area: 構造を可視化するための枠（ContextMapのみ） ── */
-            .context-area {
-                outline: 1px dashed #30343a60;
-                position: relative;
-            }
-
-            .ctx-label {
-                position: absolute;
-                top: 4px;
-                left: 8px;
-                font-family: var(--font-mono);
-                font-size: 8px;
-                color: #454a52;
-                letter-spacing: 0.2em;
-                text-transform: uppercase;
-                pointer-events: none;
-            }
-
             /* ── TOPBAR ── */
             #ctx-topbar {
                 height: 52px;
@@ -484,7 +466,6 @@
        注意: サイドバーなし。Settings はアイコンボタン一つ。
   ============================================================ -->
         <header id="ctx-topbar" class="context-area">
-            <span class="ctx-label">ctx-topbar</span>
             <div class="logo">
                 <div class="logo-kanji-wrap">
                     <span class="logo-kanji">地蔵</span>
@@ -497,7 +478,6 @@
             </div>
             <div class="topbar-spacer"></div>
             <button class="btn btn-ghost" title="Settings">⚙</button>
-
             <!--
       [Feature] Settings — アイコンボタンで設定画面を開く
     -->
@@ -508,8 +488,7 @@
        責務: global-store の projects[] を一覧表示・新規作成のエントリーポイント
        注意: クリックで /projects/:id へ遷移（routing を更新）
   ============================================================ -->
-        <main id="ctx-project-grid" data-context="ctx-project-grid" class="context-area">
-            <span class="ctx-label">ctx-project-grid</span>
+        <main id="ctx-project-grid" class="context-area">
 
             <div class="grid">
 
