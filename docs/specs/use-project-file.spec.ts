@@ -163,8 +163,11 @@ describe('useProjectFile: logic', () => {
             }
         );
         mockWriteTextFile.mockResolvedValue(undefined);
+        // hydrated.current を true にするため loadProjects を先に実行する
+        mockExists.mockResolvedValue(false);
 
-        renderHook(() => useProjectFile());
+        const { result } = renderHook(() => useProjectFile());
+        await act(() => result.current.loadProjects());
 
         await act(async () => {
             subscribedCallback?.({ projects: fixtureProjects });
