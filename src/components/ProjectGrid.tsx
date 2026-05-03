@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 
 /** フォームの初期状態 */
 const INITIAL_FORM: NewProjectForm = { name: '', description: '' }
+const INITIAL_ERRORS = { name: null as string | null, description: null as string | null }
 
 /**
  * ProjectGrid
@@ -30,19 +31,19 @@ export const ProjectGrid = () => {
     const { projects, addProject } = useProjectStore()
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [form, setForm] = useState<NewProjectForm>(INITIAL_FORM)
-    const [errors, setErrors] = useState<{ name: string | null }>({ name: null })
+    const [errors, setErrors] = useState(INITIAL_ERRORS)
 
     /** ダイアログを開く */
     const handleOpenDialog = () => {
         setForm(INITIAL_FORM)
-        setErrors({ name: null })
+        setErrors(INITIAL_ERRORS)
         setIsDialogOpen(true)
     }
 
     /** ダイアログを閉じる（キャンセル） */
     const handleCancel = () => {
         setForm(INITIAL_FORM)
-        setErrors({ name: null })
+        setErrors(INITIAL_ERRORS)
         setIsDialogOpen(false)
     }
 
@@ -50,14 +51,18 @@ export const ProjectGrid = () => {
     const handleSubmit = () => {
         const result = NewProjectFormSchema.safeParse(form)
         if (!result.success) {
-            setErrors({ name: result.error.issues[0]?.message ?? null })
+            const fieldErrors = result.error.flatten().fieldErrors
+            setErrors({
+                name: fieldErrors.name?.[0] ?? null,
+                description: fieldErrors.description?.[0] ?? null,
+            })
             return
         }
         // [C] ID生成: nanoid() で id を生成して Project に合成
         addProject({ id: nanoid(), ...result.data })
         setIsDialogOpen(false)
         setForm(INITIAL_FORM)
-        setErrors({ name: null })
+        setErrors(INITIAL_ERRORS)
     }
 
     return (
@@ -87,50 +92,55 @@ export const ProjectGrid = () => {
 
             {/* [B] New Project ダイアログ */}
             {isDialogOpen && (
-                <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleCancel()}>                    <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>New Project</DialogTitle>
-                    </DialogHeader>
+                <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleCancel()}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>New Project</DialogTitle>
+                        </DialogHeader>
 
-                    <div className="flex flex-col gap-4">
-                        {/* name フィールド */}
-                        <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="project-name" className="font-mono text-xs tracking-wide">
-                                name *
-                            </Label>
-                            <Input
-                                id="project-name"
-                                placeholder="My Awesome App"
-                                value={form.name}
-                                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                                className={errors.name ? 'border-destructive' : ''}
-                            />
-                            {errors.name && (
-                                <span className="font-mono text-xs text-destructive">{errors.name}</span>
-                            )}
+                        <div className="flex flex-col gap-4">
+                            {/* name フィールド */}
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="project-name" className="font-mono text-xs tracking-wide">
+                                    name *
+                                </Label>
+                                <Input
+                                    id="project-name"
+                                    placeholder="My Awesome App"
+                                    value={form.name}
+                                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                                    className={errors.name ? 'border-destructive' : ''}
+                                />
+                                {errors.name && (
+                                    <span className="font-mono text-xs text-destructive">{errors.name}</span>
+                                )}
+                            </div>
+
+                            {/* description フィールド */}
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="project-description" className="font-mono text-xs tracking-wide">
+                                    description
+                                </Label>
+                                <Input
+                                    id="project-description"
+                                    placeholder="このプロジェクトの説明（任意）"
+                                    value={form.description ?? ''}
+                                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                                    className={errors.description ? 'border-destructive' : ''}
+                                />
+                                {errors.description && (
+                                    <span className="font-mono text-xs text-destructive">{errors.description}</span>
+                                )}
+                            </div>
                         </div>
 
-                        {/* description フィールド */}
-                        <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="project-description" className="font-mono text-xs tracking-wide">
-                                description
-                            </Label>
-                            <Input
-                                id="project-description"
-                                placeholder="このプロジェクトの説明（任意）"
-                                value={form.description ?? ''}
-                                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                            />
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button variant="outline" onClick={handleCancel}>
-                            キャンセル
-                        </Button>
-                        <Button onClick={handleSubmit}>作成</Button>
-                    </DialogFooter>
-                </DialogContent>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={handleCancel}>
+                                キャンセル
+                            </Button>
+                            <Button onClick={handleSubmit}>作成</Button>
+                        </DialogFooter>
+                    </DialogContent>
                 </Dialog>
             )}
         </main>
