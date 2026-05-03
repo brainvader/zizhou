@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useProjectFile } from '@/hooks/useProjectFile'
 import { ProjectGrid } from '@/components/ProjectGrid'
+import "./App.css";
 
 /**
  * App
