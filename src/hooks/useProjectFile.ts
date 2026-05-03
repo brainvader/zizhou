@@ -19,12 +19,28 @@ const FILE_NAME = 'projects.json'
  * [永続化] useEffect 内の subscribe で projects[] の変化を監視し、
  *     saveProjects を自動呼び出しする。
  *     hydrated.current が true になるまで（loadProjects 完了前）は保存しない。
+ *     saving.current が true の間は重複保存をスキップする（Race Condition 対策）。
+ *     ローカルファイルへの書き込みは数ミリ秒で完了するため、
+ *     このアプリの操作頻度では変更が捨てられるリスクは現実的でない。
  *     エラーは toast.error() で通知する（Store にエラー状態は持たない）。
  *
  * @see docs/bom/project.ts UseProjectFileReturn
  */
 export const useProjectFile = (): UseProjectFileReturn => {
     const hydrated = useRef(false)
+    const saving = useRef(false)
+
+    const saveProjects = async (projects: ReturnType<typeof useProjectStore.getState>['projects']): Promise<void> => {
+        if (saving.current) return
+        saving.current = true
+        try {
+            await writeTextFile(FILE_NAME, JSON.stringify(projects, null, 2), FILE_OPTIONS)
+        } catch {
+            toast.error('projects.json の保存に失敗しました')
+        } finally {
+            saving.current = false
+        }
+    }
 
     useEffect(() => {
         const unsubscribe = useProjectStore.subscribe((state) => {
@@ -49,14 +65,6 @@ export const useProjectFile = (): UseProjectFileReturn => {
             toast.error('projects.json の読み込みに失敗しました')
         } finally {
             hydrated.current = true
-        }
-    }
-
-    const saveProjects = async (projects: ReturnType<typeof useProjectStore.getState>['projects']): Promise<void> => {
-        try {
-            await writeTextFile(FILE_NAME, JSON.stringify(projects, null, 2), FILE_OPTIONS)
-        } catch {
-            toast.error('projects.json の保存に失敗しました')
         }
     }
 
