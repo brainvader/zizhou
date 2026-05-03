@@ -34,5 +34,9 @@ export default defineConfig(async () => ({
     alias: {
       "@": "./src",
     },
-  }
+  },
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./tests/setup.ts"],
+  },
 }));
