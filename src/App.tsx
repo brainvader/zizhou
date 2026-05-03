@@ -12,7 +12,7 @@ function App() {
 
   useEffect(() => {
     loadProjects()
-  }, [])
+  }, [loadProjects])
 
   return <ProjectGrid isHydrated={isHydrated} />
 }
