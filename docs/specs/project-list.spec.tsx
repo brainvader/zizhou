@@ -87,14 +87,14 @@ describe('ProjectGrid: logic', () => {
     });
 
     test('logic: Empty State — projects[] が空のとき破線カードのみを表示する', () => {
-        render(<ProjectGrid />);
+        render(<ProjectGrid isHydrated={true} />)
         expect(screen.getByText('＋ new project')).toBeInTheDocument();
         expect(screen.queryByRole('article')).toBeNull();
     });
 
     test('logic: projects[] を受け取りカードを描画する', () => {
         setupStore(mockProjects);
-        render(<ProjectGrid />);
+        render(<ProjectGrid isHydrated={true} />)
         expect(screen.getByText('地蔵 Core')).toBeInTheDocument();
         expect(screen.getByText('Graph Renderer')).toBeInTheDocument();
         expect(screen.getByText('HITL Gate')).toBeInTheDocument();
@@ -102,14 +102,14 @@ describe('ProjectGrid: logic', () => {
     });
 
     test('logic: 破線カードクリックでダイアログが開く（isDialogOpen: true）', async () => {
-        render(<ProjectGrid />);
+        render(<ProjectGrid isHydrated={true} />)
         await userEvent.click(screen.getByText('＋ new project'));
         expect(screen.getByRole('dialog')).toBeVisible();
         expect(screen.getByText('New Project')).toBeInTheDocument();
     });
 
     test('logic: name 空で「作成」を押すとエラーが表示されダイアログは閉じない', async () => {
-        render(<ProjectGrid />);
+        render(<ProjectGrid isHydrated={true} />)
         await userEvent.click(screen.getByText('＋ new project'));
         await userEvent.click(screen.getByText('作成'));
         expect(await screen.findByText('name は必須です')).toBeInTheDocument();
@@ -117,7 +117,7 @@ describe('ProjectGrid: logic', () => {
     });
 
     test('logic: バリデーション通過後に addProject が呼ばれ、ダイアログが閉じる', async () => {
-        render(<ProjectGrid />);
+        render(<ProjectGrid isHydrated={true} />)
         await userEvent.click(screen.getByText('＋ new project'));
         await userEvent.type(screen.getByPlaceholderText('My Awesome App'), '地蔵 Core');
         await userEvent.type(
@@ -136,7 +136,7 @@ describe('ProjectGrid: logic', () => {
     });
 
     test('logic: 「キャンセル」でダイアログが閉じ form がリセットされる', async () => {
-        render(<ProjectGrid />);
+        render(<ProjectGrid isHydrated={true} />)
         await userEvent.click(screen.getByText('＋ new project'));
         await userEvent.type(screen.getByPlaceholderText('My Awesome App'), 'Draft Name');
         await userEvent.click(screen.getByText('キャンセル'));
