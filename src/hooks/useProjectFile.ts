@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { readTextFile, writeTextFile, exists, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { toast } from 'sonner'
 import { useProjectStore } from '@/store/useProjectStore'
+import { ProjectSchema } from '@/bom/project'
 import type { UseProjectFileReturn } from '@/bom/project'
 
 /** projects.json のパスオプション（AppData に保存） */
@@ -14,14 +15,13 @@ const FILE_NAME = 'projects.json'
  *
  * [A] loadProjects: 起動時に一度だけ呼ぶ。
  *     projects.json が存在しない場合は [] で初期化する。
- *     不正 JSON の場合は [] にフォールバックし toast.error() で通知する。
+ *     JSON パース失敗・Zod バリデーション失敗・fs エラーはすべて catch で
+ *     [] にフォールバックし toast.error() で通知する。
  *
  * [永続化] useEffect 内の subscribe で projects[] の変化を監視し、
  *     saveProjects を自動呼び出しする。
  *     hydrated.current が true になるまで（loadProjects 完了前）は保存しない。
  *     saving.current が true の間は重複保存をスキップする（Race Condition 対策）。
- *     ローカルファイルへの書き込みは数ミリ秒で完了するため、
- *     このアプリの操作頻度では変更が捨てられるリスクは現実的でない。
  *     エラーは toast.error() で通知する（Store にエラー状態は持たない）。
  *
  * @see docs/bom/project.ts UseProjectFileReturn
@@ -58,7 +58,8 @@ export const useProjectFile = (): UseProjectFileReturn => {
                 return
             }
             const text = await readTextFile(FILE_NAME, FILE_OPTIONS)
-            const projects = JSON.parse(text)
+            const raw = JSON.parse(text)
+            const projects = ProjectSchema.array().parse(raw)
             useProjectStore.getState().setProjects(projects)
         } catch {
             useProjectStore.getState().setProjects([])
