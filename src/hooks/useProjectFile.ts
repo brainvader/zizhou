@@ -15,7 +15,7 @@ const FILE_NAME = 'projects.json'
  *
  * [A] loadProjects: 起動時に一度だけ呼ぶ。
  *     projects.json が存在しない場合は [] で初期化する。
- *     JSON パース失敗・Zod バリデーション失敗・fs エラーはすべて catch で
+ *     JSON パース失敗・Zod バリデーション失敗・fs エラーはすべて
  *     [] にフォールバックし toast.error() で通知する。
  *
  * [永続化] useEffect 内の subscribe で projects[] の変化を監視し、
@@ -58,9 +58,13 @@ export const useProjectFile = (): UseProjectFileReturn => {
                 return
             }
             const text = await readTextFile(FILE_NAME, FILE_OPTIONS)
-            const raw = JSON.parse(text)
-            const projects = ProjectSchema.array().parse(raw)
-            useProjectStore.getState().setProjects(projects)
+            const result = ProjectSchema.array().safeParse(JSON.parse(text))
+            if (!result.success) {
+                useProjectStore.getState().setProjects([])
+                toast.error('projects.json の読み込みに失敗しました')
+                return
+            }
+            useProjectStore.getState().setProjects(result.data)
         } catch {
             useProjectStore.getState().setProjects([])
             toast.error('projects.json の読み込みに失敗しました')
