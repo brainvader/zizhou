@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { readTextFile, writeTextFile, exists, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { toast } from 'sonner'
 import { useProjectStore } from '@/store/useProjectStore'
@@ -18,13 +18,17 @@ const FILE_NAME = 'projects.json'
  *
  * [永続化] useEffect 内の subscribe で projects[] の変化を監視し、
  *     saveProjects を自動呼び出しする。
+ *     hydrated.current が true になるまで（loadProjects 完了前）は保存しない。
  *     エラーは toast.error() で通知する（Store にエラー状態は持たない）。
  *
  * @see docs/bom/project.ts UseProjectFileReturn
  */
 export const useProjectFile = (): UseProjectFileReturn => {
+    const hydrated = useRef(false)
+
     useEffect(() => {
         const unsubscribe = useProjectStore.subscribe((state) => {
+            if (!hydrated.current) return
             saveProjects(state.projects)
         })
         return () => unsubscribe()
@@ -43,6 +47,8 @@ export const useProjectFile = (): UseProjectFileReturn => {
         } catch {
             useProjectStore.getState().setProjects([])
             toast.error('projects.json の読み込みに失敗しました')
+        } finally {
+            hydrated.current = true
         }
     }
 
