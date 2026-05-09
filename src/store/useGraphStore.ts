@@ -1,0 +1,24 @@
+import { create } from 'zustand'
+import type { Node, Edge } from '@xyflow/react'
+import type { GraphNodeData, GraphStore } from '@/bom/graph'
+
+export const useGraphStore = create<GraphStore>((set) => ({
+    // State
+    nodes: [],
+    edges: [],
+    selectedNodeId: null,
+
+    // Actions
+    setNodes: (nodes: Node<GraphNodeData>[]) => set({ nodes }),
+    setEdges: (edges: Edge[]) => set({ edges }),
+    setSelectedNodeId: (id: string | null) => set({ selectedNodeId: id }),
+    addNode: (node: Node<GraphNodeData>) =>
+        set((state) => ({ nodes: [...state.nodes, node] })),
+    loadGraph: (graph) =>
+        set({
+            nodes: graph.nodes as Node<GraphNodeData>[],
+            edges: graph.edges as Edge[],
+            selectedNodeId: null,
+        }),
+    resetGraph: () => set({ nodes: [], edges: [], selectedNodeId: null }),
+}))
