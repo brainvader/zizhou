@@ -44,8 +44,8 @@ import type { Project } from '../../docs/bom/project';
  */
 const { mockProjects, mockUseProjectStore, mockUseProjectFile } = vi.hoisted(() => {
     const mockProjects: Project[] = [
-        { id: 'proj-001', name: '地蔵 Core', description: 'グラフベースのプロジェクト管理OS。' },
-        { id: 'proj-002', name: 'Graph Renderer', description: 'ノード・エッジの依存関係を可視化するビューエンジン。' },
+        { id: 'proj-001', name: '地蔵 Core', description: 'グラフベースのプロジェクト管理OS。', rootPath: '/projects/zizou-core' },
+        { id: 'proj-002', name: 'Graph Renderer', description: 'ノード・エッジの依存関係を可視化するビューエンジン。', rootPath: '/projects/graph-renderer' },
     ];
 
     const mockUseProjectStore = vi.fn(() => ({
