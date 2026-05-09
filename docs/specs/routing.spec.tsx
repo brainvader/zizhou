@@ -20,7 +20,7 @@
 // Slot 2: 外部依存のインポート (Imports)
 // =============================================================================
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
     createMemoryHistory,
@@ -28,6 +28,7 @@ import {
     createRootRoute,
     createRoute,
     RouterProvider,
+    Link,
 } from '@tanstack/react-router';
 import type { Project } from '../../docs/bom/project';
 
@@ -84,9 +85,13 @@ const ProjectGridStub = () => (
     <ul data-testid="project-grid">
         {mockProjects.map((p) => (
             <li key={p.id}>
-                <a href={`/projects/${p.id}`} data-testid={`card-${p.id}`}>
+                <Link
+                    to="/projects/$id"
+                    params={{ id: p.id }}
+                    data-testid={`card-${p.id}`}
+                >
                     {p.name}
-                </a>
+                </Link>
             </li>
         ))}
     </ul>
@@ -164,8 +169,10 @@ describe('logic: card link href', () => {
 
         await waitFor(() => screen.getByTestId('card-proj-001'));
 
+        // <Link> は最終的に <a> としてレンダリングされる
         for (const p of mockProjects) {
             const anchor = screen.getByTestId(`card-${p.id}`) as HTMLAnchorElement;
+            expect(anchor.tagName).toBe('A');
             expect(anchor.href).toContain(`/projects/${p.id}`);
         }
     });
@@ -225,13 +232,18 @@ describe('CTX-5 ROUTING — Visual Story (RTL)', () => {
         );
     });
 
-    it('step 4: router.history.back() returns to ProjectGrid', async () => {
+    it('step 4: router.navigate("/") returns to ProjectGrid', async () => {
+        // jsdom は history.back() をルーターに伝播しないため
+        // router.navigate() で同等の「戻る」操作を代替する。
+        // 実ブラウザでの history.back() 動作は E2E（Playwright）で保証する。
         const router = buildTestRouter('/projects/proj-001');
         render(<RouterProvider router={router} />);
 
         await waitFor(() => screen.getByTestId('project-detail-id'));
 
-        router.history.back();
+        await act(async () => {
+            await router.navigate({ to: '/' });
+        });
 
         await waitFor(() =>
             expect(screen.getByTestId('project-grid')).toBeInTheDocument(),
