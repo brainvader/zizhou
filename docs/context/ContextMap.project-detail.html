@@ -12,7 +12,7 @@
              styling:  Tailwind CSS v4 + shadcn/ui
              router:   TanStack Router（routing の SSOT）
              state:    Zustand（nodes[], edges[] の SSOT）
-             persist:  Tauri fs プラグイン（AppData に JSON 保存）
+             persist:  Tauri fs プラグイン（グラフは {projectRootPath}/graphs/{graphId}.json に保存）
              graph:    React Flow
              toast:    sonner
              icons:    lucide-react
@@ -23,17 +23,22 @@
         <!-- ============================================================
              GLOBAL STORE
              routing は TanStack Router に委譲するため持たない。
-             永続化は Tauri fs プラグインで AppData に JSON として保存する。
+             グラフデータは Tauri fs プラグインで {projectRootPath}/graphs/{graphId}.json に保存する。
+             activeGraphId: 現在表示中のグラフID（ファイルツリーで graphs/ 配下の .json を選択して切り替える）
+             activeProjectId: 現在表示中のプロジェクトID（TanStack Router の useParams から取得）
+             projectRootPath: 現在プロジェクトのルートパス（BOM で型定義する: string）
+             注意: projects[] はここでは持たない。SSOTはZustandのuseProjectStore。
         ============================================================ -->
         <script id="global-store" type="application/json">
             {
-                "projects": [
-                    { "id": "1", "name": "地蔵 Core", "description": "グラフベースのプロジェクト管理OS。" }
-                ]
+                "activeProjectId": "1",
+                "activeGraphId": "graph-01",
+                "projectRootPath": "/Users/user/projects/zizou-core"
             }
         </script>
 
         <!-- ctx-file-tree のローカル状態 -->
+        <!-- 注意: projectRootPath は global-store から参照する。BOM で string 型として定義する。 -->
         <script data-context="ctx-file-tree" class="local-state" type="application/json">
             {
                 "selectedPath": null,
@@ -56,6 +61,10 @@
                 "selectedNode": null
             }
         </script>
+
+        <!-- ctx-topbar: local-state なし（ステートレス）
+             breadcrumb のプロジェクト名は useProjectStore から引く。
+             Settings ボタンのコールバックは onSettingsClick prop として受け取る。 -->
 
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500&family=DM+Mono:wght@300;400&family=Outfit:wght@400;500;600;700&display=swap');
@@ -556,6 +565,9 @@
              責務: アプリ識別 + プロジェクト名 breadcrumb + Settings
              注意: ContextMap.projects.html の Topbar をそのまま流用する。
                    breadcrumb にプロジェクト名を追加する。
+                   local-state なし（ステートレス）。
+                   breadcrumb のプロジェクト名は useProjectStore から引く。
+                   Settings ボタンのコールバックは onSettingsClick prop として受け取る。
         ============================================================ -->
         <header id="ctx-topbar">
             <div class="logo">
@@ -571,6 +583,7 @@
             <span class="breadcrumb-sep">/</span>
             <span class="breadcrumb-project">地蔵 Core</span>
             <div class="topbar-spacer"></div>
+            <button class="btn-ghost" title="New Graph">＋</button>
             <button class="btn-ghost" title="Settings">⚙</button>
 
             <!--
@@ -578,6 +591,9 @@
                 [ ][Feature]   Breadcrumb  — Topbar にプロジェクト名を breadcrumb として表示する
                 [ ][Logic]     Breadcrumb  — useParams で取得した id に対応するプロジェクト名を
                                              useProjectStore から引いて表示する
+                [ ][Feature]   New Graph   — 「＋」ボタンクリックで新しいグラフを作成し、エディタに切り替える
+                [ ][Logic]     New Graph   — nanoid() で graphId を生成し {projectRootPath}/graphs/{graphId}.json を
+                                             空の nodes[], edges[] で作成後、activeGraphId を更新する
             -->
         </header>
 
@@ -587,6 +603,7 @@
                  CTX-1: FILE TREE
                  責務: プロジェクト配下の実ファイルシステムをツリー表示する
                  注意: Tauri fs でディレクトリを再帰的に読み込む
+                       projectRootPath は global-store から参照する（BOM で string 型として定義する）
             ============================================================ -->
             <nav id="ctx-file-tree">
                 <div class="pane-header">
@@ -628,8 +645,11 @@
                                                      再帰的に読み込みツリー表示する
                     [ ][Feature] Expand/Collapse   — ディレクトリをクリックで展開・折りたたむ
                     [ ][Feature] File Select       — ファイルをクリックで selectedPath を更新する
+                                                     （graphs/ 配下の .json を選択した場合は activeGraphId を更新し
+                                                     グラフエディタにロードする）
                     [ ][Logic]   fs Read           — Tauri fs の readDir で再帰読み込み
-                    [ ][Logic]   Root Path         — プロジェクトのルートパスは今後 BOM で定義する
+                    [ ][Logic]   Root Path         — projectRootPath を global-store（Zustand経由）から取得する。
+                                                     型は BOM（docs/bom/project.ts）で string として定義する
                 -->
             </nav>
 
@@ -638,6 +658,8 @@
                  責務: ノードの手動配置・接続・選択を管理するグラフエディタ
                  注意: React Flow を使用する
                        nodes[], edges[] は Zustand で管理する
+                       ノード追加はダイアログなし（インライン操作）。
+                       「＋ ノード追加」ボタンクリックでデフォルト位置に直接追加する。
             ============================================================ -->
             <main id="ctx-graph-editor">
 
@@ -680,12 +702,14 @@
 
                 <!--
                     [ ][Feature] Add Node      — 「＋ ノード追加」ボタンでデフォルト位置に汎用ノードを追加する
+                                                 （ダイアログなし・インライン操作）
                     [ ][Feature] Move Node     — ノードをドラッグで移動する（React Flow 標準）
                     [ ][Feature] Connect Nodes — ハンドルからドラッグしてエッジを接続する（React Flow 標準）
                     [ ][Feature] Select Node   — ノードをクリックで選択し selectedNodeId を更新する
                     [ ][Feature] Empty State   — nodes[] が空のとき「ノードを追加してください」を表示する
                     [ ][Logic]   State         — nodes[], edges[], selectedNodeId を Zustand で管理する
-                    [ ][Logic]   Persist       — nodes[], edges[] の変化を subscribe で監視し Tauri fs に保存する
+                    [ ][Logic]   Persist       — nodes[], edges[] の変化を subscribe で監視し
+                                                     Tauri fs で {projectRootPath}/graphs/{graphId}.json に保存する
                     [ ][Logic]   React Flow    — <ReactFlow> コンポーネントに nodes/edges/onNodesChange/onEdgesChange を渡す
                 -->
             </main>
