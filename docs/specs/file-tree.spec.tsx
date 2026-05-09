@@ -8,7 +8,7 @@
  * @story
  *   【1. ツリー表示】
  *   1. FileTree は projectRootPath（useProjectDetailStore 経由）をもとに
- *      マウント時に Tauri fs.readDir で再帰読み込みし、ツリーを描画する。
+ *      マウント時に Tauri fs.readDir（recursive: true）で再帰読み込みし、ツリーを描画する。
  *   2. ディレクトリは展開アイコン付きで、ファイルはインデント付きで表示される。
  *
  *   【2. Expand / Collapse】
@@ -41,17 +41,17 @@ import type { FileTreeNode } from '@/bom/graph'
 // Slot 3: モック・セットアップ
 // =============================================================================
 
-/** Tauri fs プラグインのモック */
-const mockReadDir = vi.fn()
+const { mockReadDir, mockSetActiveGraphId } = vi.hoisted(() => ({
+    mockReadDir: vi.fn(),
+    mockSetActiveGraphId: vi.fn(),
+}))
+
+const mockProjectRootPath = '/Users/user/projects/zizou-core'
 
 vi.mock('@tauri-apps/plugin-fs', () => ({
     readDir: mockReadDir,
     BaseDirectory: { AppData: 'AppData' },
 }))
-
-/** useProjectDetailStore のモック */
-const mockSetActiveGraphId = vi.fn()
-const mockProjectRootPath = '/Users/user/projects/zizou-core'
 
 vi.mock('@/store/useProjectDetailStore', () => ({
     useProjectDetailStore: () => ({
