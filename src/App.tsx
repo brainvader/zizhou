@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useProjectFile } from '@/hooks/useProjectFile'
 import { ProjectGrid } from '@/components/ProjectGrid'
+import { Topbar } from '@/components/Topbar'
 import "./App.css";
 
 /**
@@ -15,7 +16,12 @@ function App() {
     loadProjects()
   }, [loadProjects])
 
-  return <ProjectGrid isHydrated={isHydrated} />
+  return (
+    <>
+      <Topbar />
+      <ProjectGrid isHydrated={isHydrated} />
+    </>
+  )
 }
 
 export default App
