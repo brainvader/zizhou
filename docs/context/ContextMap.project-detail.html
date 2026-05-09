@@ -26,8 +26,8 @@
              グラフデータは Tauri fs プラグインで {projectRootPath}/graphs/{graphId}.json に保存する。
              activeGraphId: 現在表示中のグラフID（ファイルツリーで graphs/ 配下の .json を選択して切り替える）
                             初期値は null（グラフ未選択）
-             isInitialized: graphs/ ディレクトリが存在するか（null: 確認中 / false: 未存在 / true: 存在）
-                            false のときエディタ領域を Setup ビューに切り替える
+             initStatus: graphs/ ディレクトリの存在確認状態（'checking': 確認中 / 'uninitialized': 未存在 / 'ready': 存在）
+                         'uninitialized' のときエディタ領域を Setup ビューに切り替える
              activeProjectId: 現在表示中のプロジェクトID（TanStack Router の useParams から取得）
              projectRootPath: 現在プロジェクトのルートパス（BOM で型定義する: string）
              注意: projects[] はここでは持たない。SSOTはZustandのuseProjectStore。
@@ -36,7 +36,7 @@
             {
                 "activeProjectId": "1",
                 "activeGraphId": null,
-                "isInitialized": false,
+                "initStatus": "checking",
                 "projectRootPath": "/Users/user/projects/zizou-core"
             }
         </script>
@@ -596,7 +596,7 @@
                 [ ][Logic]     Breadcrumb  — useParams で取得した id に対応するプロジェクト名を
                                              useProjectStore から引いて表示する
                 [ ][Feature]   New Graph   — 「＋」ボタンクリックで新しいグラフを作成し、エディタに切り替える
-                                             isInitialized が false のときはボタンを disabled にする
+                                             initStatus が 'ready' 以外のときはボタンを disabled にする
                 [ ][Logic]     New Graph   — nanoid() で graphId を生成し {projectRootPath}/graphs/{graphId}.json を
                                              空の nodes[], edges[] で作成後、activeGraphId を更新する
             -->
@@ -665,8 +665,8 @@
                        nodes[], edges[] は Zustand で管理する
                        ノード追加はダイアログなし（インライン操作）。
                        「＋ ノード追加」ボタンクリックでデフォルト位置に直接追加する。
-                       graphs/ が存在しない場合はエディタ領域全体を Setup ビューに切り替える。
-                       Setup ビューで「初期化」ボタンを押すと graphs/ を作成しエディタに切り替わる。
+                       initStatus が 'uninitialized' の場合はエディタ領域全体を Setup ビューに切り替える。
+                       Setup ビューで「初期化」ボタンを押すと graphs/ を作成し initStatus が 'ready' になる。
             ============================================================ -->
             <main id="ctx-graph-editor">
 
@@ -708,21 +708,23 @@
                 </div>
 
                 <!--
-                    [ ][Feature] Setup View    — graphs/ が存在しない場合にエディタ領域全体を
+                    [ ][Feature] Setup View    — initStatus が 'uninitialized' のときエディタ領域全体を
                                                  Setup ビューに切り替え「初期化」ボタンを表示する
                     [ ][Feature] Add Node      — 「＋ ノード追加」ボタンでデフォルト位置に汎用ノードを追加する
                                                  （ダイアログなし・インライン操作）
+                                                 initStatus が 'ready' 以外のときはボタンを disabled にする
                     [ ][Feature] Move Node     — ノードをドラッグで移動する（React Flow 標準）
                     [ ][Feature] Connect Nodes — ハンドルからドラッグしてエッジを接続する（React Flow 標準）
                     [ ][Feature] Select Node   — ノードをクリックで選択し selectedNodeId を更新する
                     [ ][Feature] Empty State   — nodes[] が空のとき「ノードを追加してください」を表示する
                     [ ][Logic]   Init Check    — マウント時に Tauri fs で {projectRootPath}/graphs/ の存在を確認し
-                                                 isInitialized を更新する（null: 確認中 / true: 存在 / false: 未存在）
+                                                 initStatus を更新する（'checking': 確認中 / 'uninitialized': 未存在 / 'ready': 存在）
                     [ ][Logic]   Init Dir      — 「初期化」ボタンで Tauri fs の mkdir を呼び graphs/ を作成後
-                                                 isInitialized を true に更新しエディタビューに切り替える
+                                                 initStatus を 'ready' に更新しエディタビューに切り替える
+                                                 作成後にファイルツリーが graphs/ を表示することをテストで検証する
                     [ ][Logic]   State         — nodes[], edges[], selectedNodeId を Zustand で管理する
                     [ ][Logic]   Persist       — nodes[], edges[] の変化を subscribe で監視し
-                                                     Tauri fs で {projectRootPath}/graphs/{graphId}.json に保存する
+                                                 Tauri fs で {projectRootPath}/graphs/{graphId}.json に保存する
                     [ ][Logic]   React Flow    — <ReactFlow> コンポーネントに nodes/edges/onNodesChange/onEdgesChange を渡す
                 -->
             </main>
