@@ -15,8 +15,8 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
 /** フォームの初期状態 */
-const INITIAL_FORM: NewProjectForm = { name: '', description: '' }
-const INITIAL_ERRORS = { name: null as string | null, description: null as string | null }
+const INITIAL_FORM: NewProjectForm = { name: '', description: '', rootPath: '' }
+const INITIAL_ERRORS = { name: null as string | null, description: null as string | null, rootPath: null as string | null }
 
 type ProjectGridProps = {
     /** loadProjects 完了後に true になる。false の間は「＋ new project」を disabled にする */
@@ -61,6 +61,7 @@ export const ProjectGrid = ({ isHydrated }: ProjectGridProps) => {
             setErrors({
                 name: fieldErrors.name?.[0] ?? null,
                 description: fieldErrors.description?.[0] ?? null,
+                rootPath: fieldErrors.rootPath?.[0] ?? null,
             })
             return
         }
@@ -140,6 +141,23 @@ export const ProjectGrid = ({ isHydrated }: ProjectGridProps) => {
                                 />
                                 {errors.description && (
                                     <span className="font-mono text-xs text-destructive">{errors.description}</span>
+                                )}
+                            </div>
+
+                            {/* rootPath フィールド */}
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="project-root-path" className="font-mono text-xs tracking-wide">
+                                    root path *
+                                </Label>
+                                <Input
+                                    id="project-root-path"
+                                    placeholder="/Users/user/projects/my-app"
+                                    value={form.rootPath}
+                                    onChange={(e) => setForm((f) => ({ ...f, rootPath: e.target.value }))}
+                                    className={errors.rootPath ? 'border-destructive' : ''}
+                                />
+                                {errors.rootPath && (
+                                    <span className="font-mono text-xs text-destructive">{errors.rootPath}</span>
                                 )}
                             </div>
                         </div>
