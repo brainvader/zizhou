@@ -96,11 +96,17 @@ const makeGraphStoreState = (overrides: Partial<{
 const makeDetailStoreState = (overrides: Partial<{
     initStatus: InitStatus
     projectRootPath: string
+    activeGraphId: string | null
     setInitStatus: ReturnType<typeof vi.fn>
+    setActiveGraphId: ReturnType<typeof vi.fn>
+    setProjectRootPath: ReturnType<typeof vi.fn>
 }> = {}) => ({
     initStatus: 'ready' as InitStatus,
     projectRootPath: '/Users/user/projects/zizou-core',
+    activeGraphId: null,
     setInitStatus: vi.fn(),
+    setActiveGraphId: vi.fn(),
+    setProjectRootPath: vi.fn(),
     ...overrides,
 })
 
