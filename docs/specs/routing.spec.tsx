@@ -63,7 +63,7 @@ const { mockProjects, mockUseProjectStore, mockUseProjectFile } = vi.hoisted(() 
     return { mockProjects, mockUseProjectStore, mockUseProjectFile };
 });
 
-vi.mock('@/store/projectStore', () => ({
+vi.mock('@/store/useProjectStore', () => ({
     useProjectStore: mockUseProjectStore,
 }));
 
