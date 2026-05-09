@@ -18,7 +18,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { SettingsDialog } from '../../src/components/SettingsDialog'
+import { SettingsDialog } from '@/components/SettingsDialog'
 
 /**
  * Slot 3: モック・セットアップ (Test Setup)
