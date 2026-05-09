@@ -19,9 +19,8 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 // import { render, screen, waitFor } from '@testing-library/react'  // 実装後に解除
 // import userEvent from '@testing-library/user-event'               // 実装後に解除
-import type { InitStatus } from '../../docs/bom/graph'
+import type { InitStatus, GraphNodeData } from '@/docs/bom/graph'
 import type { Node, Edge } from '@xyflow/react'
-import type { GraphNodeData } from '../../docs/bom/graph'
 
 // GraphEditor は実装後にここから import する
 // import { GraphEditor } from '@/components/GraphEditor'
@@ -61,6 +60,8 @@ vi.mock('@xyflow/react', () => ({
     ),
     Background: () => <div data-testid="rf-background" />,
     Controls: () => <div data-testid="rf-controls" />,
+    // TODO: 実装後、onNodesChange/onEdgesChange の呼び出し履歴を検証する場合は
+    //       vi.fn() を vi.hoisted() で外出しにしてリセット可能にすること
     useNodesState: (init: Node[]) => [init, vi.fn(), vi.fn()],
     useEdgesState: (init: Edge[]) => [init, vi.fn(), vi.fn()],
 }))
@@ -149,8 +150,8 @@ describe('GraphEditor: Init Check logic', () => {
         // render(<GraphEditor />)
         // await waitFor(() => expect(setInitStatus).toHaveBeenCalledWith('uninitialized'))
 
-        // Placeholder: 値を確認
-        expect(false).toBe(false)
+        // Placeholder: 実装後にコメントアウト解除
+        expect(true).toBe(true)
     })
 
     test('graphs/ が存在する場合、setInitStatus("ready") が呼ばれる', async () => {
