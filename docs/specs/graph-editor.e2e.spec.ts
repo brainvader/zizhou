@@ -36,16 +36,15 @@ test.describe('GraphEditor: Setup View', () => {
 
 test.describe('GraphEditor: Add Node', () => {
     test.skip('「＋ ノード追加」クリックでノードがキャンバスに追加される', async ({ page }) => {
+        // TODO: beforeEach または test fixture で graphs/ の存在を保証すること
         await page.goto('/projects/1')
-        // graphs/ が存在する前提（ready 状態）
         await page.getByRole('button', { name: /ノード追加/ }).click()
-        // React Flow キャンバス内にノードが出現する
         await expect(page.locator('.react-flow__node').first()).toBeVisible()
         await page.screenshot({ path: 'evidence/graph-editor_add-node.png' })
     })
 
     test.skip('initStatus が "ready" 以外のとき「＋ ノード追加」ボタンは disabled', async ({ page }) => {
-        // graphs/ を削除した状態
+        // TODO: beforeEach または test fixture で graphs/ が存在しない状態を保証すること
         await page.goto('/projects/1')
         await expect(page.getByRole('button', { name: /ノード追加/ })).toBeDisabled()
         await page.screenshot({ path: 'evidence/graph-editor_add-node-disabled.png' })
@@ -54,11 +53,10 @@ test.describe('GraphEditor: Add Node', () => {
 
 test.describe('GraphEditor: Node Select', () => {
     test.skip('ノードをクリックすると Properties ペインにノード情報が表示される', async ({ page }) => {
+        // TODO: beforeEach または test fixture で graphs/ の存在を保証すること
         await page.goto('/projects/1')
-        // ノードを追加して選択する
         await page.getByRole('button', { name: /ノード追加/ }).click()
         await page.locator('.react-flow__node').first().click()
-        // Properties ペインに name が表示される
         await expect(page.getByTestId('node-property-name')).toBeVisible()
         await page.screenshot({ path: 'evidence/graph-editor_node-selected.png' })
     })
@@ -70,13 +68,5 @@ test.describe('GraphEditor: Empty State', () => {
         // ノードが 0 件の状態
         await expect(page.getByText('ノードを追加してください')).toBeVisible()
         await page.screenshot({ path: 'evidence/graph-editor_empty-state.png' })
-    })
-})
-
-test.describe('GraphEditor: Loading', () => {
-    test.skip('マウント直後（checking）にローディングスピナーが表示される', async ({ page }) => {
-        await page.goto('/projects/1')
-        // 非同期の存在確認中はスピナーが見える（即時解決するため timing に依存する）
-        await page.screenshot({ path: 'evidence/graph-editor_loading.png' })
     })
 })
