@@ -1,5 +1,6 @@
 import { useParams } from '@tanstack/react-router'
 import { useEffect } from 'react'
+import { FileTree } from '@/components/FileTree'
 import { GraphEditor } from '@/components/GraphEditor'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
@@ -7,10 +8,11 @@ import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 /**
  * ProjectDetailRoute
  * "/projects/$id" ルートのコンポーネント。
- * CTX-2 GraphEditor を仮組み込みした状態。
- * CTX-1 FileTree / CTX-3 NodeProperty は後続コンテキストで実装する。
+ * CTX-1 FileTree / CTX-2 GraphEditor を組み込む。
+ * CTX-3 NodeProperty は後続コンテキストで実装する。
  *
  * @see src/router.tsx
+ * @see docs/specs/file-tree.spec.tsx
  * @see docs/specs/graph-editor.spec.tsx
  */
 export const ProjectDetailRoute = () => {
@@ -32,8 +34,11 @@ export const ProjectDetailRoute = () => {
             data-testid="project-detail"
             style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}
         >
-            {/* CTX-2: GraphEditor（仮組み込み） */}
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+                {/* CTX-1: FileTree */}
+                <FileTree />
+
+                {/* CTX-2: GraphEditor */}
                 <GraphEditor />
             </div>
         </div>
