@@ -53,43 +53,41 @@ declare global {
  */
 const setupMockIPC = async (page: Page) => {
     await page.addInitScript(() => {
-        window.addEventListener('DOMContentLoaded', () => {
-            window.mockIPC((cmd, args) => {
-                // ── plugin:path|join ──────────────────────────────────────────
-                if (cmd === 'plugin:path|join') {
-                    const { paths } = args as { paths: string[] }
-                    return paths.join('/').replace(/\/+/g, '/')
+        window.mockIPC((cmd, args) => {
+            // ── plugin:path|join ──────────────────────────────────────────
+            if (cmd === 'plugin:path|join') {
+                const { paths } = args as { paths: string[] }
+                return paths.join('/').replace(/\/+/g, '/')
+            }
+
+            // ── plugin:fs|read_dir ────────────────────────────────────────
+            if (cmd === 'plugin:fs|read_dir') {
+                const { path } = args as { path: string }
+
+                const tree: Record<string, Array<{
+                    name: string
+                    isFile: boolean
+                    isDirectory: boolean
+                    isSymlink: boolean
+                }>> = {
+                    '/Users/user/projects/zizou-core': [
+                        { name: 'src', isFile: false, isDirectory: true, isSymlink: false },
+                        { name: 'graphs', isFile: false, isDirectory: true, isSymlink: false },
+                    ],
+                    '/Users/user/projects/zizou-core/src': [
+                        { name: 'components', isFile: false, isDirectory: true, isSymlink: false },
+                    ],
+                    '/Users/user/projects/zizou-core/src/components': [
+                        { name: 'FileTree.tsx', isFile: true, isDirectory: false, isSymlink: false },
+                    ],
+                    '/Users/user/projects/zizou-core/graphs': [
+                        { name: 'graph-01.json', isFile: true, isDirectory: false, isSymlink: false },
+                        { name: 'graph-02.json', isFile: true, isDirectory: false, isSymlink: false },
+                    ],
                 }
 
-                // ── plugin:fs|read_dir ────────────────────────────────────────
-                if (cmd === 'plugin:fs|read_dir') {
-                    const { path } = args as { path: string }
-
-                    const tree: Record<string, Array<{
-                        name: string
-                        isFile: boolean
-                        isDirectory: boolean
-                        isSymlink: boolean
-                    }>> = {
-                        '/Users/user/projects/zizou-core': [
-                            { name: 'src', isFile: false, isDirectory: true, isSymlink: false },
-                            { name: 'graphs', isFile: false, isDirectory: true, isSymlink: false },
-                        ],
-                        '/Users/user/projects/zizou-core/src': [
-                            { name: 'components', isFile: false, isDirectory: true, isSymlink: false },
-                        ],
-                        '/Users/user/projects/zizou-core/src/components': [
-                            { name: 'FileTree.tsx', isFile: true, isDirectory: false, isSymlink: false },
-                        ],
-                        '/Users/user/projects/zizou-core/graphs': [
-                            { name: 'graph-01.json', isFile: true, isDirectory: false, isSymlink: false },
-                            { name: 'graph-02.json', isFile: true, isDirectory: false, isSymlink: false },
-                        ],
-                    }
-
-                    return tree[path] ?? []
-                }
-            })
+                return tree[path] ?? []
+            }
         })
     })
 }
