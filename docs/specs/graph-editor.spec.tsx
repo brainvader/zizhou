@@ -17,13 +17,11 @@
  * Slot 2: インポート
  */
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-// import { render, screen, waitFor } from '@testing-library/react'  // 実装後に解除
-// import userEvent from '@testing-library/user-event'               // 実装後に解除
-import type { InitStatus, GraphNodeData } from '@/docs/bom/graph'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import type { InitStatus, GraphNodeData } from '@/bom/graph'
 import type { Node, Edge } from '@xyflow/react'
-
-// GraphEditor は実装後にここから import する
-// import { GraphEditor } from '@/components/GraphEditor'
+import { GraphEditor } from '@/components/GraphEditor'
 
 /**
  * Slot 3: モック・セットアップ
@@ -60,7 +58,7 @@ vi.mock('@xyflow/react', () => ({
     ),
     Background: () => <div data-testid="rf-background" />,
     Controls: () => <div data-testid="rf-controls" />,
-    // TODO: 実装後、onNodesChange/onEdgesChange の呼び出し履歴を検証する場合は
+    // TODO: onNodesChange/onEdgesChange の呼び出し履歴を検証する場合は
     //       vi.fn() を vi.hoisted() で外出しにしてリセット可能にすること
     useNodesState: (init: Node[]) => [init, vi.fn(), vi.fn()],
     useEdgesState: (init: Edge[]) => [init, vi.fn(), vi.fn()],
@@ -120,23 +118,18 @@ beforeEach(() => {
  * Slot 4: 挙動の検証
  */
 
-// --- 1. ロジック検証 ---
-
 describe('GraphEditor: Init Check logic', () => {
     test('マウント時に exists({projectRootPath}/graphs/) が呼ばれる', async () => {
         mockExists.mockResolvedValueOnce(true)
+        const setInitStatus = vi.fn()
         mockUseProjectDetailStore.mockImplementation((selector: (s: ReturnType<typeof makeDetailStoreState>) => unknown) =>
-            selector(makeDetailStoreState({ initStatus: 'checking' }))
+            selector(makeDetailStoreState({ initStatus: 'checking', setInitStatus }))
         )
 
-        // TODO: GraphEditor 実装後にコメントアウト解除
-        // render(<GraphEditor />)
-        // await waitFor(() => {
-        //     expect(mockExists).toHaveBeenCalledWith('/Users/user/projects/zizou-core/graphs')
-        // })
-
-        // Placeholder: 実装後にコメントアウト解除
-        expect(true).toBe(true)
+        render(<GraphEditor />)
+        await waitFor(() => {
+            expect(mockExists).toHaveBeenCalledWith('/Users/user/projects/zizou-core/graphs')
+        })
     })
 
     test('graphs/ が存在しない場合、setInitStatus("uninitialized") が呼ばれる', async () => {
@@ -146,12 +139,8 @@ describe('GraphEditor: Init Check logic', () => {
             selector(makeDetailStoreState({ initStatus: 'checking', setInitStatus }))
         )
 
-        // TODO: GraphEditor 実装後にコメントアウト解除
-        // render(<GraphEditor />)
-        // await waitFor(() => expect(setInitStatus).toHaveBeenCalledWith('uninitialized'))
-
-        // Placeholder: 実装後にコメントアウト解除
-        expect(true).toBe(true)
+        render(<GraphEditor />)
+        await waitFor(() => expect(setInitStatus).toHaveBeenCalledWith('uninitialized'))
     })
 
     test('graphs/ が存在する場合、setInitStatus("ready") が呼ばれる', async () => {
@@ -161,11 +150,8 @@ describe('GraphEditor: Init Check logic', () => {
             selector(makeDetailStoreState({ initStatus: 'checking', setInitStatus }))
         )
 
-        // TODO: GraphEditor 実装後にコメントアウト解除
-        // render(<GraphEditor />)
-        // await waitFor(() => expect(setInitStatus).toHaveBeenCalledWith('ready'))
-
-        expect(true).toBe(true)
+        render(<GraphEditor />)
+        await waitFor(() => expect(setInitStatus).toHaveBeenCalledWith('ready'))
     })
 })
 
@@ -177,15 +163,12 @@ describe('GraphEditor: Init Dir logic', () => {
             selector(makeDetailStoreState({ initStatus: 'uninitialized', setInitStatus }))
         )
 
-        // TODO: GraphEditor 実装後にコメントアウト解除
-        // render(<GraphEditor />)
-        // await userEvent.click(screen.getByRole('button', { name: /初期化/ }))
-        // await waitFor(() => {
-        //     expect(mockMkdir).toHaveBeenCalledWith('/Users/user/projects/zizou-core/graphs', { recursive: true })
-        //     expect(setInitStatus).toHaveBeenCalledWith('ready')
-        // })
-
-        expect(true).toBe(true)
+        render(<GraphEditor />)
+        await userEvent.click(screen.getByRole('button', { name: /初期化/ }))
+        await waitFor(() => {
+            expect(mockMkdir).toHaveBeenCalledWith('/Users/user/projects/zizou-core/graphs', { recursive: true })
+            expect(setInitStatus).toHaveBeenCalledWith('ready')
+        })
     })
 })
 
@@ -199,16 +182,13 @@ describe('GraphEditor: Add Node logic', () => {
             selector(makeDetailStoreState({ initStatus: 'ready' }))
         )
 
-        // TODO: GraphEditor 実装後にコメントアウト解除
-        // render(<GraphEditor />)
-        // await userEvent.click(screen.getByRole('button', { name: /ノード追加/ }))
-        // expect(addNode).toHaveBeenCalledOnce()
-        // const calledNode: Node<GraphNodeData> = addNode.mock.calls[0][0]
-        // expect(calledNode.id).toBe('test-node-id')
-        // expect(calledNode.data.label).toBe('New Node')
-        // expect(calledNode.position).toEqual({ x: expect.any(Number), y: expect.any(Number) })
-
-        expect(true).toBe(true)
+        render(<GraphEditor />)
+        await userEvent.click(screen.getByRole('button', { name: /ノード追加/ }))
+        expect(addNode).toHaveBeenCalledOnce()
+        const calledNode: Node<GraphNodeData> = addNode.mock.calls[0][0]
+        expect(calledNode.id).toBe('test-node-id')
+        expect(calledNode.data.label).toBe('New Node')
+        expect(calledNode.position).toEqual({ x: expect.any(Number), y: expect.any(Number) })
     })
 
     test('initStatus が "ready" 以外のとき「＋ ノード追加」ボタンは disabled', () => {
@@ -216,11 +196,8 @@ describe('GraphEditor: Add Node logic', () => {
             selector(makeDetailStoreState({ initStatus: 'uninitialized' }))
         )
 
-        // TODO: GraphEditor 実装後にコメントアウト解除
-        // render(<GraphEditor />)
-        // expect(screen.getByRole('button', { name: /ノード追加/ })).toBeDisabled()
-
-        expect(true).toBe(true)
+        render(<GraphEditor />)
+        expect(screen.getByRole('button', { name: /ノード追加/ })).toBeDisabled()
     })
 })
 
@@ -239,12 +216,9 @@ describe('GraphEditor: Select Node logic', () => {
             selector(makeDetailStoreState({ initStatus: 'ready' }))
         )
 
-        // TODO: GraphEditor 実装後にコメントアウト解除
-        // render(<GraphEditor />)
-        // await userEvent.click(screen.getByTestId('node-node-1'))
-        // expect(setSelectedNodeId).toHaveBeenCalledWith('node-1')
-
-        expect(true).toBe(true)
+        render(<GraphEditor />)
+        await userEvent.click(screen.getByTestId('node-node-1'))
+        expect(setSelectedNodeId).toHaveBeenCalledWith('node-1')
     })
 })
 
@@ -257,11 +231,8 @@ describe('GraphEditor: Empty State', () => {
             selector(makeDetailStoreState({ initStatus: 'ready' }))
         )
 
-        // TODO: GraphEditor 実装後にコメントアウト解除
-        // render(<GraphEditor />)
-        // expect(screen.getByText('ノードを追加してください')).toBeInTheDocument()
-
-        expect(true).toBe(true)
+        render(<GraphEditor />)
+        expect(screen.getByText('ノードを追加してください')).toBeInTheDocument()
     })
 
     test('nodes[] にノードがあるとき Empty State は表示されない', () => {
@@ -277,10 +248,7 @@ describe('GraphEditor: Empty State', () => {
             selector(makeDetailStoreState({ initStatus: 'ready' }))
         )
 
-        // TODO: GraphEditor 実装後にコメントアウト解除
-        // render(<GraphEditor />)
-        // expect(screen.queryByText('ノードを追加してください')).not.toBeInTheDocument()
-
-        expect(true).toBe(true)
+        render(<GraphEditor />)
+        expect(screen.queryByText('ノードを追加してください')).not.toBeInTheDocument()
     })
 })
