@@ -2,6 +2,7 @@ import { useParams } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { FileTree } from '@/components/FileTree'
 import { GraphEditor } from '@/components/GraphEditor'
+import { useProjectFile } from '@/hooks/useProjectFile'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 
@@ -17,9 +18,15 @@ import { useProjectDetailStore } from '@/store/useProjectDetailStore'
  */
 export const ProjectDetailRoute = () => {
     const { id } = useParams({ from: '/projects/$id' })
+    const { loadProjects } = useProjectFile()
     const project = useProjectStore((s) => s.projects.find((p) => p.id === id))
     const setProjectRootPath = useProjectDetailStore((s) => s.setProjectRootPath)
     const setInitStatus = useProjectDetailStore((s) => s.setInitStatus)
+
+    // 直接アクセス・リロード時も projects[] を hydrate する
+    useEffect(() => {
+        loadProjects()
+    }, [loadProjects])
 
     // projectRootPath を store に注入する
     useEffect(() => {
