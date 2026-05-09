@@ -17,9 +17,9 @@
  * Slot 2: インポート
  */
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import type { GraphFile, InitStatus } from '../../docs/bom/graph'
+// import { render, screen, waitFor } from '@testing-library/react'  // 実装後に解除
+// import userEvent from '@testing-library/user-event'               // 実装後に解除
+import type { InitStatus } from '../../docs/bom/graph'
 import type { Node, Edge } from '@xyflow/react'
 import type { GraphNodeData } from '../../docs/bom/graph'
 
@@ -61,14 +61,8 @@ vi.mock('@xyflow/react', () => ({
     ),
     Background: () => <div data-testid="rf-background" />,
     Controls: () => <div data-testid="rf-controls" />,
-    useNodesState: (init: Node[]) => {
-        const [nodes, setNodes] = vi.fn().mockReturnValue([init, vi.fn(), vi.fn()])()
-        return [nodes, vi.fn(), vi.fn()]
-    },
-    useEdgesState: (init: Edge[]) => {
-        const [edges, setEdges] = vi.fn().mockReturnValue([init, vi.fn(), vi.fn()])()
-        return [edges, vi.fn(), vi.fn()]
-    },
+    useNodesState: (init: Node[]) => [init, vi.fn(), vi.fn()],
+    useEdgesState: (init: Edge[]) => [init, vi.fn(), vi.fn()],
 }))
 
 // --- Zustand store のモック ---
