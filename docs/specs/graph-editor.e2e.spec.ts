@@ -26,9 +26,9 @@ test.describe('GraphEditor: Setup View', () => {
     })
 
     test.skip('「初期化」ボタンクリックでエディタビューに切り替わる', async ({ page }) => {
+        // TODO: beforeEach または test fixture で graphs/ が存在しない状態を保証すること
         await page.goto('/projects/1')
         await page.getByRole('button', { name: /初期化/ }).click()
-        // initStatus が 'ready' になりエディタが表示される
         await expect(page.getByTestId('react-flow')).toBeVisible()
         await page.screenshot({ path: 'evidence/graph-editor_after-init.png' })
     })
@@ -64,8 +64,8 @@ test.describe('GraphEditor: Node Select', () => {
 
 test.describe('GraphEditor: Empty State', () => {
     test.skip('nodes[] が空のとき Empty State が表示される', async ({ page }) => {
+        // TODO: beforeEach または test fixture で graphs/ が存在しかつ activeGraphId が null の状態を保証すること
         await page.goto('/projects/1')
-        // ノードが 0 件の状態
         await expect(page.getByText('ノードを追加してください')).toBeVisible()
         await page.screenshot({ path: 'evidence/graph-editor_empty-state.png' })
     })
