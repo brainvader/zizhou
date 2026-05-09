@@ -5,46 +5,47 @@
         <title>ContextMap: 地蔵 — Projects</title>
 
         <!-- ============================================================
-       STACK
-       runtime:  Tauri 2
-       frontend: React 18 + TypeScript
-       bundler:  Vite
-       styling:  Tailwind CSS v4 + shadcn/ui
-       router:   TanStack Router（routing の SSOT）
-       state:    Zustand（projects[] の SSOT）
-       persist:  Tauri fs プラグイン（AppData に JSON 保存）
-       toast:    sonner
-       testing:  Vitest + RTL + Playwright
-       package:  pnpm
-  ============================================================ -->
+            STACK
+            runtime:  Tauri 2
+            frontend: React 18 + TypeScript
+            bundler:  Vite
+            styling:  Tailwind CSS v4 + shadcn/ui
+            router:   TanStack Router（routing の SSOT）
+            state:    Zustand（projects[] の SSOT）
+            persist:  Tauri fs プラグイン（AppData に JSON 保存）
+            toast:    sonner
+            icons:    lucide-react
+            testing:  Vitest + RTL + Playwright
+            package:  pnpm
+        ============================================================ -->
 
         <!-- ============================================================
-       GLOBAL STORE
-       アプリ全体で共有すべき状態。
-       routing は TanStack Router に委譲するため持たない。
-       永続化は Tauri fs プラグインで AppData に JSON として保存する。
-  ============================================================ -->
+            GLOBAL STORE
+            アプリ全体で共有すべき状態。
+            routing は TanStack Router に委譲するため持たない。
+            永続化は Tauri fs プラグインで AppData に JSON として保存する。
+        ============================================================ -->
         <script id="global-store" type="application/json">
-    {
-      "projects": [
-        { "id": "1", "name": "地蔵 Core",      "description": "グラフベースのプロジェクト管理OS。" },
-        { "id": "2", "name": "Graph Renderer", "description": "ノード・エッジの依存関係を可視化するビューエンジン。" },
-        { "id": "3", "name": "HITL Gate",      "description": "Human-in-the-loop の承認フロー制御モジュール。" },
-        { "id": "4", "name": "Spec Extractor", "description": "実装完了時にコードと同期した仕様書を自動生成する。" },
-        { "id": "5", "name": "Auth Module",    "description": "Tauriキーチェーン連携によるローカルファースト認証。" }
-      ]
-    }
-  </script>
+            {
+                "projects": [
+                    { "id": "1", "name": "地蔵 Core",      "description": "グラフベースのプロジェクト管理OS。" },
+                    { "id": "2", "name": "Graph Renderer", "description": "ノード・エッジの依存関係を可視化するビューエンジン。" },
+                    { "id": "3", "name": "HITL Gate",      "description": "Human-in-the-loop の承認フロー制御モジュール。" },
+                    { "id": "4", "name": "Spec Extractor", "description": "実装完了時にコードと同期した仕様書を自動生成する。" },
+                    { "id": "5", "name": "Auth Module",    "description": "Tauriキーチェーン連携によるローカルファースト認証。" }
+                ]
+            }
+        </script>
 
         <!-- ctx-project-grid のローカル状態 -->
         <script data-context="ctx-project-grid" class="local-state" type="application/json">
-    {
-      "selectedProjectId": null,
-      "isDialogOpen": false,
-      "form": { "name": "", "description": "" },
-      "errors": { "name": null }
-    }
-  </script>
+            {
+            "selectedProjectId": null,
+            "isDialogOpen": false,
+            "form": { "name": "", "description": "" },
+            "errors": { "name": null }
+            }
+        </script>
 
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500&family=DM+Mono:wght@300;400&family=Outfit:wght@400;500;600;700&display=swap');
@@ -461,10 +462,10 @@
         </div>
 
         <!-- ============================================================
-       CTX-1: TOPBAR
-       責務: アプリ識別・グローバルアクション（New Project / Settings）
-       注意: サイドバーなし。Settings はアイコンボタン一つ。
-  ============================================================ -->
+            CTX-1: TOPBAR [✓]
+            責務: アプリ識別・グローバルアクション（New Project / Settings）
+            注意: サイドバーなし。Settings はアイコンボタン一つ。
+        ============================================================ -->
         <header id="ctx-topbar" class="context-area">
             <div class="logo">
                 <div class="logo-kanji-wrap">
@@ -478,16 +479,18 @@
             </div>
             <div class="topbar-spacer"></div>
             <button class="btn btn-ghost" title="Settings">⚙</button>
+
             <!--
-      [Feature] Settings — アイコンボタンで設定画面を開く
-    -->
+                [✓][Feature] Settings — アイコンボタンクリックで CTX-4 Settings ダイアログを開く
+                [✓][Logic]   Open Dialog — onSettingsClick コールバック経由で isSettingsOpen を true にす
+            -->
         </header>
 
         <!-- ============================================================
-       CTX-2: PROJECT-GRID
-       責務: global-store の projects[] を一覧表示・新規作成のエントリーポイント
-       注意: クリックで /projects/:id へ遷移（routing を更新）
-  ============================================================ -->
+            CTX-2: PROJECT-GRID [✓]
+            責務: global-store の projects[] を一覧表示・新規作成のエントリーポイント
+            注意: クリックで /projects/:id へ遷移（routing を更新）
+        ============================================================ -->
         <main id="ctx-project-grid" class="context-area">
 
             <div class="grid">
@@ -524,21 +527,21 @@
             </div>
 
             <!--
-      [Feature] Project List     — global-store の projects[] をカードグリッドで表示する
-      [Feature] Open Project     — カードを TanStack Router の <Link to="/projects/$id"> でラップして遷移する
-      [Feature] New Project Card — 破線カードクリックで shadcn Dialog を開き name・description を入力して作成する
-      [Logic]   Empty State      — projects[] が空のとき破線カードのみを表示する
-      [Logic]   Routing          — TanStack Router に委譲。Zustand に currentPath は持たない
-      [Logic]   Persist          — 起動時に Tauri fs で projects.json を読み込み、変更時に書き出す
-    -->
+                [✓][Feature] Project List     — global-store の projects[] をカードグリッドで表示する
+                [ ][Feature] Open Project     — カードを TanStack Router の <Link to="/projects/$id"> でラップして遷移する
+                [✓][Feature] New Project Card — 破線カードクリックで shadcn Dialog を開き name・description を入力して作成する
+                [✓][Logic]   Empty State      — projects[] が空のとき破線カードのみを表示する
+                [ ][Logic]   Routing          — TanStack Router に委譲。Zustand に currentPath は持たない
+                [✓][Logic]   Persist          — 起動時に Tauri fs で projects.json を読み込み、変更時に書き出す
+            -->
         </main>
 
         <!-- ============================================================
-       CTX-3: NEW PROJECT DIALOG
-       責務: プロジェクトの新規作成フォーム
-       トリガー: 破線カード（＋ new project）クリック
-       使用コンポーネント: shadcn Dialog / Input / Button
-  ============================================================ -->
+            CTX-3: NEW PROJECT DIALOG [✓]
+            責務: プロジェクトの新規作成フォーム
+            トリガー: 破線カード（＋ new project）クリック
+            使用コンポーネント: shadcn Dialog / Input / Button
+        ============================================================ -->
         <div class="dialog-overlay">
             <dialog id="ctx-new-project-dialog" class="dialog" open>
 
@@ -562,12 +565,35 @@
                 </div>
 
                 <!--
-        [Feature] Create Project  — name・description を入力して「作成」で projects[] に追加する
-        [Feature] Cancel          — 「キャンセル」または overlay クリックでダイアログを閉じる
-        [Logic]   Validation      — name が空のとき「作成」ボタンを押すとエラーメッセージを表示し送信しない（Zod）
-        [Logic]   Submit          — バリデーション通過後、Zustand の projects[] に追加し Tauri fs で保存、dialog を閉じる
-        [Logic]   ID生成          — 新規プロジェクトの id は nanoid() で生成する
-      -->
+                    [✓][Feature] Create Project — name・description を入力して「作成」で projects[] に追加する
+                    [✓][Feature] Cancel         — 「キャンセル」または overlay クリックでダイアログを閉じる
+                    [✓][Logic]   Validation     — name が空のとき「作成」ボタンを押すとエラーメッセージを表示し送信しない（Zod）
+                    [✓][Logic]   Submit         — バリデーション通過後、Zustand の projects[] に追加し Tauri fs で保存、dialog を閉じる
+                    [✓][Logic]   ID生成         — 新規プロジェクトの id は nanoid() で生成する
+                -->
+            </dialog>
+        </div>
+
+        <!-- ============================================================
+            CTX-4: SETTINGS DIALOG [ ]
+            責務: アプリ設定の表示（中身はおいおい追加）
+            トリガー: Topbar の Settings アイコンボタンクリック
+            使用コンポーネント: shadcn Dialog / Button
+            注意: </body> 直前に配置（position:fixed のため）
+        ============================================================ -->
+        <div class="dialog-overlay">
+            <dialog id="ctx-settings-dialog" class="dialog" open>
+
+                <div class="dialog-title">Settings</div>
+
+                <div class="dialog-footer">
+                    <button class="btn-outline">閉じる</button>
+                </div>
+
+                <!--
+                    [ ][Feature] Close   — 「閉じる」または overlay クリックでダイアログを閉じる
+                    [ ][Logic]   Control — isSettingsOpen && <SettingsDialog/> の条件付きレンダリング（shadcn Dialog）
+                -->
             </dialog>
         </div>
 
