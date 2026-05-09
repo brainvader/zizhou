@@ -462,7 +462,7 @@
         </div>
 
         <!-- ============================================================
-            CTX-1: TOPBAR
+            CTX-1: TOPBAR [✓]
             責務: アプリ識別・グローバルアクション（New Project / Settings）
             注意: サイドバーなし。Settings はアイコンボタン一つ。
         ============================================================ -->
@@ -481,13 +481,13 @@
             <button class="btn btn-ghost" title="Settings">⚙</button>
 
             <!--
-                [Feature] Settings — アイコンボタンクリックで CTX-4 Settings ダイアログを開く
-                [Logic]   Open Dialog — onSettingsClick コールバック経由で isSettingsOpen を true にす
+                [✓][Feature] Settings — アイコンボタンクリックで CTX-4 Settings ダイアログを開く
+                [✓][Logic]   Open Dialog — onSettingsClick コールバック経由で isSettingsOpen を true にす
             -->
         </header>
 
         <!-- ============================================================
-            CTX-2: PROJECT-GRID
+            CTX-2: PROJECT-GRID [✓]
             責務: global-store の projects[] を一覧表示・新規作成のエントリーポイント
             注意: クリックで /projects/:id へ遷移（routing を更新）
         ============================================================ -->
@@ -527,17 +527,17 @@
             </div>
 
             <!--
-                [Feature] Project List     — global-store の projects[] をカードグリッドで表示する
-                [Feature] Open Project     — カードを TanStack Router の <Link to="/projects/$id"> でラップして遷移する
-                [Feature] New Project Card — 破線カードクリックで shadcn Dialog を開き name・description を入力して作成する
-                [Logic]   Empty State      — projects[] が空のとき破線カードのみを表示する
-                [Logic]   Routing          — TanStack Router に委譲。Zustand に currentPath は持たない
-                [Logic]   Persist          — 起動時に Tauri fs で projects.json を読み込み、変更時に書き出す
+                [✓][Feature] Project List     — global-store の projects[] をカードグリッドで表示する
+                [ ][Feature] Open Project     — カードを TanStack Router の <Link to="/projects/$id"> でラップして遷移する
+                [✓][Feature] New Project Card — 破線カードクリックで shadcn Dialog を開き name・description を入力して作成する
+                [✓][Logic]   Empty State      — projects[] が空のとき破線カードのみを表示する
+                [ ][Logic]   Routing          — TanStack Router に委譲。Zustand に currentPath は持たない
+                [✓][Logic]   Persist          — 起動時に Tauri fs で projects.json を読み込み、変更時に書き出す
             -->
         </main>
 
         <!-- ============================================================
-            CTX-3: NEW PROJECT DIALOG
+            CTX-3: NEW PROJECT DIALOG [✓]
             責務: プロジェクトの新規作成フォーム
             トリガー: 破線カード（＋ new project）クリック
             使用コンポーネント: shadcn Dialog / Input / Button
@@ -565,17 +565,17 @@
                 </div>
 
                 <!--
-                    [Feature] Create Project  — name・description を入力して「作成」で projects[] に追加する
-                    [Feature] Cancel          — 「キャンセル」または overlay クリックでダイアログを閉じる
-                    [Logic]   Validation      — name が空のとき「作成」ボタンを押すとエラーメッセージを表示し送信しない（Zod）
-                    [Logic]   Submit          — バリデーション通過後、Zustand の projects[] に追加し Tauri fs で保存、dialog を閉じる
-                    [Logic]   ID生成          — 新規プロジェクトの id は nanoid() で生成する
+                    [✓][Feature] Create Project — name・description を入力して「作成」で projects[] に追加する
+                    [✓][Feature] Cancel         — 「キャンセル」または overlay クリックでダイアログを閉じる
+                    [✓][Logic]   Validation     — name が空のとき「作成」ボタンを押すとエラーメッセージを表示し送信しない（Zod）
+                    [✓][Logic]   Submit         — バリデーション通過後、Zustand の projects[] に追加し Tauri fs で保存、dialog を閉じる
+                    [✓][Logic]   ID生成         — 新規プロジェクトの id は nanoid() で生成する
                 -->
             </dialog>
         </div>
 
         <!-- ============================================================
-            CTX-4: SETTINGS DIALOG
+            CTX-4: SETTINGS DIALOG [ ]
             責務: アプリ設定の表示（中身はおいおい追加）
             トリガー: Topbar の Settings アイコンボタンクリック
             使用コンポーネント: shadcn Dialog / Button
@@ -591,8 +591,8 @@
                 </div>
 
                 <!--
-                    [Feature] Close   — 「閉じる」または overlay クリックでダイアログを閉じる
-                    [Logic]   Control — isSettingsOpen && <SettingsDialog/> の条件付きレンダリング（shadcn Dialog）
+                    [ ][Feature] Close   — 「閉じる」または overlay クリックでダイアログを閉じる
+                    [ ][Logic]   Control — isSettingsOpen && <SettingsDialog/> の条件付きレンダリング（shadcn Dialog）
                 -->
             </dialog>
         </div>
