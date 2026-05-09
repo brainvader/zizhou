@@ -6,20 +6,9 @@
  * @story    file-tree.spec.tsx の @story に準拠
  * @output   src/components/FileTree.tsx
  *
- * @note     Tauri IPC を mockIPC でモックして dev サーバー上で動作する。
- *           index.html に VITE_PLAYWRIGHT ガードが必要（下記参照）。
- *
- *           index.html に以下を追加すること:
- *           ```html
- *           <script type="module">
- *             if (import.meta.env.VITE_PLAYWRIGHT) {
- *               const { mockIPC } = await import('@tauri-apps/api/mocks')
- *               window.mockIPC = mockIPC
- *             }
- *           </script>
- *           ```
- *
- *           playwright.config.ts の webServer に以下を追加すること:
+ * @note     Tauri IPC を addInitScript 内で mockIPC を直接 import してモックする。
+ *           index.html への window.mockIPC 差し込みは不要。
+ *           playwright.config.ts の webServer に以下が必要:
  *           ```ts
  *           env: { VITE_PLAYWRIGHT: 'true' }
  *           ```
@@ -37,22 +26,16 @@ import { test, expect, type Page } from '@playwright/test'
 
 const PROJECT_DETAIL_URL = '/projects/1'
 
-/** mockIPC のグローバル型定義 */
-declare global {
-    interface Window {
-        mockIPC: (cb: (cmd: string, args: Record<string, unknown>) => unknown) => void
-    }
-}
-
 /**
  * テスト用ファイルツリーの IPC モック定義。
- * addInitScript でページロード前に仕込み、最初の readDir 呼び出しに間に合わせる。
+ * addInitScript 内で mockIPC を直接 import し、window.mockIPC への依存を排除する。
  * plugin:fs|read_dir  — path をキーにしたマップで DirEntry[] を返す。
  * plugin:path|join    — パスを '/' で結合して返す（Windows パスの検証も兼ねる）。
  */
 const setupMockIPC = async (page: Page) => {
-    await page.addInitScript(() => {
-        window.mockIPC((cmd, args) => {
+    await page.addInitScript(async () => {
+        const { mockIPC } = await import('@tauri-apps/api/mocks')
+        mockIPC((cmd, args) => {
             // ── plugin:path|join ──────────────────────────────────────────
             if (cmd === 'plugin:path|join') {
                 const { paths } = args as { paths: string[] }
