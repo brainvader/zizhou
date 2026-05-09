@@ -665,6 +665,7 @@
                        nodes[], edges[] は Zustand で管理する
                        ノード追加はダイアログなし（インライン操作）。
                        「＋ ノード追加」ボタンクリックでデフォルト位置に直接追加する。
+                       initStatus が 'checking' の場合はエディタ領域にローディングスピナーを表示する。
                        initStatus が 'uninitialized' の場合はエディタ領域全体を Setup ビューに切り替える。
                        Setup ビューで「初期化」ボタンを押すと graphs/ を作成し initStatus が 'ready' になる。
             ============================================================ -->
@@ -708,6 +709,7 @@
                 </div>
 
                 <!--
+                    [ ][Feature] Loading    — initStatus が 'checking' のときエディタ領域にローディングスピナーを表示する
                     [ ][Feature] Setup View    — initStatus が 'uninitialized' のときエディタ領域全体を
                                                  Setup ビューに切り替え「初期化」ボタンを表示する
                     [ ][Feature] Add Node      — 「＋ ノード追加」ボタンでデフォルト位置に汎用ノードを追加する
@@ -732,7 +734,7 @@
             <!-- ============================================================
                  CTX-3: NODE PROPERTY
                  責務: 選択中ノードの名前・説明を表示する（読み取り専用）
-                 注意: selectedNodeId が null のときは空状態を表示する
+                 注意: selectedNodeId が null のときは何も表示しない（空白）
             ============================================================ -->
             <aside id="ctx-node-property">
                 <div class="pane-header">
@@ -752,16 +754,11 @@
                     </div>
                 </div>
 
-                <!-- 空状態（selectedNodeId が null のとき） -->
-                <!--
-                <div class="property-empty">
-                    <span class="property-empty-text">ノードを選択してください</span>
-                </div>
-                -->
+                <!-- 空状態（selectedNodeId が null のとき）: 何も表示しない -->
 
                 <!--
                     [ ][Feature] Property Display — 選択中ノードの name・description を表示する
-                    [ ][Feature] Empty State      — selectedNodeId が null のとき「ノードを選択してください」を表示する
+                    [ ][Feature] Empty State      — selectedNodeId が null のとき何も表示しない（空白）
                     [ ][Logic]   Sync             — selectedNodeId の変化を購読し、対応するノードのデータを表示する
                 -->
             </aside>
