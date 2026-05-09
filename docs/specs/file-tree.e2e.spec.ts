@@ -113,6 +113,7 @@ test.describe('CTX-1 FileTree — Visual Story', () => {
 
     test.beforeEach(async ({ page }) => {
         await setupMockIPC(page)
+        await page.goto('/')
         await page.goto(PROJECT_DETAIL_URL)
     })
 
