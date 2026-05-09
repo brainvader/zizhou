@@ -49,14 +49,14 @@ const { mockProjects, mockUseProjectStore, mockUseProjectFile } = vi.hoisted(() 
 
     const mockUseProjectStore = vi.fn(() => ({
         projects: mockProjects,
-        addProject: vi.fn<[Project], void>(),
-        setProjects: vi.fn<[Project[]], void>(),
+        addProject: vi.fn() as unknown as (p: Project) => void,
+        setProjects: vi.fn() as unknown as (ps: Project[]) => void,
     }));
 
     const mockUseProjectFile = vi.fn(() => ({
         isHydrated: true,
-        loadProjects: vi.fn<[], Promise<void>>(),
-        saveProjects: vi.fn<[Project[]], Promise<void>>(),
+        loadProjects: vi.fn() as unknown as () => Promise<void>,
+        saveProjects: vi.fn() as unknown as (ps: Project[]) => Promise<void>,
     }));
 
     return { mockProjects, mockUseProjectStore, mockUseProjectFile };
