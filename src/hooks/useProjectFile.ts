@@ -80,6 +80,7 @@ export const useProjectFile = (): UseProjectFileReturn => {
         } finally {
             hydrated.current = true
             setIsHydrated(true)
+            useProjectStore.getState().setHydrated(true)
         }
     }, [])
 
