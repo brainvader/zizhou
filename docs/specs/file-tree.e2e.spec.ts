@@ -6,109 +6,22 @@
  * @story    file-tree.spec.tsx の @story に準拠
  * @output   src/components/FileTree.tsx
  *
- * @note     Tauri IPC を __TAURI_INTERNALS__.invoke の同期差し替えでモックする。
- *           playwright.config.ts の webServer に以下が必要:
- *           ```ts
- *           env: { VITE_PLAYWRIGHT: 'true' }
- *           ```
+ * @note     Tauri プラグインは vite.config.ts の alias で差し替える。
+ *           VITE_PLAYWRIGHT=true のとき src/__mocks__/ のモジュールが使われる。
+ *           playwright.config.ts の webServer.env に設定済み。
  */
 
 // =============================================================================
 // Slot 2: Imports
 // =============================================================================
 
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 
 // =============================================================================
 // Slot 3: セットアップ（E2E 共通）
 // =============================================================================
 
 const PROJECT_DETAIL_URL = '/projects/1'
-
-/** __TAURI_INTERNALS__ のグローバル型定義 */
-declare global {
-    interface Window {
-        __TAURI_INTERNALS__: {
-            invoke?: (cmd: string, args: Record<string, unknown>) => Promise<unknown>
-            [key: string]: unknown
-        }
-    }
-}
-
-/**
- * テスト用 IPC モック定義。
- * window.__TAURI_INTERNALS__.invoke を同期的に差し替える。
- *
- * モック対象:
- * - plugin:fs|exists          — projects.json の存在確認 → true
- * - plugin:fs|read_text_file  — projects.json の内容 → id=1 のプロジェクト
- * - plugin:fs|read_dir        — ファイルツリーの再帰読み込み
- * - plugin:path|join          — パス結合（Windows パスの正規化も兼ねる）
- */
-const setupMockIPC = async (page: Page) => {
-    await page.addInitScript(() => {
-        window.__TAURI_INTERNALS__ = window.__TAURI_INTERNALS__ ?? {}
-
-        window.__TAURI_INTERNALS__.invoke = async (cmd: string, args: Record<string, unknown>) => {
-
-            // ── plugin:fs|write_text_file ─────────────────────────────────
-            if (cmd === 'plugin:fs|write_text_file') {
-                return null
-            }
-
-            // ── plugin:fs|exists ──────────────────────────────────────────
-            if (cmd === 'plugin:fs|exists') {
-                return true
-            }
-
-            // ── plugin:fs|read_text_file ──────────────────────────────────
-            if (cmd === 'plugin:fs|read_text_file') {
-                return JSON.stringify([
-                    {
-                        id: '1',
-                        name: 'zizou-core',
-                        rootPath: '/Users/user/projects/zizou-core',
-                    },
-                ])
-            }
-
-            // ── plugin:path|join ──────────────────────────────────────────
-            if (cmd === 'plugin:path|join') {
-                const { paths } = args as { paths: string[] }
-                return paths.join('/').replace(/\/+/g, '/')
-            }
-
-            // ── plugin:fs|read_dir ────────────────────────────────────────
-            if (cmd === 'plugin:fs|read_dir') {
-                const { path } = args as { path: string }
-
-                const tree: Record<string, Array<{
-                    name: string
-                    isFile: boolean
-                    isDirectory: boolean
-                    isSymlink: boolean
-                }>> = {
-                    '/Users/user/projects/zizou-core': [
-                        { name: 'src', isFile: false, isDirectory: true, isSymlink: false },
-                        { name: 'graphs', isFile: false, isDirectory: true, isSymlink: false },
-                    ],
-                    '/Users/user/projects/zizou-core/src': [
-                        { name: 'components', isFile: false, isDirectory: true, isSymlink: false },
-                    ],
-                    '/Users/user/projects/zizou-core/src/components': [
-                        { name: 'FileTree.tsx', isFile: true, isDirectory: false, isSymlink: false },
-                    ],
-                    '/Users/user/projects/zizou-core/graphs': [
-                        { name: 'graph-01.json', isFile: true, isDirectory: false, isSymlink: false },
-                        { name: 'graph-02.json', isFile: true, isDirectory: false, isSymlink: false },
-                    ],
-                }
-
-                return tree[path] ?? []
-            }
-        }
-    })
-}
 
 // =============================================================================
 // Slot 4: Visual Story
@@ -117,9 +30,8 @@ const setupMockIPC = async (page: Page) => {
 test.describe('CTX-1 FileTree — Visual Story', () => {
 
     test.beforeEach(async ({ page }) => {
-        await setupMockIPC(page)
         await page.goto(PROJECT_DETAIL_URL)
-        // loadProjects() + setProjectRootPath の完了を Loading… の消失で待つ
+        // readDir 完了を Loading… の消失で待つ
         await expect(page.getByText('Loading…')).toBeHidden()
     })
 
@@ -168,7 +80,7 @@ test.describe('CTX-1 FileTree — Visual Story', () => {
     test('step 7-8: selects graph json and updates activeGraphId', async ({ page }) => {
         await page.getByText('graphs').click()
         await page.getByText('graph-01.json').click()
-        await expect(page.locator('#ctx-graph-editor')).toBeVisible()
+        await expect(page.locator('#graph-editor')).toBeVisible()
         await page.screenshot({
             path: 'evidence/FileTree_step7-8_graph_selected.png',
         })
