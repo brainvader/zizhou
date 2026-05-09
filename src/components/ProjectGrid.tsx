@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
+import { Link } from '@tanstack/react-router'
 import { useProjectStore } from '@/store/useProjectStore'
 import { NewProjectFormSchema, type NewProjectForm } from '@/bom/project'
 import {
@@ -75,15 +76,18 @@ export const ProjectGrid = ({ isHydrated }: ProjectGridProps) => {
             {/* プロジェクトカードグリッド */}
             <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
                 {projects.map((project) => (
-                    <article
+                    <Link
                         key={project.id}
-                        className="rounded-md border border-border bg-card p-4 cursor-pointer hover:-translate-y-px transition-transform"
+                        to="/projects/$id"
+                        params={{ id: project.id }}
+                        data-testid={`card-${project.id}`}
+                        className="rounded-md border border-border bg-card p-4 cursor-pointer hover:-translate-y-px transition-transform block no-underline"
                     >
                         <div className="font-medium text-card-foreground text-sm">{project.name}</div>
                         {project.description && (
                             <div className="text-muted-foreground text-xs mt-1">{project.description}</div>
                         )}
-                    </article>
+                    </Link>
                 ))}
 
                 {/* ＋ new project 破線カード — loadProjects 完了前は disabled */}
