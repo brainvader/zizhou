@@ -51,6 +51,11 @@ const setupMockIPC = async (page: Page) => {
 
         window.__TAURI_INTERNALS__.invoke = async (cmd: string, args: Record<string, unknown>) => {
 
+            // ── plugin:fs|write_text_file ─────────────────────────────────
+            if (cmd === 'plugin:fs|write_text_file') {
+                return null
+            }
+
             // ── plugin:fs|exists ──────────────────────────────────────────
             if (cmd === 'plugin:fs|exists') {
                 return true
@@ -113,10 +118,9 @@ test.describe('CTX-1 FileTree — Visual Story', () => {
 
     test.beforeEach(async ({ page }) => {
         await setupMockIPC(page)
-        await page.goto('/')
-        // loadProjects() の完了を isHydrated で待つ（＋ new project が enabled になる）
-        await expect(page.getByRole('button', { name: '＋ new project' })).toBeEnabled()
         await page.goto(PROJECT_DETAIL_URL)
+        // loadProjects() + setProjectRootPath の完了を Loading… の消失で待つ
+        await expect(page.getByText('Loading…')).toBeHidden()
     })
 
     /**
