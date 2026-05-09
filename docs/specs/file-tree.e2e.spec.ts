@@ -36,8 +36,7 @@ import type { mockIPC } from '@tauri-apps/api/mocks'
 // Slot 3: セットアップ（E2E 共通）
 // =============================================================================
 
-const APP_URL = 'http://localhost:1420'
-const PROJECT_DETAIL_URL = `${APP_URL}/projects/1`
+const PROJECT_DETAIL_URL = '/projects/1'
 
 /** mockIPC のグローバル型定義 */
 declare global {
@@ -48,47 +47,49 @@ declare global {
 
 /**
  * テスト用ファイルツリーの IPC モック定義。
+ * addInitScript でページロード前に仕込み、最初の readDir 呼び出しに間に合わせる。
  * plugin:fs|read_dir  — path をキーにしたマップで DirEntry[] を返す。
  * plugin:path|join    — パスを '/' で結合して返す（Windows パスの検証も兼ねる）。
  */
 const setupMockIPC = async (page: Page) => {
-    await page.evaluate(() => {
-        window.mockIPC((cmd, args) => {
-            // ── plugin:path|join ──────────────────────────────────────────
-            if (cmd === 'plugin:path|join') {
-                const { paths } = args as { paths: string[] }
-                // OS セパレータに依存しない結合（Windows の \ も正規化）
-                return paths.join('/').replace(/\/+/g, '/')
-            }
-
-            // ── plugin:fs|read_dir ────────────────────────────────────────
-            if (cmd === 'plugin:fs|read_dir') {
-                const { path } = args as { path: string }
-
-                const tree: Record<string, Array<{
-                    name: string
-                    isFile: boolean
-                    isDirectory: boolean
-                    isSymlink: boolean
-                }>> = {
-                    '/Users/user/projects/zizou-core': [
-                        { name: 'src', isFile: false, isDirectory: true, isSymlink: false },
-                        { name: 'graphs', isFile: false, isDirectory: true, isSymlink: false },
-                    ],
-                    '/Users/user/projects/zizou-core/src': [
-                        { name: 'components', isFile: false, isDirectory: true, isSymlink: false },
-                    ],
-                    '/Users/user/projects/zizou-core/src/components': [
-                        { name: 'FileTree.tsx', isFile: true, isDirectory: false, isSymlink: false },
-                    ],
-                    '/Users/user/projects/zizou-core/graphs': [
-                        { name: 'graph-01.json', isFile: true, isDirectory: false, isSymlink: false },
-                        { name: 'graph-02.json', isFile: true, isDirectory: false, isSymlink: false },
-                    ],
+    await page.addInitScript(() => {
+        window.addEventListener('DOMContentLoaded', () => {
+            window.mockIPC((cmd, args) => {
+                // ── plugin:path|join ──────────────────────────────────────────
+                if (cmd === 'plugin:path|join') {
+                    const { paths } = args as { paths: string[] }
+                    return paths.join('/').replace(/\/+/g, '/')
                 }
 
-                return tree[path] ?? []
-            }
+                // ── plugin:fs|read_dir ────────────────────────────────────────
+                if (cmd === 'plugin:fs|read_dir') {
+                    const { path } = args as { path: string }
+
+                    const tree: Record<string, Array<{
+                        name: string
+                        isFile: boolean
+                        isDirectory: boolean
+                        isSymlink: boolean
+                    }>> = {
+                        '/Users/user/projects/zizou-core': [
+                            { name: 'src', isFile: false, isDirectory: true, isSymlink: false },
+                            { name: 'graphs', isFile: false, isDirectory: true, isSymlink: false },
+                        ],
+                        '/Users/user/projects/zizou-core/src': [
+                            { name: 'components', isFile: false, isDirectory: true, isSymlink: false },
+                        ],
+                        '/Users/user/projects/zizou-core/src/components': [
+                            { name: 'FileTree.tsx', isFile: true, isDirectory: false, isSymlink: false },
+                        ],
+                        '/Users/user/projects/zizou-core/graphs': [
+                            { name: 'graph-01.json', isFile: true, isDirectory: false, isSymlink: false },
+                            { name: 'graph-02.json', isFile: true, isDirectory: false, isSymlink: false },
+                        ],
+                    }
+
+                    return tree[path] ?? []
+                }
+            })
         })
     })
 }
@@ -100,8 +101,8 @@ const setupMockIPC = async (page: Page) => {
 test.describe('CTX-1 FileTree — Visual Story', () => {
 
     test.beforeEach(async ({ page }) => {
-        await page.goto(PROJECT_DETAIL_URL)
         await setupMockIPC(page)
+        await page.goto(PROJECT_DETAIL_URL)
     })
 
     /**
