@@ -18,12 +18,12 @@ export const Topbar = ({ onSettingsClick }: TopbarProps) => {
     return (
         <header
             data-testid="topbar"
-            className="h-[52px] bg-card border-b border-border flex items-center px-[22px] gap-4 flex-shrink-0 shadow-[inset_0_1px_0_#c0392b28]"
+            className="h-13 bg-card border-b border-border flex items-center px-5.5 gap-4 shrink-0 shadow-[inset_0_1px_0_#c0392b28]"
         >
             {/* ロゴ */}
             <div className="flex items-center gap-3">
                 {/* 漢字 + 朱色アンダーライン */}
-                <div className="relative inline-block after:content-[''] after:absolute after:bottom-[-3px] after:left-0 after:right-0 after:h-[2px] after:bg-primary after:rounded-sm after:opacity-80">
+                <div className="relative inline-block after:content-[''] after:absolute after:-bottom-0.75 after:left-0 after:right-0 after:h-0.5 after:bg-primary after:rounded-sm after:opacity-80">
                     <span
                         className="font-serif text-[20px] font-normal text-foreground tracking-[0.15em] leading-none drop-shadow-sm"
                         style={{ fontFamily: "'Noto Serif JP', serif" }}
@@ -33,10 +33,10 @@ export const Topbar = ({ onSettingsClick }: TopbarProps) => {
                 </div>
 
                 {/* セパレーター */}
-                <div className="w-px h-[18px] bg-border" />
+                <div className="w-px h-4.5 bg-border" />
 
                 {/* romaji + version */}
-                <div className="flex flex-col gap-[1px]">
+                <div className="flex flex-col gap-px">
                     <span className="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">
                         Zizou
                     </span>
