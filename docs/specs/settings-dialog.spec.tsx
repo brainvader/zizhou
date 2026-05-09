@@ -23,7 +23,7 @@ import { SettingsDialog } from '../../src/components/SettingsDialog'
 /**
  * Slot 3: モック・セットアップ (Test Setup)
  */
-const onOpenChange = vi.fn<[boolean], void>()
+const onOpenChange = vi.fn<(open: boolean) => void>()
 
 const renderOpen = () =>
     render(<SettingsDialog open={true} onOpenChange={onOpenChange} />)
