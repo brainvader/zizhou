@@ -22,8 +22,8 @@ import { test, expect } from '@playwright/test'
  * Vitest/RTL のモックは使用しない。
  * Dev サーバー（localhost:5173）にアクセスして視覚的証拠を取得する。
  */
-const TOPBAR_SELECTOR = 'header#ctx-topbar, [data-testid="topbar"]'
-const SETTINGS_BTN_SELECTOR = '[aria-label="Settings"], button[title="Settings"], [data-testid="settings-btn"]'
+const TOPBAR_SELECTOR = '[data-testid="topbar"]'
+const SETTINGS_BTN_SELECTOR = '[data-testid="settings-btn"]'
 
 /**
  * Slot 4: 挙動の検証コード (Story Verification)
@@ -33,7 +33,7 @@ const SETTINGS_BTN_SELECTOR = '[aria-label="Settings"], button[title="Settings"]
 
 test.describe('Topbar — Visual Story', () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto('http://localhost:5173')
+        await page.goto('/')
         // Topbar が DOM に現れるまで待機
         await page.waitForSelector(TOPBAR_SELECTOR, { timeout: 10_000 })
     })
@@ -50,20 +50,21 @@ test.describe('Topbar — Visual Story', () => {
         await expect(settingsBtn).toBeVisible()
 
         // 視覚的証拠
-        await page.screenshot({ path: 'evidence/Topbar_result.png', fullPage: false })
+        await page.screenshot({ path: 'evidence/Topbar_step2_initial.png' })
     })
 
     test('story step 3-4: Settings ボタンをクリックできる', async ({ page }) => {
         const settingsBtn = page.locator(SETTINGS_BTN_SELECTOR).first()
 
         // クリック前のスクリーンショット
-        await page.screenshot({ path: 'evidence/Topbar_settings_before.png', fullPage: false })
+        await page.screenshot({ path: 'evidence/Topbar_step3_before.png' })
 
         await settingsBtn.click()
 
         // クリック後のスクリーンショット（コールバック発火の視覚的記録）
-        await page.screenshot({ path: 'evidence/Topbar_settings_after.png', fullPage: false })
+        await page.screenshot({ path: 'evidence/Topbar_step4_clicked.png' })
 
+        // TODO: Settings画面実装後、遷移先のUI要素をアサーションに追加する
         // Settings ボタンがクリック後も DOM に残っていること（クラッシュしていない）
         await expect(settingsBtn).toBeVisible()
     })
