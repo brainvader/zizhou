@@ -15,7 +15,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { Topbar } from '../../src/components/Topbar'
+import { Topbar } from '@/components/Topbar'
 
 /**
  * Slot 3: モック・セットアップ (Test Setup)
