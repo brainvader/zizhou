@@ -49,6 +49,7 @@
         <!-- ctx-graph-editor のローカル状態 -->
         <script data-context="ctx-graph-editor" class="local-state" type="application/json">
             {
+                "isInitialized": null,
                 "nodes": [],
                 "edges": [],
                 "selectedNodeId": null
@@ -660,6 +661,8 @@
                        nodes[], edges[] は Zustand で管理する
                        ノード追加はダイアログなし（インライン操作）。
                        「＋ ノード追加」ボタンクリックでデフォルト位置に直接追加する。
+                       graphs/ が存在しない場合はエディタ領域全体を Setup ビューに切り替える。
+                       Setup ビューで「初期化」ボタンを押すと graphs/ を作成しエディタに切り替わる。
             ============================================================ -->
             <main id="ctx-graph-editor">
 
@@ -701,12 +704,18 @@
                 </div>
 
                 <!--
+                    [ ][Feature] Setup View    — graphs/ が存在しない場合にエディタ領域全体を
+                                                 Setup ビューに切り替え「初期化」ボタンを表示する
                     [ ][Feature] Add Node      — 「＋ ノード追加」ボタンでデフォルト位置に汎用ノードを追加する
                                                  （ダイアログなし・インライン操作）
                     [ ][Feature] Move Node     — ノードをドラッグで移動する（React Flow 標準）
                     [ ][Feature] Connect Nodes — ハンドルからドラッグしてエッジを接続する（React Flow 標準）
                     [ ][Feature] Select Node   — ノードをクリックで選択し selectedNodeId を更新する
                     [ ][Feature] Empty State   — nodes[] が空のとき「ノードを追加してください」を表示する
+                    [ ][Logic]   Init Check    — マウント時に Tauri fs で {projectRootPath}/graphs/ の存在を確認し
+                                                 isInitialized を更新する（null: 確認中 / true: 存在 / false: 未存在）
+                    [ ][Logic]   Init Dir      — 「初期化」ボタンで Tauri fs の mkdir を呼び graphs/ を作成後
+                                                 isInitialized を true に更新しエディタビューに切り替える
                     [ ][Logic]   State         — nodes[], edges[], selectedNodeId を Zustand で管理する
                     [ ][Logic]   Persist       — nodes[], edges[] の変化を subscribe で監視し
                                                      Tauri fs で {projectRootPath}/graphs/{graphId}.json に保存する
