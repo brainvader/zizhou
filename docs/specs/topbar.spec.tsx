@@ -24,10 +24,8 @@ const { mockOnSettingsClick } = vi.hoisted(() => ({
     mockOnSettingsClick: vi.fn(),
 }))
 
-const setup = (overrides?: { onSettingsClick?: () => void }) => {
-    const onSettingsClick = overrides?.onSettingsClick ?? mockOnSettingsClick
-    return render(<Topbar onSettingsClick={onSettingsClick} />)
-}
+const setup = (props?: React.ComponentProps<typeof Topbar>) =>
+    render(<Topbar onSettingsClick={mockOnSettingsClick} {...props} />)
 
 /**
  * Slot 4: 挙動の検証コード (Story Verification)
@@ -42,22 +40,22 @@ describe('Topbar — logic', () => {
 
     it('logic: ロゴ漢字「地蔵」が表示される', () => {
         setup()
-        expect(screen.getByText('地蔵')).toBeTruthy()
+        expect(screen.getByText('地蔵')).toBeVisible()
     })
 
     it('logic: romaji「Zizou」が表示される', () => {
         setup()
-        expect(screen.getByText(/zizou/i)).toBeTruthy()
+        expect(screen.getByText(/zizou/i)).toBeVisible()
     })
 
     it('logic: バージョン文字列「Protocol v7.00」が表示される', () => {
         setup()
-        expect(screen.getByText(/protocol v7\.00/i)).toBeTruthy()
+        expect(screen.getByText(/protocol v7\.00/i)).toBeVisible()
     })
 
     it('logic: Settings ボタンが role=button として存在する', () => {
         setup()
-        expect(screen.getByRole('button', { name: /settings/i })).toBeTruthy()
+        expect(screen.getByRole('button', { name: /settings/i })).toBeVisible()
     })
 
     it('logic: Settings ボタンクリックで onSettingsClick が1回呼ばれる', () => {
@@ -67,9 +65,9 @@ describe('Topbar — logic', () => {
     })
 
     it('logic: onSettingsClick が未指定でもクリックでエラーが発生しない', () => {
-        // デフォルト props なし — クラッシュしないことを確認
+        // onSettingsClick を undefined で上書きしてデフォルト props なしを再現
         expect(() => {
-            render(<Topbar />)
+            setup({ onSettingsClick: undefined })
             fireEvent.click(screen.getByRole('button', { name: /settings/i }))
         }).not.toThrow()
     })
