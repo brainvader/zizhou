@@ -31,7 +31,7 @@
 // =============================================================================
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+// import { render, screen, fireEvent } from '@testing-library/react'
 import type { FileTreeNode } from '@/bom/graph'
 
 // コンポーネント本体（実装後にアンコメント）
@@ -101,18 +101,9 @@ const makeTree = (): FileTreeNode[] => [
     },
 ]
 
-/** ディレクトリが空の最小ツリー */
-const makeEmptyTree = (): FileTreeNode[] => [
-    {
-        name: 'src',
-        path: '/Users/user/projects/zizou-core/src',
-        isDir: true,
-        children: [],
-    },
-]
-
 beforeEach(() => {
     vi.clearAllMocks()
+    mockReadDir.mockResolvedValue(makeTree())
 })
 
 // =============================================================================
@@ -125,7 +116,7 @@ describe('FileTree — logic', () => {
      * ツリーデータが渡されたとき、ルートディレクトリ名が画面に表示される。
      */
     it('renders root directory names from tree data', () => {
-        // render(<FileTree tree={makeTree()} />)
+        // render(<FileTree />) // readDir は内部で呼ばれる
         // expect(screen.getByText('src')).toBeInTheDocument()
         // expect(screen.getByText('graphs')).toBeInTheDocument()
         expect(true).toBe(true) // placeholder
@@ -136,7 +127,7 @@ describe('FileTree — logic', () => {
      * 初期状態では子ノードは非表示（expandedDirs が空）。
      */
     it('hides children on initial render when expandedDirs is empty', () => {
-        // render(<FileTree tree={makeTree()} />)
+        // render(<FileTree />) // readDir は内部で呼ばれる
         // expect(screen.queryByText('components')).not.toBeInTheDocument()
         expect(true).toBe(true) // placeholder
     })
@@ -146,7 +137,7 @@ describe('FileTree — logic', () => {
      * ディレクトリをクリックすると子ノードが表示される（展開）。
      */
     it('expands a directory on click and shows children', () => {
-        // render(<FileTree tree={makeTree()} />)
+        // render(<FileTree />) // readDir は内部で呼ばれる
         // fireEvent.click(screen.getByText('src'))
         // expect(screen.getByText('components')).toBeInTheDocument()
         expect(true).toBe(true) // placeholder
@@ -157,7 +148,7 @@ describe('FileTree — logic', () => {
      * 展開済みディレクトリを再クリックすると子ノードが非表示になる（折りたたみ）。
      */
     it('collapses an expanded directory on second click', () => {
-        // render(<FileTree tree={makeTree()} />)
+        // render(<FileTree />) // readDir は内部で呼ばれる
         // fireEvent.click(screen.getByText('src'))
         // expect(screen.getByText('components')).toBeInTheDocument()
         // fireEvent.click(screen.getByText('src'))
@@ -170,7 +161,7 @@ describe('FileTree — logic', () => {
      * graphs/ 配下以外のファイルをクリックしても setActiveGraphId は呼ばれない。
      */
     it('does not call setActiveGraphId when selecting a non-graph file', () => {
-        // render(<FileTree tree={makeTree()} />)
+        // render(<FileTree />) // readDir は内部で呼ばれる
         // fireEvent.click(screen.getByText('src'))
         // fireEvent.click(screen.getByText('components'))
         // fireEvent.click(screen.getByText('FileTree.tsx'))
@@ -184,19 +175,11 @@ describe('FileTree — logic', () => {
      * 拡張子なしファイル名（graphId）で呼ばれる。
      */
     it('calls setActiveGraphId with graphId when selecting a .json under graphs/', () => {
-        // render(<FileTree tree={makeTree()} />)
+        // render(<FileTree />) // readDir は内部で呼ばれる
         // fireEvent.click(screen.getByText('graphs'))
         // fireEvent.click(screen.getByText('graph-01.json'))
         // expect(mockSetActiveGraphId).toHaveBeenCalledWith('graph-01')
         expect(true).toBe(true) // placeholder
     })
 
-    /**
-     * ツリーが空（children: []）のとき何もクラッシュせずレンダリングできる。
-     */
-    it('renders without crashing when tree is empty', () => {
-        // render(<FileTree tree={makeEmptyTree()} />)
-        // expect(screen.getByText('src')).toBeInTheDocument()
-        expect(true).toBe(true) // placeholder
-    })
 })
