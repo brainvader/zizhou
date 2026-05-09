@@ -72,7 +72,7 @@ export const ProjectGrid = ({ isHydrated }: ProjectGridProps) => {
     }
 
     return (
-        <main className="p-6">
+        <main data-testid="project-grid" className="p-6">
             {/* プロジェクトカードグリッド */}
             <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
                 {projects.map((project) => (
