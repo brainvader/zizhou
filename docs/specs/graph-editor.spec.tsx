@@ -134,11 +134,8 @@ describe('GraphEditor: Init Check logic', () => {
         //     expect(mockExists).toHaveBeenCalledWith('/Users/user/projects/zizou-core/graphs')
         // })
 
-        // Placeholder: ロジック確認のみ
-        const path = '/Users/user/projects/zizou-core/graphs'
-        mockExists.mockResolvedValueOnce(true)
-        await expect(mockExists(path)).resolves.toBe(true)
-        expect(mockExists).toHaveBeenCalledWith(path)
+        // Placeholder: 実装後にコメントアウト解除
+        expect(true).toBe(true)
     })
 
     test('graphs/ が存在しない場合、setInitStatus("uninitialized") が呼ばれる', async () => {
