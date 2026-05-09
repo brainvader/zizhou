@@ -20,7 +20,7 @@ const loadTree = async (dirPath: string): Promise<FileTreeNode[]> => {
         entries.map(async (entry): Promise<FileTreeNode> => {
             const entryPath = await join(dirPath, entry.name)
 
-            if (entry.isDirectory) {
+            if (entry.isDirectory && !entry.isSymlink) {
                 const children = await loadTree(entryPath)
                 return { name: entry.name, path: entryPath, isDir: true, children }
             }
@@ -203,7 +203,7 @@ export const FileTree = () => {
         if (isGraphJson(path)) {
             setActiveGraphId(toGraphId(path))
         }
-    }, [setActiveGraphId])
+    }, [setSelectedPath, setActiveGraphId])
 
     return (
         <nav
