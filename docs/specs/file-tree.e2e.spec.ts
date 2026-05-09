@@ -6,8 +6,7 @@
  * @story    file-tree.spec.tsx の @story に準拠
  * @output   src/components/FileTree.tsx
  *
- * @note     Tauri IPC を addInitScript 内で mockIPC を直接 import してモックする。
- *           index.html への window.mockIPC 差し込みは不要。
+ * @note     Tauri IPC を __TAURI_INTERNALS__.invoke の同期差し替えでモックする。
  *           playwright.config.ts の webServer に以下が必要:
  *           ```ts
  *           env: { VITE_PLAYWRIGHT: 'true' }
@@ -26,16 +25,48 @@ import { test, expect, type Page } from '@playwright/test'
 
 const PROJECT_DETAIL_URL = '/projects/1'
 
+/** __TAURI_INTERNALS__ のグローバル型定義 */
+declare global {
+    interface Window {
+        __TAURI_INTERNALS__: {
+            invoke?: (cmd: string, args: Record<string, unknown>) => Promise<unknown>
+            [key: string]: unknown
+        }
+    }
+}
+
 /**
- * テスト用ファイルツリーの IPC モック定義。
- * addInitScript 内で mockIPC を直接 import し、window.mockIPC への依存を排除する。
- * plugin:fs|read_dir  — path をキーにしたマップで DirEntry[] を返す。
- * plugin:path|join    — パスを '/' で結合して返す（Windows パスの検証も兼ねる）。
+ * テスト用 IPC モック定義。
+ * window.__TAURI_INTERNALS__.invoke を同期的に差し替える。
+ *
+ * モック対象:
+ * - plugin:fs|exists          — projects.json の存在確認 → true
+ * - plugin:fs|read_text_file  — projects.json の内容 → id=1 のプロジェクト
+ * - plugin:fs|read_dir        — ファイルツリーの再帰読み込み
+ * - plugin:path|join          — パス結合（Windows パスの正規化も兼ねる）
  */
 const setupMockIPC = async (page: Page) => {
-    await page.addInitScript(async () => {
-        const { mockIPC } = await import('@tauri-apps/api/mocks')
-        mockIPC((cmd, args) => {
+    await page.addInitScript(() => {
+        window.__TAURI_INTERNALS__ = window.__TAURI_INTERNALS__ ?? {}
+
+        window.__TAURI_INTERNALS__.invoke = async (cmd: string, args: Record<string, unknown>) => {
+
+            // ── plugin:fs|exists ──────────────────────────────────────────
+            if (cmd === 'plugin:fs|exists') {
+                return true
+            }
+
+            // ── plugin:fs|read_text_file ──────────────────────────────────
+            if (cmd === 'plugin:fs|read_text_file') {
+                return JSON.stringify([
+                    {
+                        id: '1',
+                        name: 'zizou-core',
+                        rootPath: '/Users/user/projects/zizou-core',
+                    },
+                ])
+            }
+
             // ── plugin:path|join ──────────────────────────────────────────
             if (cmd === 'plugin:path|join') {
                 const { paths } = args as { paths: string[] }
@@ -70,7 +101,7 @@ const setupMockIPC = async (page: Page) => {
 
                 return tree[path] ?? []
             }
-        })
+        }
     })
 }
 
