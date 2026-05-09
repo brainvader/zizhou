@@ -528,10 +528,10 @@
 
             <!--
                 [✓][Feature] Project List     — global-store の projects[] をカードグリッドで表示する
-                [ ][Feature] Open Project     — カードを TanStack Router の <Link to="/projects/$id"> でラップして遷移する
+                [✓][Feature] Open Project     — カードを TanStack Router の <Link to="/projects/$id"> でラップして遷移する
                 [✓][Feature] New Project Card — 破線カードクリックで shadcn Dialog を開き name・description を入力して作成する
                 [✓][Logic]   Empty State      — projects[] が空のとき破線カードのみを表示する
-                [ ][Logic]   Routing          — TanStack Router に委譲。Zustand に currentPath は持たない
+                [✓][Logic]   Routing          — TanStack Router に委譲。Zustand に currentPath は持たない
                 [✓][Logic]   Persist          — 起動時に Tauri fs で projects.json を読み込み、変更時に書き出す
             -->
         </main>
@@ -596,6 +596,21 @@
                 -->
             </dialog>
         </div>
+
+        <!-- ============================================================
+            CTX-5: ROUTING [ ]
+            責務: TanStack Router のルート定義・ページコンポーネントの配線
+            注意: routing の SSOT は TanStack Router。Zustand に currentPath は持たない。
+        ============================================================ -->
+        <!--
+            src/router.tsx          — createRouter() + RouterProvider のエクスポート
+            src/routes/index.tsx    — "/" ルート（ProjectGrid をレンダリング）
+            src/routes/projects.$id.tsx — "/projects/$id" ルート（id 表示プレースホルダー）
+
+            [✓][Feature] Project Detail Route — /projects/$id を開くと useParams で id を取得して表示する（プレースホルダー）
+            [✓][Logic]   Router Setup         — createRouter() でルートツリーを構築し App.tsx で RouterProvider をラップする    
+            [✓][Logic]   Link Wrap            — ProjectGrid の各カードを <Link to="/projects/$id"> でラップする（CTX-2 Open Project の実装）
+        -->
 
     </body>
 </html>
