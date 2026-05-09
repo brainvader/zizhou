@@ -43,11 +43,11 @@ test.describe('GraphEditor: Add Node', () => {
         await page.screenshot({ path: 'evidence/graph-editor_add-node.png' })
     })
 
-    test.skip('initStatus が "ready" 以外のとき「＋ ノード追加」ボタンは disabled', async ({ page }) => {
+    test.skip('initStatus が "ready" 以外のとき「＋ ノード追加」ボタンは表示されない', async ({ page }) => {
         // TODO: beforeEach または test fixture で graphs/ が存在しない状態を保証すること
         await page.goto('/projects/1')
-        await expect(page.getByRole('button', { name: /ノード追加/ })).toBeDisabled()
-        await page.screenshot({ path: 'evidence/graph-editor_add-node-disabled.png' })
+        await expect(page.getByRole('button', { name: /ノード追加/ })).not.toBeVisible()
+        await page.screenshot({ path: 'evidence/graph-editor_add-node-hidden.png' })
     })
 })
 

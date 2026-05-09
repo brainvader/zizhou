@@ -7,7 +7,7 @@
  * 2. graphs/ が存在しない場合、Setup ビューに切り替わり「初期化」ボタンが表示される（initStatus: 'uninitialized'）
  * 3. 「初期化」ボタンをクリックすると Tauri fs の mkdir が呼ばれ graphs/ が作成され、エディタビューに切り替わる（initStatus: 'ready'）
  * 4. graphs/ が存在する場合、直接エディタビューが表示される（initStatus: 'ready'）
- * 5. 「＋ ノード追加」ボタンをクリックするとデフォルト位置にノードが追加される
+ * 5. 「＋ ノード追加」ボタンをクリックするとデフォルト位置にノードが追加される（initStatus が 'ready' 以外のときボタンは表示されない）
  * 6. nodes[] が空のとき「ノードを追加してください」の Empty State が表示される
  * 7. ノードをクリックすると selectedNodeId が更新される
  * @output src/components/GraphEditor.tsx
@@ -191,13 +191,13 @@ describe('GraphEditor: Add Node logic', () => {
         expect(calledNode.position).toEqual({ x: expect.any(Number), y: expect.any(Number) })
     })
 
-    test('initStatus が "ready" 以外のとき「＋ ノード追加」ボタンは disabled', () => {
+    test('initStatus が "ready" 以外のとき「＋ ノード追加」ボタンは表示されない', () => {
         mockUseProjectDetailStore.mockImplementation((selector: (s: ReturnType<typeof makeDetailStoreState>) => unknown) =>
             selector(makeDetailStoreState({ initStatus: 'uninitialized' }))
         )
 
         render(<GraphEditor />)
-        expect(screen.getByRole('button', { name: /ノード追加/ })).toBeDisabled()
+        expect(screen.queryByRole('button', { name: /ノード追加/ })).not.toBeInTheDocument()
     })
 })
 
