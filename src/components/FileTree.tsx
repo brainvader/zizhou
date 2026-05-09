@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { readDir } from '@tauri-apps/plugin-fs'
+import { join } from '@tauri-apps/api/path'
 import { ChevronRight, ChevronDown, FileText, Folder, FolderOpen } from 'lucide-react'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import type { FileTreeNode } from '@/bom/graph'
@@ -9,28 +10,31 @@ import type { FileTreeNode } from '@/bom/graph'
 // ============================================================
 
 /**
- * Tauri fs の readDir 結果を FileTreeNode[] にマッピングする。
- * recursive: true で再帰的に読み込む。
+ * plugin-fs v2 の readDir は再帰オプションを持たないため、
+ * path を join しながら再帰的に readDir を呼んで FileTreeNode[] を構築する。
  */
-const loadTree = async (rootPath: string): Promise<FileTreeNode[]> => {
-    const entries = await readDir(rootPath, { recursive: true })
+const loadTree = async (dirPath: string): Promise<FileTreeNode[]> => {
+    const entries = await readDir(dirPath)
 
-    const mapEntries = (items: typeof entries): FileTreeNode[] =>
-        items
-            .map((entry) => ({
-                name: entry.name ?? '',
-                path: entry.path,
-                isDir: entry.children !== undefined,
-                children: entry.children ? mapEntries(entry.children) : undefined,
-            }))
-            .filter((node) => node.name !== '')
-            .sort((a, b) => {
-                // ディレクトリを先、ファイルを後にソート
-                if (a.isDir !== b.isDir) return a.isDir ? -1 : 1
-                return a.name.localeCompare(b.name)
-            })
+    const nodes = await Promise.all(
+        entries.map(async (entry): Promise<FileTreeNode> => {
+            const entryPath = await join(dirPath, entry.name)
 
-    return mapEntries(entries)
+            if (entry.isDirectory) {
+                const children = await loadTree(entryPath)
+                return { name: entry.name, path: entryPath, isDir: true, children }
+            }
+
+            return { name: entry.name, path: entryPath, isDir: false }
+        })
+    )
+
+    return nodes
+        .filter((node) => node.name !== '')
+        .sort((a, b) => {
+            if (a.isDir !== b.isDir) return a.isDir ? -1 : 1
+            return a.name.localeCompare(b.name)
+        })
 }
 
 /**
@@ -79,7 +83,7 @@ const TreeItem = ({
                     role="button"
                     tabIndex={0}
                     className={[
-                        'flex items-center gap-1.5 px-2 py-[3px] rounded-sm cursor-pointer select-none',
+                        'flex items-center gap-1.5 px-2 py-0.75 rounded-sm cursor-pointer select-none',
                         'text-[--muted-foreground] hover:text-[--foreground] hover:bg-[--muted]',
                         'transition-colors duration-100',
                     ].join(' ')}
@@ -87,12 +91,12 @@ const TreeItem = ({
                     onClick={() => onToggleDir(node.path)}
                     onKeyDown={(e) => e.key === 'Enter' && onToggleDir(node.path)}
                 >
-                    <span className="flex-shrink-0 w-3 h-3 text-[--muted-foreground]">
+                    <span className="shrink-0 w-3 h-3 text-[--muted-foreground]">
                         {isExpanded
                             ? <ChevronDown size={12} />
                             : <ChevronRight size={12} />}
                     </span>
-                    <span className="flex-shrink-0 w-3.5 h-3.5">
+                    <span className="shrink-0 w-3.5 h-3.5">
                         {isExpanded
                             ? <FolderOpen size={14} className="text-[--primary]" />
                             : <Folder size={14} className="text-[--muted-foreground]" />}
@@ -120,7 +124,7 @@ const TreeItem = ({
             role="button"
             tabIndex={0}
             className={[
-                'flex items-center gap-1.5 px-2 py-[3px] rounded-sm cursor-pointer select-none',
+                'flex items-center gap-1.5 px-2 py-0.75 rounded-sm cursor-pointer select-none',
                 'text-xs font-mono truncate transition-colors duration-100',
                 isSelected
                     ? 'bg-[--primary-glow] text-[--primary-foreground]'
@@ -130,8 +134,8 @@ const TreeItem = ({
             onClick={() => onSelectFile(node.path)}
             onKeyDown={(e) => e.key === 'Enter' && onSelectFile(node.path)}
         >
-            <span className="flex-shrink-0 w-3 h-3" />
-            <span className="flex-shrink-0 w-3.5 h-3.5">
+            <span className="shrink-0 w-3 h-3" />
+            <span className="shrink-0 w-3.5 h-3.5">
                 <FileText size={14} className={isSelected ? 'text-[--primary]' : 'text-[--muted-foreground]'} />
             </span>
             <span className="truncate">{node.name}</span>
@@ -148,7 +152,7 @@ const TreeItem = ({
  * @bom      docs/bom/graph.ts (FileTreeNode, ProjectDetailStore)
  *
  * projectRootPath を useProjectDetailStore から取得し、
- * マウント時に Tauri fs.readDir（recursive: true）でツリーを構築する。
+ * マウント時に Tauri fs.readDir を再帰呼び出しでツリーを構築する。
  * graphs/ 配下の .json 選択時は setActiveGraphId を呼ぶ。
  */
 export const FileTree = () => {
@@ -160,7 +164,6 @@ export const FileTree = () => {
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
-    // マウント時にツリーを読み込む
     useEffect(() => {
         if (!projectRootPath) return
 
@@ -190,11 +193,7 @@ export const FileTree = () => {
     const handleToggleDir = useCallback((path: string) => {
         setExpandedDirs((prev) => {
             const next = new Set(prev)
-            if (next.has(path)) {
-                next.delete(path)
-            } else {
-                next.add(path)
-            }
+            next.has(path) ? next.delete(path) : next.add(path)
             return next
         })
     }, [])
@@ -206,8 +205,6 @@ export const FileTree = () => {
         }
     }, [setActiveGraphId])
 
-    // ── Render ──────────────────────────────────────────────
-
     return (
         <nav
             id="ctx-file-tree"
@@ -215,7 +212,7 @@ export const FileTree = () => {
             style={{ width: 'var(--pane-file-tree-width)' }}
         >
             {/* ヘッダー */}
-            <div className="flex items-center px-3 h-9 flex-shrink-0 border-b border-[--border]">
+            <div className="flex items-center px-3 h-9 shrink-0 border-b border-[--border]">
                 <span className="text-[10px] font-mono tracking-widest uppercase text-[--muted-foreground]">
                     Files
                 </span>
