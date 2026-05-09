@@ -11,7 +11,7 @@ export const ProjectSchema = z.object({
     id: z.string(),
     name: z.string().min(1, 'name は必須です').max(50),
     description: z.string().max(200).optional(),
-    rootPath: z.string().min(1, 'rootPath は必須です'),  // 追加
+    rootPath: z.string().min(1, 'rootPath は必須です'),
 })
 
 export type Project = z.infer<typeof ProjectSchema>
@@ -25,7 +25,7 @@ export type Project = z.infer<typeof ProjectSchema>
 export const NewProjectFormSchema = z.object({
     name: z.string().min(1, 'name は必須です'),
     description: z.string().max(200).optional(),
-    rootPath: z.string().min(1, 'rootPath は必須です'),  // 追加
+    rootPath: z.string().min(1, 'rootPath は必須です'),
 })
 
 export type NewProjectForm = z.infer<typeof NewProjectFormSchema>
@@ -46,4 +46,15 @@ export type ProjectStore = {
     addProject: (project: Project) => void
     setProjects: (projects: Project[]) => void
     setHydrated: (value: boolean) => void
+}
+
+// ============================================================
+// UseProjectFileReturn
+// useProjectFile hook の戻り値型。
+// ============================================================
+
+export type UseProjectFileReturn = {
+    isHydrated: boolean
+    loadProjects: () => Promise<void>
+    saveProjects: (projects: Project[]) => Promise<void>
 }

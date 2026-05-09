@@ -10,9 +10,12 @@ import type { ProjectStore } from '@/bom/project'
  */
 export const useProjectStore = create<ProjectStore>((set) => ({
     projects: [],
+    isHydrated: false,
 
     addProject: (project) =>
         set((state) => ({ projects: [...state.projects, project] })),
 
     setProjects: (projects) => set({ projects }),
+
+    setHydrated: (value) => set({ isHydrated: value }),
 }))

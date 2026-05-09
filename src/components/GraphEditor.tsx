@@ -73,8 +73,6 @@ export function GraphEditor() {
     // --- onNodesChange / onEdgesChange (React Flow 標準) ---
     const onNodesChange = useCallback(
         (changes: Parameters<typeof setNodes>[0] extends Node[] ? any : any) => {
-            // React Flow の applyNodeChanges を使って nodes を更新する
-            // 現時点では setNodes を直接呼ぶ（applyNodeChanges は実装フェーズで統合）
             void changes
         },
         []
@@ -90,7 +88,6 @@ export function GraphEditor() {
     if (initStatus === 'checking') {
         return (
             <div
-                data-testid="graph-editor-loading"
                 style={{
                     flex: 1,
                     display: 'flex',
@@ -107,7 +104,6 @@ export function GraphEditor() {
     if (initStatus === 'uninitialized') {
         return (
             <div
-                data-testid="graph-editor-setup"
                 style={{
                     flex: 1,
                     display: 'flex',
@@ -126,7 +122,7 @@ export function GraphEditor() {
     // --- Render: ready ---
     return (
         <div
-            data-testid="graph-editor"
+            id="graph-editor"
             style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
         >
             {/* ツールバー */}
@@ -142,7 +138,6 @@ export function GraphEditor() {
             {/* Empty State */}
             {nodes.length === 0 && (
                 <div
-                    data-testid="graph-empty-state"
                     style={{
                         position: 'absolute',
                         inset: 0,

@@ -3,18 +3,15 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
+
+const isPlaywright = process.env.VITE_PLAYWRIGHT === 'true';
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [react(), tailwindcss()],
 
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,
     strictPort: true,
@@ -27,12 +24,16 @@ export default defineConfig(async () => ({
       }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
     },
   },
   resolve: {
     alias: [
+      // Playwright E2E 用モック（VITE_PLAYWRIGHT=true のときのみ有効）
+      ...(isPlaywright ? [
+        { find: '@tauri-apps/plugin-fs', replacement: path.resolve(__dirname, './src/__mocks__/plugin-fs.ts') },
+        { find: '@tauri-apps/api/path', replacement: path.resolve(__dirname, './src/__mocks__/api-path.ts') },
+      ] : []),
       { find: '@/bom', replacement: path.resolve(__dirname, './docs/bom') },
       { find: '@', replacement: path.resolve(__dirname, './src') },
     ],
