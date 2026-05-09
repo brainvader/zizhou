@@ -9,6 +9,7 @@
  * @note     Tauri WebDriver 未対応のため全テスト test.skip。
  *           対応後、test.skip を test に変更して実行する。
  *           スクリーンショットは evidence/ に保存する。
+ *
  */
 
 // =============================================================================
@@ -36,7 +37,9 @@ test.describe('CTX-1 FileTree — Visual Story', () => {
      */
     test.skip('step 1-2: shows root directories on mount', async ({ page }) => {
         await page.goto(PROJECT_DETAIL_URL)
-        await expect(page.getByTestId('file-tree')).toBeVisible()
+        await expect(page.locator('#ctx-file-tree')).toBeVisible()
+        await expect(page.getByText('src')).toBeVisible()
+        await expect(page.getByText('graphs')).toBeVisible()
         await page.screenshot({
             path: 'evidence/FileTree_step1-2_initial.png',
         })
@@ -48,8 +51,8 @@ test.describe('CTX-1 FileTree — Visual Story', () => {
      */
     test.skip('step 3: expands directory on click', async ({ page }) => {
         await page.goto(PROJECT_DETAIL_URL)
-        await page.getByTestId('tree-item-src').click()
-        await expect(page.getByTestId('tree-item-components')).toBeVisible()
+        await page.getByText('src').click()
+        await expect(page.getByText('components')).toBeVisible()
         await page.screenshot({
             path: 'evidence/FileTree_step3_expanded.png',
         })
@@ -61,10 +64,10 @@ test.describe('CTX-1 FileTree — Visual Story', () => {
      */
     test.skip('step 4: collapses directory on second click', async ({ page }) => {
         await page.goto(PROJECT_DETAIL_URL)
-        await page.getByTestId('tree-item-src').click()
+        await page.getByText('src').click()
         await page.screenshot({ path: 'evidence/FileTree_step4_before_collapse.png' })
-        await page.getByTestId('tree-item-src').click()
-        await expect(page.getByTestId('tree-item-components')).not.toBeVisible()
+        await page.getByText('src').click()
+        await expect(page.getByText('components')).not.toBeVisible()
         await page.screenshot({ path: 'evidence/FileTree_step4_after_collapse.png' })
     })
 
@@ -74,10 +77,9 @@ test.describe('CTX-1 FileTree — Visual Story', () => {
      */
     test.skip('step 7-8: selects graph json and updates activeGraphId', async ({ page }) => {
         await page.goto(PROJECT_DETAIL_URL)
-        await page.getByTestId('tree-item-graphs').click()
-        await page.getByTestId('tree-item-graph-01.json').click()
-        // グラフエディタ側でロード済みであることを確認（CTX-2 側の data-testid を参照）
-        await expect(page.getByTestId('graph-editor')).toBeVisible()
+        await page.getByText('graphs').click()
+        await page.getByText('graph-01.json').click()
+        await expect(page.locator('#ctx-graph-editor')).toBeVisible()
         await page.screenshot({
             path: 'evidence/FileTree_step7-8_graph_selected.png',
         })
