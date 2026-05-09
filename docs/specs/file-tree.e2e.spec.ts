@@ -30,7 +30,6 @@
 // =============================================================================
 
 import { test, expect, type Page } from '@playwright/test'
-import type { mockIPC } from '@tauri-apps/api/mocks'
 
 // =============================================================================
 // Slot 3: セットアップ（E2E 共通）
@@ -41,7 +40,7 @@ const PROJECT_DETAIL_URL = '/projects/1'
 /** mockIPC のグローバル型定義 */
 declare global {
     interface Window {
-        mockIPC: typeof mockIPC
+        mockIPC: (cb: (cmd: string, args: Record<string, unknown>) => unknown) => void
     }
 }
 
