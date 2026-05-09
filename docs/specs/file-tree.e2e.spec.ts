@@ -114,6 +114,8 @@ test.describe('CTX-1 FileTree — Visual Story', () => {
     test.beforeEach(async ({ page }) => {
         await setupMockIPC(page)
         await page.goto('/')
+        // loadProjects() の完了をプロジェクトカードの表示で待つ
+        await expect(page.getByRole('link').first()).toBeVisible()
         await page.goto(PROJECT_DETAIL_URL)
     })
 
