@@ -14,7 +14,7 @@ import { NodeProperty } from '@/components/NodeProperty'
 
 const meta: Meta<typeof NodeProperty> = {
     component: NodeProperty,
-    title: 'CTX-3/NodeProperty',
+    title: 'Project Detail/NodeProperty',
     parameters: { layout: 'centered' },
 }
 export default meta
