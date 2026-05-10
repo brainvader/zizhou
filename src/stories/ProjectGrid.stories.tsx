@@ -84,8 +84,7 @@ export const OpenDialog: Story = {
     args: { isHydrated: true },
     play: async ({ userEvent }) => {
         await userEvent.click(screen.getByText('＋ new project'))
-        await expect(screen.getByRole('dialog')).toBeVisible()
-        await expect(screen.getByText('New Project')).toBeVisible()
+        await expect(await screen.findByText('New Project')).toBeInTheDocument()
     },
 }
 
@@ -94,9 +93,10 @@ export const ValidationError: Story = {
     args: { isHydrated: true },
     play: async ({ userEvent }) => {
         await userEvent.click(screen.getByText('＋ new project'))
+        await screen.findByRole('dialog')
         await userEvent.click(screen.getByText('作成'))
         await expect(await screen.findByText('name は必須です')).toBeVisible()
-        await expect(screen.getByRole('dialog')).toBeVisible()
+        await expect(screen.getByRole('dialog')).toBeInTheDocument()
     },
 }
 

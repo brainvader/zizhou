@@ -1,6 +1,7 @@
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog'
@@ -35,6 +36,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Settings</DialogTitle>
+                    <DialogDescription className="sr-only">
+                        アプリケーションの設定を変更します
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex justify-end pt-1">
