@@ -33,10 +33,10 @@ const mockNodes: Node<GraphNodeData>[] = [
     },
 ]
 
-// @story 状態 1: ノード選択済み（description あり）
-export const WithDescription: Story = {
+// @story 状態 3: 未選択（空白）
+export const Empty: Story = {
     args: {
-        selectedNodeId: 'node-001',
+        selectedNodeId: null,
         nodes: mockNodes,
     },
 }
@@ -49,10 +49,10 @@ export const WithoutDescription: Story = {
     },
 }
 
-// @story 状態 3: 未選択（空白）
-export const Empty: Story = {
+// @story 状態 1: ノード選択済み（description あり）
+export const WithDescription: Story = {
     args: {
-        selectedNodeId: null,
+        selectedNodeId: 'node-001',
         nodes: mockNodes,
     },
 }
