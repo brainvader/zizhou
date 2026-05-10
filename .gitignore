@@ -27,3 +27,6 @@ dist-ssr
 evidence/
 *storybook.log
 storybook-static
+
+# Vitest Unite Test Covarage
+coverage/
