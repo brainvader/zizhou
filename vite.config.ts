@@ -2,26 +2,21 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
+import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
+import { playwright } from "@vitest/browser-playwright";
 
 const host = process.env.TAURI_DEV_HOST;
-
 const isPlaywright = process.env.VITE_PLAYWRIGHT === 'true';
 
-// https://vite.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig({
   plugins: [react(), tailwindcss()],
-
   clearScreen: false,
   server: {
     port: 1420,
     strictPort: true,
     host: host || false,
     hmr: host
-      ? {
-        protocol: "ws",
-        host,
-        port: 1421,
-      }
+      ? { protocol: "ws", host, port: 1421 }
       : undefined,
     watch: {
       ignored: ["**/src-tauri/**"],
@@ -29,7 +24,6 @@ export default defineConfig(async () => ({
   },
   resolve: {
     alias: [
-      // Playwright E2E 用モック（VITE_PLAYWRIGHT=true のときのみ有効）
       ...(isPlaywright ? [
         { find: '@tauri-apps/plugin-fs', replacement: path.resolve(__dirname, './src/__mocks__/plugin-fs.ts') },
         { find: '@tauri-apps/api/path', replacement: path.resolve(__dirname, './src/__mocks__/api-path.ts') },
@@ -39,9 +33,28 @@ export default defineConfig(async () => ({
     ],
   },
   test: {
-    environment: "jsdom",
-    setupFiles: ["./tests/setup.ts"],
-    globals: true,
-    exclude: ["**/e2e/**", "**/*.e2e.spec.ts"],
+    projects: [
+      {
+        test: {
+          name: 'unit',
+          environment: 'jsdom',
+          setupFiles: ['./tests/setup.ts'],
+          globals: true,
+          exclude: ['**/e2e/**', '**/*.e2e.spec.ts'],
+        },
+      },
+      {
+        plugins: [storybookTest({ configDir: './.storybook' })],
+        test: {
+          name: 'storybook',
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [{ browser: 'chromium' }],
+          },
+        },
+      },
+    ],
   },
-}));
+});

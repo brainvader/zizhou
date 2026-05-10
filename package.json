@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "e2e": "playwright test",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "test-storybook": "vitest --project=storybook"
   },
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
