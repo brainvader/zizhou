@@ -7,6 +7,7 @@ import {
     type Edge,
     type NodeMouseHandler,
 } from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
 import { nanoid } from 'nanoid'
 import { exists, mkdir } from '@tauri-apps/plugin-fs'
 import { useGraphStore } from '@/store/useGraphStore'
