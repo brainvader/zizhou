@@ -2,6 +2,7 @@ import { useParams } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { FileTree } from '@/components/FileTree'
 import { GraphEditor } from '@/components/GraphEditor'
+import { NodeProperty } from '@/components/NodeProperty'
 import { useProjectFile } from '@/hooks/useProjectFile'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
@@ -38,7 +39,6 @@ export const ProjectDetailRoute = () => {
 
     return (
         <div
-            data-testid="project-detail"
             style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}
         >
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
@@ -47,6 +47,11 @@ export const ProjectDetailRoute = () => {
 
                 {/* CTX-2: GraphEditor */}
                 <GraphEditor />
+
+                {/* CTX-3: NodeProperty */}
+                <aside id="ctx-node-property">
+                    <NodeProperty />
+                </aside>
             </div>
         </div>
     )
