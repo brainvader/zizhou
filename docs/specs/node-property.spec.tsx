@@ -21,9 +21,9 @@
 // =============================================================================
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import type { GraphNodeData } from '@/bom/graph'
-import type { Node } from '@xyflow/react'
+// import { render, screen } from '@testing-library/react'
+// import type { GraphNodeData } from '@/bom/graph'
+// import type { Node } from '@xyflow/react'
 
 // コンポーネント本体（実装後にアンコメント）
 // import { NodeProperty } from '@/components/NodeProperty'
@@ -33,14 +33,14 @@ import type { Node } from '@xyflow/react'
 // =============================================================================
 
 const { mockSelectedNodeId, mockNodes } = vi.hoisted(() => ({
-    mockSelectedNodeId: vi.fn<[], string | null>(() => null),
-    mockNodes: vi.fn<[], Node<GraphNodeData>[]>(() => []),
+    mockSelectedNodeId: vi.fn(),
+    mockNodes: vi.fn(),
 }))
 
 vi.mock('@/store/useGraphStore', () => ({
     useGraphStore: (selector: (state: {
         selectedNodeId: string | null
-        nodes: Node<GraphNodeData>[]
+        nodes: unknown[]
     }) => unknown) =>
         selector({
             selectedNodeId: mockSelectedNodeId(),
@@ -48,15 +48,15 @@ vi.mock('@/store/useGraphStore', () => ({
         }),
 }))
 
-const makeNode = (
-    id: string,
-    label: string,
-    description?: string
-): Node<GraphNodeData> => ({
-    id,
-    position: { x: 0, y: 0 },
-    data: { label, ...(description ? { description } : {}) },
-})
+// const makeNode = (
+//   id: string,
+//   label: string,
+//   description?: string
+// ): Node<GraphNodeData> => ({
+//   id,
+//   position: { x: 0, y: 0 },
+//   data: { label, ...(description ? { description } : {}) },
+// })
 
 beforeEach(() => {
     vi.clearAllMocks()
