@@ -40,7 +40,7 @@ test.describe('CTX-1 FileTree — Visual Story', () => {
      * マウント時に readDir が呼ばれ、ルートディレクトリが表示される。
      */
     test('step 1-2: shows root directories on mount', async ({ page }) => {
-        await expect(page.locator('#ctx-file-tree')).toBeVisible()
+        await expect(page.getByTestId('file-tree')).toBeVisible()
         await expect(page.getByText('src')).toBeVisible()
         await expect(page.getByText('graphs')).toBeVisible()
         await page.screenshot({
@@ -80,7 +80,7 @@ test.describe('CTX-1 FileTree — Visual Story', () => {
     test('step 7-8: selects graph json and updates activeGraphId', async ({ page }) => {
         await page.getByText('graphs').click()
         await page.getByText('graph-01.json').click()
-        await expect(page.locator('#graph-editor')).toBeVisible()
+        await expect(page.getByTestId('graph-editor')).toBeVisible()
         await page.screenshot({
             path: 'evidence/FileTree_step7-8_graph_selected.png',
         })

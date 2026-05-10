@@ -207,7 +207,7 @@ export const FileTree = () => {
 
     return (
         <nav
-            id="ctx-file-tree"
+            data-testid="file-tree"
             className="flex flex-col h-full overflow-hidden border-r border-[--border]"
             style={{ width: 'var(--pane-file-tree-width)' }}
         >
