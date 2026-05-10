@@ -38,8 +38,8 @@ test.describe('CTX-3 NodeProperty — Visual Story', () => {
      * selectedNodeId が null のとき NodeProperty は何も表示しない。
      */
     test('step 1: renders nothing when no node is selected', async ({ page }) => {
-        await expect(page.locator('#ctx-node-property')).toBeVisible()
-        await expect(page.locator('#ctx-node-property')).toBeEmpty()
+        await expect(page.getByTestId('node-property')).toBeVisible()
+        await expect(page.getByTestId('node-property')).toBeEmpty()
         await page.screenshot({
             path: 'evidence/NodeProperty_step1_empty.png',
         })
@@ -52,7 +52,7 @@ test.describe('CTX-3 NodeProperty — Visual Story', () => {
     test('step 2-3: displays node properties after selecting a node', async ({ page }) => {
         await page.getByRole('button', { name: /ノード追加/ }).click()
         await page.locator('.react-flow__node').first().click()
-        await expect(page.locator('#ctx-node-property').getByText('New Node')).toBeVisible()
+        await expect(page.getByTestId('node-property').getByText('New Node')).toBeVisible()
         await page.screenshot({
             path: 'evidence/NodeProperty_step2-3_selected.png',
         })
@@ -65,7 +65,7 @@ test.describe('CTX-3 NodeProperty — Visual Story', () => {
     test('step 4: does not show description field when node has no description', async ({ page }) => {
         await page.getByRole('button', { name: /ノード追加/ }).click()
         await page.locator('.react-flow__node').first().click()
-        await expect(page.locator('#ctx-node-property').getByText('description')).not.toBeVisible()
+        await expect(page.getByTestId('node-property').getByText('description')).not.toBeVisible()
         await page.screenshot({
             path: 'evidence/NodeProperty_step4_no_description.png',
         })

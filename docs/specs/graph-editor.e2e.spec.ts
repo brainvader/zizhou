@@ -30,7 +30,7 @@ test.describe('GraphEditor: Setup View', () => {
         await page.goto(PROJECT_DETAIL_UNINITIALIZED_URL)
         await expect(page.getByRole('button', { name: /初期化/ })).toBeVisible()
         await page.getByRole('button', { name: /初期化/ }).click()
-        await expect(page.locator('#graph-editor')).toBeVisible()
+        await expect(page.getByTestId('graph-editor')).toBeVisible()
         await page.screenshot({ path: 'evidence/graph-editor_after-init.png' })
     })
 

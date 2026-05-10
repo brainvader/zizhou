@@ -50,7 +50,7 @@ export const ProjectDetailRoute = () => {
 
                 {/* CTX-3: NodeProperty */}
                 <aside
-                    id="ctx-node-property"
+                    data-testid="node-property"
                     style={{
                         width: '200px',
                         flexShrink: 0,

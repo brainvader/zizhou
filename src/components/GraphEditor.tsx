@@ -88,7 +88,7 @@ export function GraphEditor() {
     // --- Render ---
     return (
         <div
-            id="graph-editor"
+            data-testid="graph-editor"
             style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
         >
             {/* ツールバー — 常に表示。ready 以外は disabled */}
