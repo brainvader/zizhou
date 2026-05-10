@@ -7,7 +7,7 @@
  * 2. graphs/ が存在しない場合、エディタ領域に Setup ビューが表示される
  * 3. 「初期化」ボタンをクリックすると graphs/ が作成されエディタビューに切り替わる
  * 4. 「＋ ノード追加」ボタンをクリックするとノードがキャンバスに追加される
- * 5. nodes[] が空のとき Empty State が表示される
+ * 5. initStatus が 'ready' 以外のとき「＋ ノード追加」ボタンは表示されない
  * @output src/components/GraphEditor.tsx
  *
  * @note ?fs=uninitialized を付けると plugin-fs モックの exists が false を返す
@@ -46,9 +46,9 @@ test.describe('GraphEditor: Add Node', () => {
         await page.screenshot({ path: 'evidence/graph-editor_add-node.png' })
     })
 
-    test('initStatus が "ready" 以外のとき「＋ ノード追加」ボタンは disabled になる', async ({ page }) => {
+    test('initStatus が "ready" 以外のとき「＋ ノード追加」ボタンは表示されない', async ({ page }) => {
         await page.goto(PROJECT_DETAIL_UNINITIALIZED_URL)
-        await expect(page.getByRole('button', { name: /ノード追加/ })).toBeDisabled()
+        await expect(page.getByRole('button', { name: /ノード追加/ })).not.toBeVisible()
         await page.screenshot({ path: 'evidence/graph-editor_add-node-disabled.png' })
     })
 
