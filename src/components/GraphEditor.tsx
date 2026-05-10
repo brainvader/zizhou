@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react'
+import { useCallback } from 'react'
 import {
     ReactFlow,
     Background,
@@ -13,7 +13,7 @@ import { exists, mkdir, readTextFile } from '@tauri-apps/plugin-fs'
 import { useGraphStore } from '@/store/useGraphStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import { useGraphFile } from '@/hooks/useGraphFile'
-import { graphsDir, graphFilePath, GraphFileSchema } from '@/bom/graph'
+import { useGraphInit } from '@/hooks/useGraphInit'
 import type { GraphNodeData, GraphFile, InitStatus } from '@/bom/graph'
 
 // ============================================================
@@ -49,15 +49,17 @@ export type GraphEditorProps = {
  *
  * 責務: ノードの手動配置・接続・選択を管理するグラフエディタ。
  *
- * - マウント時に {projectRootPath}/graphs/ の存在を確認し initStatus を更新する
  * - initStatus: 'checking'      → ローディングスピナーを表示
  * - initStatus: 'uninitialized' → Setup ビューを表示（「初期化」ボタン）
  * - initStatus: 'ready'         → React Flow エディタを表示
+ *
+ * 初期化・ロードロジックは useGraphInit に委譲する。
  *
  * props DI: Tauri fs 依存・store 依存を props で受け取る。
  * 省略時は Tauri 実装・Zustand store にフォールバックする。
  *
  * @see docs/bom/graph.ts
+ * @see src/hooks/useGraphInit.ts
  * @see src/hooks/useGraphFile.ts
  */
 export function GraphEditor({
@@ -76,82 +78,33 @@ export function GraphEditor({
     onReadTextFile = readTextFile,
     setHydrated: setHydratedProp,
 }: GraphEditorProps = {}) {
-    // --- store フォールバック ---
+    // --- store フォールバック (描画用) ---
     const storeNodes = useGraphStore((s) => s.nodes)
     const storeEdges = useGraphStore((s) => s.edges)
     const storeAddNode = useGraphStore((s) => s.addNode)
-    const storeLoadGraph = useGraphStore((s) => s.loadGraph)
-    const storeResetGraph = useGraphStore((s) => s.resetGraph)
     const storeSetSelectedNodeId = useGraphStore((s) => s.setSelectedNodeId)
     const storeInitStatus = useProjectDetailStore((s) => s.initStatus)
-    const storeProjectRootPath = useProjectDetailStore((s) => s.projectRootPath)
-    const storeActiveGraphId = useProjectDetailStore((s) => s.activeGraphId)
-    const storeSetInitStatus = useProjectDetailStore((s) => s.setInitStatus)
     const { setHydrated: storeSetHydrated } = useGraphFile()
 
     const initStatus = initStatusProp ?? storeInitStatus
-    const projectRootPath = projectRootPathProp ?? storeProjectRootPath
-    const activeGraphId = activeGraphIdProp ?? storeActiveGraphId
     const nodes = nodesProp ?? storeNodes
     const edges = edgesProp ?? storeEdges
-    const setInitStatus = onSetInitStatus ?? storeSetInitStatus
     const addNode = onAddNode ?? storeAddNode
-    const loadGraph = onLoadGraph ?? storeLoadGraph
-    const resetGraph = onResetGraph ?? storeResetGraph
     const setSelectedNodeId = onSetSelectedNodeId ?? storeSetSelectedNodeId
-    const setHydrated = setHydratedProp ?? storeSetHydrated
 
-    // --- Init Check ---
-    const checkGraphsDir = useCallback(async () => {
-        if (!projectRootPath) return
-        const dir = graphsDir(projectRootPath)
-        const found = await onExists(dir)
-        setInitStatus(found ? 'ready' : 'uninitialized')
-    }, [projectRootPath, setInitStatus, onExists])
-
-    useEffect(() => {
-        checkGraphsDir()
-    }, [checkGraphsDir])
-
-    // --- Load Graph ---
-    useEffect(() => {
-        if (initStatus !== 'ready' || !activeGraphId || !projectRootPath) {
-            setHydrated(false)
-            return
-        }
-
-        const loadAndHydrate = async () => {
-            setHydrated(false)
-            try {
-                const filePath = graphFilePath(projectRootPath, activeGraphId)
-                const fileExists = await onExists(filePath)
-                if (fileExists) {
-                    const text = await onReadTextFile(filePath)
-                    const result = GraphFileSchema.safeParse(JSON.parse(text))
-                    if (result.success) {
-                        loadGraph(result.data)
-                    } else {
-                        resetGraph()
-                    }
-                } else {
-                    resetGraph()
-                }
-            } catch {
-                resetGraph()
-            } finally {
-                setHydrated(true)
-            }
-        }
-
-        loadAndHydrate()
-    }, [activeGraphId, initStatus, projectRootPath, loadGraph, resetGraph, setHydrated, onExists, onReadTextFile])
-
-    // --- Init Dir ---
-    const handleInit = useCallback(async () => {
-        const dir = graphsDir(projectRootPath)
-        await onMkdir(dir, { recursive: true })
-        setInitStatus('ready')
-    }, [projectRootPath, setInitStatus, onMkdir])
+    // --- 初期化・ロードロジックを useGraphInit に委譲 ---
+    const { handleInit } = useGraphInit({
+        projectRootPath: projectRootPathProp,
+        activeGraphId: activeGraphIdProp,
+        initStatus: initStatusProp,
+        onSetInitStatus,
+        onLoadGraph,
+        onResetGraph,
+        onExists,
+        onMkdir,
+        onReadTextFile,
+        setHydrated: setHydratedProp ?? storeSetHydrated,
+    })
 
     // --- Add Node ---
     const handleAddNode = useCallback(() => {
