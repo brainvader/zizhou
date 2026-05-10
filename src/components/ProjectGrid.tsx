@@ -6,6 +6,7 @@ import { NewProjectFormSchema, type NewProjectForm } from '@/bom/project'
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogFooter,
@@ -107,6 +108,9 @@ export const ProjectGrid = ({ isHydrated }: ProjectGridProps) => {
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>New Project</DialogTitle>
+                            <DialogDescription className="sr-only">
+                                新しいプロジェクトを作成します
+                            </DialogDescription>
                         </DialogHeader>
 
                         <div className="flex flex-col gap-4">

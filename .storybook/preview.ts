@@ -10,8 +10,17 @@ const preview: Preview = {
       },
     },
     a11y: {
-      test: 'todo'
-    }
+      test: 'todo',
+      config: {
+        rules: [
+          {
+            // Radix UI の FocusGuard による既知の誤検知
+            id: 'aria-hidden-focus',
+            enabled: false,
+          },
+        ],
+      },
+    },
   },
 }
 

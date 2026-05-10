@@ -35,12 +35,13 @@ export default defineConfig({
   test: {
     projects: [
       {
+        extends: './vite.config.ts',
         test: {
           name: 'unit',
           environment: 'jsdom',
           setupFiles: ['./tests/setup.ts'],
           globals: true,
-          exclude: ['**/e2e/**', '**/*.e2e.spec.ts'],
+          exclude: ['**/e2e/**', '**/*.e2e.spec.ts', '**/node_modules/**'],
         },
       },
       {

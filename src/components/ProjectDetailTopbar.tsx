@@ -96,7 +96,7 @@ export const ProjectDetailTopbar = ({
                     <span className="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">
                         Zizou
                     </span>
-                    <span className="font-mono text-[8px] text-[#454a52] tracking-[0.15em]">
+                    <span className="font-mono text-[8px] text-[#6b7280] tracking-[0.15em]">
                         Protocol v7.00
                     </span>
                 </div>

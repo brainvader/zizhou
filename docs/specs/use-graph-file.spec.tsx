@@ -198,6 +198,44 @@ describe('useGraphFile: logic', () => {
         )
     })
 
+    test('logic: saving.current が true のとき重複保存をスキップする', async () => {
+        // 最初の saveGraph が pending 中に2回目が呼ばれた場合
+        let resolve: () => void
+        mockWriteTextFile.mockImplementation(
+            () => new Promise<void>((r) => { resolve = r })
+        )
+
+        const { result } = renderHook(() => useGraphFile())
+
+        // 1回目（pending のまま）
+        const first = act(() => result.current.saveGraph(fixtureNodes, fixtureEdges))
+        // 2回目（saving.current === true なのでスキップ）
+        await act(() => result.current.saveGraph(fixtureNodes, fixtureEdges))
+
+        resolve!()
+        await first
+
+        expect(mockWriteTextFile).toHaveBeenCalledTimes(1)
+    })
+
+    test('logic: activeGraphId が null の場合 saveGraph は writeTextFile を呼ばない', async () => {
+        mockGetState.mockReturnValue({ activeGraphId: null, projectRootPath: MOCK_ROOT })
+
+        const { result } = renderHook(() => useGraphFile())
+        await act(() => result.current.saveGraph(fixtureNodes, fixtureEdges))
+
+        expect(mockWriteTextFile).not.toHaveBeenCalled()
+    })
+
+    test('logic: projectRootPath が空の場合 saveGraph は writeTextFile を呼ばない', async () => {
+        mockGetState.mockReturnValue({ activeGraphId: MOCK_GRAPH, projectRootPath: '' })
+
+        const { result } = renderHook(() => useGraphFile())
+        await act(() => result.current.saveGraph(fixtureNodes, fixtureEdges))
+
+        expect(mockWriteTextFile).not.toHaveBeenCalled()
+    })
+
 })
 
 // --- 2. 監督へのプレゼン (Visual Story) ---

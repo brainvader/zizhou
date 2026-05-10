@@ -6,10 +6,12 @@
  * 2. initStatus が 'uninitialized' のとき Setup ビューを表示する
  * 3. initStatus が 'ready' かつ nodes[] が空のとき Empty State を表示する
  * 4. initStatus が 'ready' かつ nodes[] があるとき React Flow を表示する
- * 5. 「初期化」ボタンをクリックすると onMkdir が呼ばれ initStatus が 'ready' になる
+ * 5. 「初期化」ボタンをクリックすると onMkdir が呼ばれる
  * 6. 「＋ ノード追加」ボタンをクリックすると onAddNode が呼ばれる
+ * 7. initStatus が 'ready' 以外のとき「＋ ノード追加」ボタンは表示されない
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
+import { expect, fn } from 'storybook/test'
 import type { Node, Edge } from '@xyflow/react'
 import type { GraphNodeData } from '@/bom/graph'
 import { GraphEditor } from '@/components/GraphEditor'
@@ -25,6 +27,12 @@ const meta: Meta<typeof GraphEditor> = {
             </div>
         ),
     ],
+    args: {
+        onAddNode: fn(),
+        onMkdir: async () => { },
+        onExists: async () => true,
+        setHydrated: () => { },
+    },
 }
 export default meta
 type Story = StoryObj<typeof GraphEditor>
@@ -46,14 +54,15 @@ const mockEdges: Edge[] = [
     { id: 'e-001', source: 'node-001', target: 'node-002' },
 ]
 
-const noopAsync = async () => { }
-
 // @story 状態 1: ローディング中
 export const Checking: Story = {
     args: {
         initStatus: 'checking',
         projectRootPath: '/mock/project',
         onExists: () => new Promise(() => { }),
+    },
+    play: async ({ canvas }) => {
+        await expect(canvas.getByText('Loading…')).toBeVisible()
     },
 }
 
@@ -63,8 +72,10 @@ export const Uninitialized: Story = {
         initStatus: 'uninitialized',
         projectRootPath: '/mock/project',
         onExists: async () => false,
-        onMkdir: noopAsync,
-        setHydrated: () => { },
+    },
+    play: async ({ canvas }) => {
+        await expect(canvas.getByRole('button', { name: /初期化/ })).toBeVisible()
+        await expect(canvas.queryByRole('button', { name: /ノード追加/ })).not.toBeInTheDocument()
     },
 }
 
@@ -76,8 +87,9 @@ export const ReadyEmpty: Story = {
         activeGraphId: null,
         nodes: [],
         edges: [],
-        onExists: async () => true,
-        setHydrated: () => { },
+    },
+    play: async ({ canvas }) => {
+        await expect(canvas.getByText('ノードを追加してください')).toBeVisible()
     },
 }
 
@@ -89,12 +101,44 @@ export const ReadyWithNodes: Story = {
         activeGraphId: 'graph-01',
         nodes: mockNodes,
         edges: mockEdges,
-        onExists: async () => true,
         onReadTextFile: async () => JSON.stringify({
             id: 'graph-01',
             nodes: mockNodes,
             edges: mockEdges,
         }),
-        setHydrated: () => { },
+    },
+    play: async ({ canvas }) => {
+        await expect(canvas.getByRole('button', { name: /ノード追加/ })).toBeVisible()
+        await expect(canvas.queryByText('ノードを追加してください')).not.toBeInTheDocument()
+    },
+}
+
+// @story 状態 5: 「初期化」ボタンクリックで onMkdir が呼ばれる
+export const ClickInit: Story = {
+    args: {
+        initStatus: 'uninitialized',
+        projectRootPath: '/mock/project',
+        onExists: async () => false,
+        onMkdir: fn(),
+        onSetInitStatus: fn(),
+    },
+    play: async ({ canvas, userEvent, args }) => {
+        await userEvent.click(canvas.getByRole('button', { name: /初期化/ }))
+        await expect(args.onMkdir).toHaveBeenCalledOnce()
+    },
+}
+
+// @story 状態 6: 「＋ ノード追加」ボタンクリックで onAddNode が呼ばれる
+export const ClickAddNode: Story = {
+    args: {
+        initStatus: 'ready',
+        projectRootPath: '/mock/project',
+        nodes: [],
+        edges: [],
+        onAddNode: fn(),
+    },
+    play: async ({ canvas, userEvent, args }) => {
+        await userEvent.click(canvas.getByRole('button', { name: /ノード追加/ }))
+        await expect(args.onAddNode).toHaveBeenCalledOnce()
     },
 }

@@ -62,6 +62,7 @@ vi.mock('@/store/useProjectStore', () => ({
     useProjectStore: {
         getState: () => ({
             setProjects: mockSetProjects,
+            setHydrated: vi.fn(),        // ← 追加
             projects: mockGetProjects(),
         }),
         subscribe: vi.fn(() => () => { }),
@@ -69,9 +70,9 @@ vi.mock('@/store/useProjectStore', () => ({
 }));
 
 const fixtureProjects: Project[] = [
-    { id: '1', name: '地蔵 Core', description: 'グラフベースのプロジェクト管理OS。' },
-    { id: '2', name: 'Graph Renderer', description: 'ノード・エッジの依存関係を可視化するビューエンジン。' },
-];
+    { id: '1', name: '地蔵 Core', description: 'グラフベースのプロジェクト管理OS。', rootPath: '/Users/user/projects/zizou-core' },
+    { id: '2', name: 'Graph Renderer', description: 'ノード・エッジの依存関係を可視化するビューエンジン。', rootPath: '/Users/user/projects/graph-renderer' },
+]
 
 /**
  * Slot 4: 挙動の検証コード (Story Verification)
@@ -123,6 +124,20 @@ describe('useProjectFile: logic', () => {
         expect(mockToastError).toHaveBeenCalledTimes(1);
     });
 
+    test('logic: [A] Zod バリデーション失敗の場合、setProjects([]) にフォールバックし toast.error を呼ぶ', async () => {
+        mockExists.mockResolvedValue(true)
+        // rootPath が欠けているため Zod バリデーションが失敗する
+        mockReadTextFile.mockResolvedValue(JSON.stringify([
+            { id: '1', name: '地蔵 Core' }
+        ]))
+
+        const { result } = renderHook(() => useProjectFile())
+        await act(() => result.current.loadProjects())
+
+        expect(mockSetProjects).toHaveBeenCalledWith([])
+        expect(mockToastError).toHaveBeenCalledTimes(1)
+    })
+
     // ── saveProjects ──
 
     test('logic: saveProjects が呼ばれると writeTextFile に JSON 文字列を渡す', async () => {
@@ -148,6 +163,25 @@ describe('useProjectFile: logic', () => {
         expect(mockToastError).toHaveBeenCalledTimes(1);
         expect(mockSetProjects).not.toHaveBeenCalled();
     });
+
+    test('logic: saving.current が true のとき重複保存をスキップする', async () => {
+        let resolve: () => void
+        mockWriteTextFile.mockImplementation(
+            () => new Promise<void>((r) => { resolve = r })
+        )
+
+        const { result } = renderHook(() => useProjectFile())
+
+        // 1回目（pending のまま）
+        const first = act(() => result.current.saveProjects(fixtureProjects))
+        // 2回目（saving.current === true なのでスキップ）
+        await act(() => result.current.saveProjects(fixtureProjects))
+
+        resolve!()
+        await first
+
+        expect(mockWriteTextFile).toHaveBeenCalledTimes(1)
+    })
 
     // ── subscribe による自動保存 ──
 

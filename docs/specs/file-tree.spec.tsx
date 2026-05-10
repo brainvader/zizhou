@@ -1,29 +1,15 @@
 /**
- * Slot 1: 発注用ヘッダー (JSDoc Metadata)
- *
- * @context  CTX-1 / FileTree
- * @bom      docs/bom/graph.ts  (FileTreeNode, FileTreeNodeSchema, ProjectDetailStore)
- *           docs/bom/project.ts (Project, ProjectStore)
- *
+ * Slot 1: 発注用ヘッダー
+ * @context CTX-1 / FileTree — ロジック検証
+ * @bom docs/bom/graph.ts
  * @story
- *   【1. ツリー表示】
- *   1. FileTree は projectRootPath（useProjectDetailStore 経由）をもとに
- *      マウント時に Tauri fs.readDir（recursive: true）で再帰読み込みし、ツリーを描画する。
- *   2. ディレクトリは展開アイコン付きで、ファイルはインデント付きで表示される。
- *
- *   【2. Expand / Collapse】
- *   3. ディレクトリ行をクリックすると expandedDirs に追加されツリーが展開する。
- *   4. 展開済みのディレクトリ行を再クリックすると expandedDirs から除去され折りたたまれる。
- *
- *   【3. File Select — 通常ファイル】
- *   5. graphs/ 配下以外のファイル行をクリックすると selectedPath が更新される。
- *   6. activeGraphId は変化しない。
- *
- *   【4. File Select — graphs/ 配下 .json】
- *   7. graphs/ 配下の .json ファイル行をクリックすると selectedPath が更新される。
- *   8. useProjectDetailStore の setActiveGraphId が呼ばれ activeGraphId が更新される。
- *
- * @output   src/components/FileTree.tsx
+ * 1. onReadDir で返したツリーのルートディレクトリ名が表示される
+ * 2. 初期状態では子ノードは非表示
+ * 3. ディレクトリをクリックすると展開される
+ * 4. 展開済みディレクトリを再クリックすると折りたたまれる
+ * 5. graphs/ 配下の .json ファイルをクリックすると setActiveGraphId が呼ばれる
+ * 6. graphs/ 配下以外のファイルをクリックしても setActiveGraphId は呼ばれない
+ * @output src/components/FileTree.tsx
  */
 
 // =============================================================================
@@ -31,155 +17,123 @@
 // =============================================================================
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-// import { render, screen, fireEvent } from '@testing-library/react'
-import type { FileTreeNode } from '@/bom/graph'
-
-// コンポーネント本体（実装後にアンコメント）
-// import { FileTree } from '@/components/FileTree'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { FileTree } from '@/components/FileTree'
 
 // =============================================================================
 // Slot 3: モック・セットアップ
 // =============================================================================
 
-const { mockReadDir, mockSetActiveGraphId } = vi.hoisted(() => ({
-    mockReadDir: vi.fn(),
-    mockSetActiveGraphId: vi.fn(),
-}))
-
-const mockProjectRootPath = '/Users/user/projects/zizou-core'
-
-vi.mock('@tauri-apps/plugin-fs', () => ({
-    readDir: mockReadDir,
-    BaseDirectory: { AppData: 'AppData' },
-}))
-
+// store フォールバックを無効化（props DI で完結させる）
 vi.mock('@/store/useProjectDetailStore', () => ({
-    useProjectDetailStore: () => ({
-        projectRootPath: mockProjectRootPath,
-        activeGraphId: null,
-        setActiveGraphId: mockSetActiveGraphId,
-    }),
+    useProjectDetailStore: vi.fn(() => undefined),
 }))
 
-/** graphs/ を含むシンプルなツリー構造 */
-const makeTree = (): FileTreeNode[] => [
-    {
-        name: 'src',
-        path: '/Users/user/projects/zizou-core/src',
-        isDir: true,
-        children: [
-            {
-                name: 'components',
-                path: '/Users/user/projects/zizou-core/src/components',
-                isDir: true,
-                children: [
-                    {
-                        name: 'FileTree.tsx',
-                        path: '/Users/user/projects/zizou-core/src/components/FileTree.tsx',
-                        isDir: false,
-                    },
-                ],
-            },
-        ],
-    },
-    {
-        name: 'graphs',
-        path: '/Users/user/projects/zizou-core/graphs',
-        isDir: true,
-        children: [
-            {
-                name: 'graph-01.json',
-                path: '/Users/user/projects/zizou-core/graphs/graph-01.json',
-                isDir: false,
-            },
-            {
-                name: 'graph-02.json',
-                path: '/Users/user/projects/zizou-core/graphs/graph-02.json',
-                isDir: false,
-            },
-        ],
-    },
-]
+const mockSetActiveGraphId = vi.fn()
+const mockJoin = async (...paths: string[]) => paths.join('/')
+
+const mockReadDir = vi.fn()
+
+const setup = () =>
+    render(
+        <FileTree
+            projectRootPath="/mock/project"
+            onJoin={mockJoin}
+            onReadDir={mockReadDir}
+            setActiveGraphId={mockSetActiveGraphId}
+        />
+    )
 
 beforeEach(() => {
     vi.clearAllMocks()
-    mockReadDir.mockResolvedValue(makeTree())
+    mockReadDir.mockImplementation(async (path: string) => {
+        if (path === '/mock/project') return [
+            { name: 'graphs', isDirectory: true, isSymlink: false },
+            { name: 'src', isDirectory: true, isSymlink: false },
+            { name: 'README.md', isDirectory: false, isSymlink: false },
+        ]
+        if (path === '/mock/project/graphs') return [
+            { name: 'graph-01.json', isDirectory: false, isSymlink: false },
+        ]
+        if (path === '/mock/project/src') return [
+            { name: 'main.ts', isDirectory: false, isSymlink: false },
+        ]
+        return []
+    })
 })
 
 // =============================================================================
-// Slot 4: 挙動の検証コード (Logic Verification)
+// Slot 4: 挙動の検証
 // =============================================================================
 
-describe('FileTree — logic', () => {
-    /**
-     * @story ステップ 1-2
-     * ツリーデータが渡されたとき、ルートディレクトリ名が画面に表示される。
-     */
-    it('renders root directory names from tree data', () => {
-        // render(<FileTree />) // readDir は内部で呼ばれる
-        // expect(screen.getByText('src')).toBeInTheDocument()
-        // expect(screen.getByText('graphs')).toBeInTheDocument()
-        expect(true).toBe(true) // placeholder
+describe('FileTree: ツリー表示', () => {
+    it('onReadDir で返したルートディレクトリ・ファイル名が表示される', async () => {
+        setup()
+        await waitFor(() => {
+            expect(screen.getByText('graphs')).toBeInTheDocument()
+            expect(screen.getByText('src')).toBeInTheDocument()
+            expect(screen.getByText('README.md')).toBeInTheDocument()
+        })
     })
 
-    /**
-     * @story ステップ 1-2
-     * 初期状態では子ノードは非表示（expandedDirs が空）。
-     */
-    it('hides children on initial render when expandedDirs is empty', () => {
-        // render(<FileTree />) // readDir は内部で呼ばれる
-        // expect(screen.queryByText('components')).not.toBeInTheDocument()
-        expect(true).toBe(true) // placeholder
+    it('初期状態では子ノードは非表示', async () => {
+        setup()
+        await waitFor(() => expect(screen.getByText('graphs')).toBeInTheDocument())
+        expect(screen.queryByText('graph-01.json')).not.toBeInTheDocument()
+        expect(screen.queryByText('main.ts')).not.toBeInTheDocument()
+    })
+})
+
+describe('FileTree: Expand / Collapse', () => {
+    it('ディレクトリをクリックすると子ノードが表示される', async () => {
+        setup()
+        await waitFor(() => expect(screen.getByText('graphs')).toBeInTheDocument())
+
+        await userEvent.click(screen.getByText('graphs'))
+        expect(screen.getByText('graph-01.json')).toBeInTheDocument()
     })
 
-    /**
-     * @story ステップ 3
-     * ディレクトリをクリックすると子ノードが表示される（展開）。
-     */
-    it('expands a directory on click and shows children', () => {
-        // render(<FileTree />) // readDir は内部で呼ばれる
-        // fireEvent.click(screen.getByText('src'))
-        // expect(screen.getByText('components')).toBeInTheDocument()
-        expect(true).toBe(true) // placeholder
+    it('展開済みディレクトリを再クリックすると子ノードが非表示になる', async () => {
+        setup()
+        await waitFor(() => expect(screen.getByText('src')).toBeInTheDocument())
+
+        await userEvent.click(screen.getByText('src'))
+        expect(screen.getByText('main.ts')).toBeInTheDocument()
+
+        await userEvent.click(screen.getByText('src'))
+        expect(screen.queryByText('main.ts')).not.toBeInTheDocument()
+    })
+})
+
+describe('FileTree: File Select', () => {
+    it('graphs/ 配下の .json をクリックすると setActiveGraphId が graphId で呼ばれる', async () => {
+        setup()
+        await waitFor(() => expect(screen.getByText('graphs')).toBeInTheDocument())
+
+        await userEvent.click(screen.getByText('graphs'))
+        await userEvent.click(screen.getByText('graph-01.json'))
+
+        expect(mockSetActiveGraphId).toHaveBeenCalledWith('graph-01')
+        expect(mockSetActiveGraphId).toHaveBeenCalledTimes(1)
     })
 
-    /**
-     * @story ステップ 4
-     * 展開済みディレクトリを再クリックすると子ノードが非表示になる（折りたたみ）。
-     */
-    it('collapses an expanded directory on second click', () => {
-        // render(<FileTree />) // readDir は内部で呼ばれる
-        // fireEvent.click(screen.getByText('src'))
-        // expect(screen.getByText('components')).toBeInTheDocument()
-        // fireEvent.click(screen.getByText('src'))
-        // expect(screen.queryByText('components')).not.toBeInTheDocument()
-        expect(true).toBe(true) // placeholder
+    it('graphs/ 配下以外のファイルをクリックしても setActiveGraphId は呼ばれない', async () => {
+        setup()
+        await waitFor(() => expect(screen.getByText('README.md')).toBeInTheDocument())
+
+        await userEvent.click(screen.getByText('README.md'))
+
+        expect(mockSetActiveGraphId).not.toHaveBeenCalled()
     })
 
-    /**
-     * @story ステップ 5-6
-     * graphs/ 配下以外のファイルをクリックしても setActiveGraphId は呼ばれない。
-     */
-    it('does not call setActiveGraphId when selecting a non-graph file', () => {
-        // render(<FileTree />) // readDir は内部で呼ばれる
-        // fireEvent.click(screen.getByText('src'))
-        // fireEvent.click(screen.getByText('components'))
-        // fireEvent.click(screen.getByText('FileTree.tsx'))
-        // expect(mockSetActiveGraphId).not.toHaveBeenCalled()
-        expect(mockSetActiveGraphId).not.toHaveBeenCalled() // placeholder
-    })
+    it('src/ 配下のファイルをクリックしても setActiveGraphId は呼ばれない', async () => {
+        setup()
+        await waitFor(() => expect(screen.getByText('src')).toBeInTheDocument())
 
-    /**
-     * @story ステップ 7-8
-     * graphs/ 配下の .json ファイルをクリックすると setActiveGraphId が
-     * 拡張子なしファイル名（graphId）で呼ばれる。
-     */
-    it('calls setActiveGraphId with graphId when selecting a .json under graphs/', () => {
-        // render(<FileTree />) // readDir は内部で呼ばれる
-        // fireEvent.click(screen.getByText('graphs'))
-        // fireEvent.click(screen.getByText('graph-01.json'))
-        // expect(mockSetActiveGraphId).toHaveBeenCalledWith('graph-01')
-        expect(true).toBe(true) // placeholder
-    })
+        await userEvent.click(screen.getByText('src'))
+        await userEvent.click(screen.getByText('main.ts'))
 
+        expect(mockSetActiveGraphId).not.toHaveBeenCalled()
+    })
 })
