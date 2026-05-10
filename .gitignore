@@ -25,3 +25,5 @@ dist-ssr
 
 # Playwright test artifacts
 evidence/
+*storybook.log
+storybook-static
