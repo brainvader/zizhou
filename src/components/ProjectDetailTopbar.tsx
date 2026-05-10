@@ -7,39 +7,60 @@ import { Button } from '@/components/ui/button'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import { graphFilePath } from '@/bom/graph'
-import type { GraphFile } from '@/bom/graph'
+import type { GraphFile, InitStatus } from '@/bom/graph'
+import type { Project } from '@/bom/project'
 
-type ProjectDetailTopbarProps = {
+type WriteTextFileFn = (path: string, contents: string) => Promise<void>
+
+export type ProjectDetailTopbarProps = {
     /** TanStack Router の useParams から渡されるプロジェクト ID */
     projectId: string
     /** Settings アイコンボタンクリック時のコールバック */
     onSettingsClick?: () => void
+    // props DI
+    project?: Project
+    initStatus?: InitStatus
+    projectRootPath?: string
+    onSetActiveGraphId?: (id: string) => void
+    onWriteTextFile?: WriteTextFileFn
 }
 
 /**
  * ProjectDetailTopbar
  *
  * 責務: project-detail 画面のヘッダー。
- * - 地蔵ロゴ（Topbar から継承）
+ * - 地蔵ロゴ
  * - プロジェクト名 breadcrumb（projectId prop → useProjectStore で解決）
  * - New Graph ボタン（initStatus が 'ready' 以外のとき disabled）
  * - Settings ボタン（onSettingsClick コールバック経由）
  *
- * local-state なし（ステートレス）。
- * breadcrumb のプロジェクト名は useProjectStore から引く。
- * router 依存（useParams）は呼び出し側（projects.$id.tsx）に委譲する。
+ * props DI: project / initStatus / projectRootPath / onSetActiveGraphId /
+ *           onWriteTextFile を props で受け取る。
+ * 省略時は Tauri 実装・Zustand store にフォールバックする。
  *
  * @see docs/bom/graph.ts
  * @see docs/bom/project.ts
  * @see docs/specs/project-detail-topbar.spec.tsx
  * @see docs/specs/project-detail-topbar.e2e.spec.ts
  */
-export const ProjectDetailTopbar = ({ projectId, onSettingsClick }: ProjectDetailTopbarProps) => {
-    const project = useProjectStore((s) => s.projects.find((p) => p.id === projectId))
+export const ProjectDetailTopbar = ({
+    projectId,
+    onSettingsClick,
+    project: projectProp,
+    initStatus: initStatusProp,
+    projectRootPath: projectRootPathProp,
+    onSetActiveGraphId,
+    onWriteTextFile = writeTextFile,
+}: ProjectDetailTopbarProps) => {
+    const storeProject = useProjectStore((s) => s.projects.find((p) => p.id === projectId))
+    const storeInitStatus = useProjectDetailStore((s) => s.initStatus)
+    const storeProjectRootPath = useProjectDetailStore((s) => s.projectRootPath)
+    const storeSetActiveGraphId = useProjectDetailStore((s) => s.setActiveGraphId)
 
-    const initStatus = useProjectDetailStore((s) => s.initStatus)
-    const projectRootPath = useProjectDetailStore((s) => s.projectRootPath)
-    const setActiveGraphId = useProjectDetailStore((s) => s.setActiveGraphId)
+    const project = projectProp ?? storeProject
+    const initStatus = initStatusProp ?? storeInitStatus
+    const projectRootPath = projectRootPathProp ?? storeProjectRootPath
+    const setActiveGraphId = onSetActiveGraphId ?? storeSetActiveGraphId
 
     // --- New Graph ---
     const handleNewGraph = useCallback(async () => {
@@ -48,13 +69,12 @@ export const ProjectDetailTopbar = ({ projectId, onSettingsClick }: ProjectDetai
         const graphFile: GraphFile = { id: graphId, nodes: [], edges: [] }
 
         try {
-            // NOTE: 絶対パスで書き込むため第3引数（options/baseDir）は不要。
-            await writeTextFile(filePath, JSON.stringify(graphFile, null, 2))
+            await onWriteTextFile(filePath, JSON.stringify(graphFile, null, 2))
             setActiveGraphId(graphId)
         } catch {
             toast.error('グラフファイルの作成に失敗しました')
         }
-    }, [projectRootPath, setActiveGraphId])
+    }, [projectRootPath, setActiveGraphId, onWriteTextFile])
 
     return (
         <header
@@ -63,7 +83,6 @@ export const ProjectDetailTopbar = ({ projectId, onSettingsClick }: ProjectDetai
         >
             {/* ロゴ */}
             <div className="flex items-center gap-3">
-                {/* 漢字 + 朱色アンダーライン */}
                 <div className="relative inline-block after:content-[''] after:absolute after:-bottom-0.75 after:left-0 after:right-0 after:h-0.5 after:bg-primary after:rounded-sm after:opacity-80">
                     <span
                         className="font-serif text-[20px] font-normal text-foreground tracking-[0.15em] leading-none drop-shadow-sm"
@@ -72,11 +91,7 @@ export const ProjectDetailTopbar = ({ projectId, onSettingsClick }: ProjectDetai
                         地蔵
                     </span>
                 </div>
-
-                {/* セパレーター */}
                 <div className="w-px h-4.5 bg-border" />
-
-                {/* romaji + version */}
                 <div className="flex flex-col gap-px">
                     <span className="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">
                         Zizou
