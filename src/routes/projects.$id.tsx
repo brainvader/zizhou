@@ -49,7 +49,15 @@ export const ProjectDetailRoute = () => {
                 <GraphEditor />
 
                 {/* CTX-3: NodeProperty */}
-                <aside id="ctx-node-property">
+                <aside
+                    id="ctx-node-property"
+                    style={{
+                        width: '200px',
+                        flexShrink: 0,
+                        borderLeft: '1px solid var(--border)',
+                        overflowY: 'auto',
+                    }}
+                >
                     <NodeProperty />
                 </aside>
             </div>
