@@ -11,7 +11,7 @@ import { Topbar } from '@/components/Topbar'
 
 const meta: Meta<typeof Topbar> = {
     component: Topbar,
-    title: 'CTX-TOPBAR/Topbar',
+    title: 'Projects/Topbar',
     parameters: { layout: 'fullscreen' },
 }
 export default meta
