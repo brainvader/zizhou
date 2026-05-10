@@ -1,9 +1,19 @@
 /**
  * @tauri-apps/plugin-fs のテスト用モック。
  * VITE_PLAYWRIGHT=true のとき vite.config.ts の alias で差し替えられる。
+ *
+ * URL パラメータ ?fs=uninitialized を付けると exists が false を返す。
+ * デフォルト（パラメータなし）は exists が true を返す。
  */
 
-export const exists = async (_path: string): Promise<boolean> => true
+const fsMode = new URLSearchParams(window.location.search).get('fs')
+
+export const exists = async (path: string): Promise<boolean> => {
+    // projects.json の存在確認は常に true
+    if (path === 'projects.json') return true
+    // graphs/ の存在確認は fsMode で切り替える
+    return fsMode !== 'uninitialized'
+}
 
 export const readTextFile = async (_path: string): Promise<string> =>
     JSON.stringify([
