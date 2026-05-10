@@ -565,12 +565,12 @@
         </div>
 
         <!-- ============================================================
-             CTX-TOPBAR: TOPBAR [継承]
-             責務: アプリ識別 + プロジェクト名 breadcrumb + Settings
-             注意: ContextMap.projects.html の Topbar をそのまま流用する。
-                   breadcrumb にプロジェクト名を追加する。
-                   local-state なし（ステートレス）。
+             CTX-TOPBAR: TOPBAR [✓]
+             責務: アプリ識別 + プロジェクト名 breadcrumb + New Graph + Settings
+             注意: ProjectDetailTopbar.tsx として独立コンポーネントで実装。
                    breadcrumb のプロジェクト名は useProjectStore から引く。
+                   router 依存（useParams）は呼び出し側（projects.$id.tsx）に委譲し
+                   projectId prop として受け取る。
                    Settings ボタンのコールバックは onSettingsClick prop として受け取る。
         ============================================================ -->
         <header id="ctx-topbar">
@@ -591,14 +591,14 @@
             <button class="btn-ghost" title="Settings">⚙</button>
 
             <!--
-                [継承][Feature] Settings   — ContextMap.projects.html と同じ
-                [ ][Feature]   Breadcrumb  — Topbar にプロジェクト名を breadcrumb として表示する
-                [ ][Logic]     Breadcrumb  — useParams で取得した id に対応するプロジェクト名を
-                                             useProjectStore から引いて表示する
-                [ ][Feature]   New Graph   — 「＋」ボタンクリックで新しいグラフを作成し、エディタに切り替える
-                                             initStatus が 'ready' 以外のときはボタンを disabled にする
-                [ ][Logic]     New Graph   — nanoid() で graphId を生成し {projectRootPath}/graphs/{graphId}.json を
-                                             空の nodes[], edges[] で作成後、activeGraphId を更新する
+                [✓][Feature] Settings   — ContextMap.projects.html と同じ
+                [✓][Feature] Breadcrumb — Topbar にプロジェクト名を breadcrumb として表示する
+                [✓][Logic]   Breadcrumb — projectId prop に対応するプロジェクト名を
+                                          useProjectStore から引いて表示する
+                [✓][Feature] New Graph  — 「＋」ボタンクリックで新しいグラフを作成し、エディタに切り替える
+                                          initStatus が 'ready' 以外のときはボタンを disabled にする
+                [✓][Logic]   New Graph  — nanoid() で graphId を生成し {projectRootPath}/graphs/{graphId}.json を
+                                          空の nodes[], edges[] で作成後、activeGraphId を更新する
             -->
         </header>
 
