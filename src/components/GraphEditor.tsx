@@ -7,6 +7,7 @@ import {
     type Edge,
     type NodeMouseHandler,
 } from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
 import { nanoid } from 'nanoid'
 import { exists, mkdir } from '@tauri-apps/plugin-fs'
 import { useGraphStore } from '@/store/useGraphStore'
@@ -84,48 +85,13 @@ export function GraphEditor() {
         []
     )
 
-    // --- Render: checking ---
-    if (initStatus === 'checking') {
-        return (
-            <div
-                style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                }}
-            >
-                <span>Loading...</span>
-            </div>
-        )
-    }
-
-    // --- Render: uninitialized ---
-    if (initStatus === 'uninitialized') {
-        return (
-            <div
-                style={{
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 16,
-                }}
-            >
-                <p>graphs/ ディレクトリが見つかりません</p>
-                <button onClick={handleInit}>初期化</button>
-            </div>
-        )
-    }
-
-    // --- Render: ready ---
+    // --- Render ---
     return (
         <div
             id="graph-editor"
             style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
         >
-            {/* ツールバー */}
+            {/* ツールバー — 常に表示。ready 以外は disabled */}
             <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10 }}>
                 <button
                     onClick={handleAddNode}
@@ -135,8 +101,8 @@ export function GraphEditor() {
                 </button>
             </div>
 
-            {/* Empty State */}
-            {nodes.length === 0 && (
+            {/* Render: checking */}
+            {initStatus === 'checking' && (
                 <div
                     style={{
                         position: 'absolute',
@@ -144,25 +110,63 @@ export function GraphEditor() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        pointerEvents: 'none',
-                        opacity: 0.3,
                     }}
                 >
-                    <span>ノードを追加してください</span>
+                    <span>Loading...</span>
                 </div>
             )}
 
-            {/* React Flow */}
-            <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onNodeClick={handleNodeClick}
-            >
-                <Background />
-                <Controls />
-            </ReactFlow>
+            {/* Render: uninitialized */}
+            {initStatus === 'uninitialized' && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 16,
+                    }}
+                >
+                    <p>graphs/ ディレクトリが見つかりません</p>
+                    <button onClick={handleInit}>初期化</button>
+                </div>
+            )}
+
+            {/* Render: ready */}
+            {initStatus === 'ready' && (
+                <>
+                    {/* Empty State */}
+                    {nodes.length === 0 && (
+                        <div
+                            style={{
+                                position: 'absolute',
+                                inset: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                pointerEvents: 'none',
+                                opacity: 0.3,
+                            }}
+                        >
+                            <span>ノードを追加してください</span>
+                        </div>
+                    )}
+
+                    {/* React Flow */}
+                    <ReactFlow
+                        nodes={nodes}
+                        edges={edges}
+                        onNodesChange={onNodesChange}
+                        onEdgesChange={onEdgesChange}
+                        onNodeClick={handleNodeClick}
+                    >
+                        <Background />
+                        <Controls />
+                    </ReactFlow>
+                </>
+            )}
         </div>
     )
 }
