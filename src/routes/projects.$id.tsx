@@ -46,7 +46,7 @@ export const ProjectDetailRoute = () => {
             style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}
         >
             {/* CTX-Topbar: Breadcrumb + New Graph + Settings */}
-            <ProjectDetailTopbar onSettingsClick={() => setIsSettingsOpen(true)} />
+            <ProjectDetailTopbar projectId={id} onSettingsClick={() => setIsSettingsOpen(true)} />
 
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
                 {/* CTX-1: FileTree */}

@@ -1,5 +1,4 @@
 import { useCallback } from 'react'
-import { useParams } from '@tanstack/react-router'
 import { nanoid } from 'nanoid'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { toast } from 'sonner'
@@ -11,6 +10,8 @@ import { graphFilePath } from '@/bom/graph'
 import type { GraphFile } from '@/bom/graph'
 
 type ProjectDetailTopbarProps = {
+    /** TanStack Router の useParams から渡されるプロジェクト ID */
+    projectId: string
     /** Settings アイコンボタンクリック時のコールバック */
     onSettingsClick?: () => void
 }
@@ -20,22 +21,21 @@ type ProjectDetailTopbarProps = {
  *
  * 責務: project-detail 画面のヘッダー。
  * - 地蔵ロゴ（Topbar から継承）
- * - プロジェクト名 breadcrumb（useParams の id → useProjectStore で解決）
+ * - プロジェクト名 breadcrumb（projectId prop → useProjectStore で解決）
  * - New Graph ボタン（initStatus が 'ready' 以外のとき disabled）
  * - Settings ボタン（onSettingsClick コールバック経由）
  *
  * local-state なし（ステートレス）。
  * breadcrumb のプロジェクト名は useProjectStore から引く。
+ * router 依存（useParams）は呼び出し側（projects.$id.tsx）に委譲する。
  *
  * @see docs/bom/graph.ts
  * @see docs/bom/project.ts
  * @see docs/specs/project-detail-topbar.spec.tsx
  * @see docs/specs/project-detail-topbar.e2e.spec.ts
  */
-export const ProjectDetailTopbar = ({ onSettingsClick }: ProjectDetailTopbarProps) => {
-    const { id } = useParams({ from: '/projects/$id' })
-
-    const project = useProjectStore((s) => s.projects.find((p) => p.id === id))
+export const ProjectDetailTopbar = ({ projectId, onSettingsClick }: ProjectDetailTopbarProps) => {
+    const project = useProjectStore((s) => s.projects.find((p) => p.id === projectId))
 
     const initStatus = useProjectDetailStore((s) => s.initStatus)
     const projectRootPath = useProjectDetailStore((s) => s.projectRootPath)

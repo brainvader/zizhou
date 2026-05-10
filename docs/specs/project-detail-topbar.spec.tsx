@@ -10,7 +10,7 @@
  * 1. project-detail 画面を開く（URL: /projects/:id）
  * 2. Topbar にロゴ（地蔵 / Zizou / Protocol v7.00）が表示される。
  * 3. ロゴの右に「/」セパレーターとプロジェクト名（breadcrumb）が表示される。
- *    プロジェクト名は useParams の id → useProjectStore で解決する。
+ *    プロジェクト名は projectId prop → useProjectStore で解決する。
  * 4. id に対応するプロジェクトが存在しない場合、breadcrumb は空文字（非表示）になる。
  *
  * 【2. New Graph ボタン — 活性/非活性】
@@ -50,7 +50,6 @@ const {
     mockWriteTextFile,
     mockToastError,
     mockSetActiveGraphId,
-    mockUseParams,
     mockUseProjectDetailStore,
     mockUseProjectStore,
     mockOnSettingsClick,
@@ -58,7 +57,6 @@ const {
     mockWriteTextFile: vi.fn<() => Promise<void>>(),
     mockToastError: vi.fn(),
     mockSetActiveGraphId: vi.fn(),
-    mockUseParams: vi.fn(),
     mockUseProjectDetailStore: vi.fn(),
     mockUseProjectStore: vi.fn(),
     mockOnSettingsClick: vi.fn(),
@@ -77,11 +75,6 @@ vi.mock('sonner', () => ({
 // --- nanoid ---
 vi.mock('nanoid', () => ({
     nanoid: vi.fn(() => 'test-graph-id'),
-}))
-
-// --- TanStack Router useParams ---
-vi.mock('@tanstack/react-router', () => ({
-    useParams: mockUseParams,
 }))
 
 // --- Zustand stores ---
@@ -116,9 +109,6 @@ const setupMocks = (overrides: {
         project = MOCK_PROJECT,
     } = overrides
 
-    // NOTE: undefined 時は存在しない id にして find が undefined になることを明示
-    mockUseParams.mockReturnValue({ id: project?.id ?? 'nonexistent-id' })
-
     mockUseProjectDetailStore.mockImplementation((selector: (s: {
         initStatus: InitStatus
         projectRootPath: string
@@ -142,6 +132,7 @@ const setupMocks = (overrides: {
 const setup = (props?: Partial<React.ComponentProps<typeof ProjectDetailTopbar>>) =>
     render(
         <ProjectDetailTopbar
+            projectId={MOCK_PROJECT.id}
             onSettingsClick={mockOnSettingsClick}
             {...props}
         />
@@ -188,7 +179,7 @@ describe('ProjectDetailTopbar — logic', () => {
 
     it('logic: 対応するプロジェクトが存在しない場合、breadcrumb は表示されない', () => {
         setupMocks({ project: undefined })
-        setup()
+        setup({ projectId: 'nonexistent-id' }) // NOTE: store に存在しない id を渡して find が undefined になることを明示
         // breadcrumb-project 要素は存在しないかテキストが空
         expect(screen.queryByTestId('breadcrumb-project')).toBeNull()
     })
