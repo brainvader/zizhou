@@ -1,4 +1,4 @@
-# AI Coding Protocol (ver 8.00)
+# AI Coding Protocol (ver 8.10)
 
 あなたは私の開発パートナーとして、以下の**「証拠に基づくトップダウン開発」**に従って動作してください。
 
@@ -6,8 +6,8 @@
 
 - **まず形にする:** 最速で `src/` 等に「実際に動くコード」を生成せよ。
 - **テストが証拠:** 正しく動くことの証明は、言葉ではなく以下の3層で行え。
-  - **Storybook（視覚的証拠）** — @story の手順をコンポーネント単位で実演する
-  - **Vitest/RTL（論理的証拠）** — 状態遷移・データ変換のロジックを検証する
+  - **Storybook（視覚的証拠）** — @story の手順をコンポーネント単位で実演する。play 関数でインタラクションも検証する
+  - **Vitest/RTL（論理的証拠）** — hook・ユーティリティなど純粋なロジックのユニットテストに限定する
   - **Playwright（結合的証拠）** — Tauri fs・ルーティングなど実環境のみで確認できる事項を検証する
 - **進捗の定義:** 監督（ユーザー）が **Storybook の画面を見て「意図通りだ」と認めた時**、初めて進捗として記録される。
 
@@ -23,14 +23,23 @@
 
 ## 3. テスト責務の分担
 
-| 層         | ツール     | 責務                                           | 証拠               |
-| ---------- | ---------- | ---------------------------------------------- | ------------------ |
-| ビジュアル | Storybook  | @story の全状態をコンポーネント単位で確認      | Story の画面       |
-| ロジック   | Vitest/RTL | 状態遷移・データ変換・hook のユニットテスト    | テスト結果         |
-| 結合       | Playwright | Tauri fs・ルーティング・画面遷移など実環境依存 | スクリーンショット |
+| 層         | ツール     | 責務                                                     | 証拠               |
+| ---------- | ---------- | -------------------------------------------------------- | ------------------ |
+| ビジュアル | Storybook  | @story の全状態を確認。play 関数でインタラクションも検証 | Story の画面       |
+| ロジック   | Vitest/RTL | hook・ユーティリティなど純粋なロジックのユニットテスト   | テスト結果         |
+| 結合       | Playwright | Tauri fs・ルーティング・画面遷移など実環境依存           | スクリーンショット |
 
-**Playwright は「Storybook では確認できないこと」に限定する。**
-コンポーネントの見た目・インタラクションは Storybook で完結させ、Playwright に持ち込まない。
+**コンポーネントのインタラクション検証は Storybook の play 関数に寄せる。**
+Vitest/RTL はコンポーネントを `render()` せず、hook・ユーティリティのロジックに限定する。
+Playwright は「Storybook では確認できないこと」のみを対象とする。
+
+### テスト配置の判断基準
+
+| 検証したいこと                         | 使うツール             |
+| -------------------------------------- | ---------------------- |
+| コンポーネントの表示・インタラクション | Storybook（play 関数） |
+| hook の状態遷移・データ変換            | Vitest/RTL             |
+| Tauri fs・ルーティング・実環境依存     | Playwright             |
 
 ## 4. props DI パターン
 
@@ -184,7 +193,8 @@ AIは、`docs/specs/` 配下に以下の**3ファイル**を生成せよ。
 
 ### 7-1. Vitest/RTL spec（`*.spec.tsx`）
 
-ロジック検証に特化。コンポーネントのレンダリングは最小限。
+**hook・ユーティリティのロジック検証に特化。コンポーネントを `render()` しない。**
+コンポーネントのインタラクション検証は Storybook の play 関数に委譲する。
 
 ```typescript
 /**
@@ -222,6 +232,7 @@ import { [ComponentName] } from '@/components/[ComponentName]';
 ### 7-2. Storybook Story（`*.stories.tsx`）
 
 @story の全状態を props の組み合わせで網羅する。視覚的証拠の主軸。
+インタラクションがある場合は play 関数で検証する。
 
 ```typescript
 /**
@@ -230,21 +241,29 @@ import { [ComponentName] } from '@/components/[ComponentName]';
  * 1. [ユーザー操作]
  * 2. [システム/UIの反応]
  */
-import type { Meta, StoryObj } from '@storybook/react';
-import { [ComponentName] } from '@/components/[ComponentName]';
+import type { Meta, StoryObj } from '@storybook/react-vite'
+import { expect, userEvent, within } from '@storybook/test'
+import { fn } from '@storybook/test'
+import { [ComponentName] } from '@/components/[ComponentName]'
 
 const meta: Meta<typeof [ComponentName]> = {
   component: [ComponentName],
-};
-export default meta;
-type Story = StoryObj<typeof [ComponentName]>;
+}
+export default meta
+type Story = StoryObj<typeof [ComponentName]>
 
 // @story の各状態を Story として定義する
 export const [StateName]: Story = {
   args: {
     // props DI: 外部依存はここで差し替える
+    onSomething: fn(),
   },
-};
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByRole('button', { name: /ラベル/ }))
+    await expect(args.onSomething).toHaveBeenCalledOnce()
+  },
+}
 ```
 
 ### 7-3. Playwright E2E spec（`*.e2e.spec.ts`）
@@ -300,8 +319,8 @@ ContextMap.html → BOM → Spec  ←【境界面】→  実装 → 証拠
 Specが十分に具体的であれば、追加のプロンプトエンジニアリングは不要。
 
 9. **実装実行:** 実装モデルはSpecの @story を元に `src/` にコードを実装する。
-10. **内省ループ:** 実装モデルは自らVitest/RTLテストを実行し、ロジックの不備を自己修正する。
-11. **ビジュアル出力:** 実装モデルはStorybookでコンポーネントの全状態を確認できるようにする。
+10. **内省ループ:** 実装モデルは自らVitest/RTLテストを実行し、hook・ロジックの不備を自己修正する。
+11. **ビジュアル出力:** 実装モデルはStorybookでコンポーネントの全状態を確認できるようにする。インタラクションがある場合は play 関数も実装する。
 12. **人間検品:** 人間がStorybookの画面を確認。意図と異なる場合はAIが修正し、再提出する。
 13. **結合確認:** Playwrightで実環境依存の動作のみを確認する。
 14. **ロジック深掘り:** 見た目では分からないエッジケースのテストを追加し、堅牢にする。
