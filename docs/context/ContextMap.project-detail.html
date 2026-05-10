@@ -646,14 +646,14 @@
                 </div>
 
                 <!--
-                    [ ][Feature] File Tree Display — Tauri fs でプロジェクトルート配下を
+                    [x][Feature] File Tree Display — Tauri fs でプロジェクトルート配下を
                                                      再帰的に読み込みツリー表示する
-                    [ ][Feature] Expand/Collapse   — ディレクトリをクリックで展開・折りたたむ
-                    [ ][Feature] File Select       — ファイルをクリックで selectedPath を更新する
+                    [x][Feature] Expand/Collapse   — ディレクトリをクリックで展開・折りたたむ
+                    [x][Feature] File Select       — ファイルをクリックで selectedPath を更新する
                                                      （graphs/ 配下の .json を選択した場合は activeGraphId を更新し
                                                      グラフエディタにロードする）
-                    [ ][Logic]   fs Read           — Tauri fs の readDir で再帰読み込み
-                    [ ][Logic]   Root Path         — projectRootPath を global-store（Zustand経由）から取得する。
+                    [x][Logic]   fs Read           — Tauri fs の readDir で再帰読み込み
+                    [x][Logic]   Root Path         — projectRootPath を global-store（Zustand経由）から取得する。
                                                      型は BOM（docs/bom/project.ts）で string として定義する
                 -->
             </nav>
@@ -709,25 +709,25 @@
                 </div>
 
                 <!--
-                    [ ][Feature] Loading    — initStatus が 'checking' のときエディタ領域にローディングスピナーを表示する
-                    [ ][Feature] Setup View    — initStatus が 'uninitialized' のときエディタ領域全体を
+                    [x][Feature] Loading    — initStatus が 'checking' のときエディタ領域にローディングスピナーを表示する
+                    [x][Feature] Setup View    — initStatus が 'uninitialized' のときエディタ領域全体を
                                                  Setup ビューに切り替え「初期化」ボタンを表示する
-                    [ ][Feature] Add Node      — 「＋ ノード追加」ボタンでデフォルト位置に汎用ノードを追加する
+                    [x][Feature] Add Node      — 「＋ ノード追加」ボタンでデフォルト位置に汎用ノードを追加する
                                                  （ダイアログなし・インライン操作）
                                                  initStatus が 'ready' 以外のときはボタンを disabled にする
-                    [ ][Feature] Move Node     — ノードをドラッグで移動する（React Flow 標準）
-                    [ ][Feature] Connect Nodes — ハンドルからドラッグしてエッジを接続する（React Flow 標準）
-                    [ ][Feature] Select Node   — ノードをクリックで選択し selectedNodeId を更新する
-                    [ ][Feature] Empty State   — nodes[] が空のとき「ノードを追加してください」を表示する
-                    [ ][Logic]   Init Check    — マウント時に Tauri fs で {projectRootPath}/graphs/ の存在を確認し
+                    [x][Feature] Move Node     — ノードをドラッグで移動する（React Flow 標準）
+                    [x][Feature] Connect Nodes — ハンドルからドラッグしてエッジを接続する（React Flow 標準）
+                    [x][Feature] Select Node   — ノードをクリックで選択し selectedNodeId を更新する
+                    [x][Feature] Empty State   — nodes[] が空のとき「ノードを追加してください」を表示する
+                    [x][Logic]   Init Check    — マウント時に Tauri fs で {projectRootPath}/graphs/ の存在を確認し
                                                  initStatus を更新する（'checking': 確認中 / 'uninitialized': 未存在 / 'ready': 存在）
-                    [ ][Logic]   Init Dir      — 「初期化」ボタンで Tauri fs の mkdir を呼び graphs/ を作成後
+                    [x][Logic]   Init Dir      — 「初期化」ボタンで Tauri fs の mkdir を呼び graphs/ を作成後
                                                  initStatus を 'ready' に更新しエディタビューに切り替える
                                                  作成後にファイルツリーが graphs/ を表示することをテストで検証する
-                    [ ][Logic]   State         — nodes[], edges[], selectedNodeId を Zustand で管理する
+                    [x][Logic]   State         — nodes[], edges[], selectedNodeId を Zustand で管理する
                     [ ][Logic]   Persist       — nodes[], edges[] の変化を subscribe で監視し
                                                  Tauri fs で {projectRootPath}/graphs/{graphId}.json に保存する
-                    [ ][Logic]   React Flow    — <ReactFlow> コンポーネントに nodes/edges/onNodesChange/onEdgesChange を渡す
+                    [x][Logic]   React Flow    — <ReactFlow> コンポーネントに nodes/edges/onNodesChange/onEdgesChange を渡す
                 -->
             </main>
 
