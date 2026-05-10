@@ -1,38 +1,76 @@
-# AI Coding Protocol (ver 7.00)
+# AI Coding Protocol (ver 8.00)
 
 あなたは私の開発パートナーとして、以下の**「証拠に基づくトップダウン開発」**に従って動作してください。
 
 ## 1. 基本コンセプト：動くものが正義
 
 - **まず形にする:** 最速で `src/` 等に「実際に動くコード」を生成せよ。
-- **テストが証拠:** 正しく動くことの証明は、言葉ではなく **Playwright（視覚的証拠）** および **Vitest/RTL（論理的証拠）** で行え。
-- **進捗の定義:** 監督（ユーザー）が **Playwright のスクリーンショットを見て「意図通りだ」と認めた時**、初めて進捗として記録される。
+- **テストが証拠:** 正しく動くことの証明は、言葉ではなく以下の3層で行え。
+  - **Storybook（視覚的証拠）** — @story の手順をコンポーネント単位で実演する
+  - **Vitest/RTL（論理的証拠）** — 状態遷移・データ変換のロジックを検証する
+  - **Playwright（結合的証拠）** — Tauri fs・ルーティングなど実環境のみで確認できる事項を検証する
+- **進捗の定義:** 監督（ユーザー）が **Storybook の画面を見て「意図通りだ」と認めた時**、初めて進捗として記録される。
 
 ## 2. 運用ルール
 
-- **@story 準拠:** テストコードは @story の手順と1対1で対応させ、ユーザー体験を保証せよ。
+- **@story 準拠:** @story の手順は Storybook の Story と1対1で対応させ、ユーザー体験を保証せよ。
 - **JSDocへの集約:** 実装仕様はすべてコード内の JSDoc に集約し、重複するドキュメントは作成しない。
 - **名前の絶対遵守:** BOMで決めた命名を絶対とし、実装側で勝手に変更・エイリアス化しないこと。
 - **Context Isolation:** 各部品はBOMを通じてのみ通信し、担当範囲外の実装詳細に依存しない。
-- **人間の検品:** Playwright は監督へのプレゼンである。画像で意図を証明せよ。
+- **props DI 標準:** コンポーネントは外部依存（Tauri fs 等）を props で受け取る。デフォルト値を実装とし、Story・テストでは差し替える。
+- **人間の検品:** Storybook は監督へのプレゼンである。画面で意図を証明せよ。
 - **セレクタ規約:** E2E テストのセレクタは `data-testid` を使用する。命名は `ctx-` プレフィックスなしのシンプルな役割名とする（例: `file-tree`, `graph-editor`, `node-property`）。
 
-## 3. 標準ディレクトリ構成
+## 3. テスト責務の分担
+
+| 層         | ツール     | 責務                                           | 証拠               |
+| ---------- | ---------- | ---------------------------------------------- | ------------------ |
+| ビジュアル | Storybook  | @story の全状態をコンポーネント単位で確認      | Story の画面       |
+| ロジック   | Vitest/RTL | 状態遷移・データ変換・hook のユニットテスト    | テスト結果         |
+| 結合       | Playwright | Tauri fs・ルーティング・画面遷移など実環境依存 | スクリーンショット |
+
+**Playwright は「Storybook では確認できないこと」に限定する。**
+コンポーネントの見た目・インタラクションは Storybook で完結させ、Playwright に持ち込まない。
+
+## 4. props DI パターン
+
+コンポーネントは「データの写像」であるべきで、外部依存を内部に持ち込まない。
+
+```typescript
+// NG: コンポーネント内で Tauri fs を直接呼ぶ
+import { exists } from '@tauri-apps/plugin-fs'
+export function GraphEditor() {
+  useEffect(() => { exists(path) ... }, [])
+}
+
+// OK: props で受け取り、デフォルト値を実装とする
+type GraphEditorProps = {
+  onExists?: (path: string) => Promise<boolean>
+  onMkdir?:  (path: string) => Promise<void>
+}
+export function GraphEditor({
+  onExists = exists,
+  onMkdir  = mkdir,
+}: GraphEditorProps = {}) { ... }
+```
+
+Story・Vitest では props を差し替えるだけでよい。`vite.config.ts` の alias モックや `src/__mocks__/` は不要になる。
+
+**既存コンポーネントへの適用:** 壊れていないものを無理に改修しない。新規コンポーネントから標準として適用し、既存は機能追加のタイミングで順次移行する。
+
+## 5. 標準ディレクトリ構成
 
     root/
-    ├── AGENTS.md            <-- 本規約（AI用OS）
-    ├── docs/                <-- 【発注・設計エリア】
-    │   ├── bom/             <-- 共通規格：Interface / Zod Schema / State Machine
-    │   └── specs/           <-- 発注書：*.spec.ts（主戦場）
-    ├── src/                 <-- 【実装・納品エリア】
-    └── tests/               <-- 共通設定・Playwrightビジュアル検品用
+    ├── AGENTS.md              <-- 本規約（AI用OS）
+    ├── docs/                  <-- 【発注・設計エリア】
+    │   ├── bom/               <-- 共通規格：Interface / Zod Schema / State Machine
+    │   └── specs/             <-- 発注書：*.spec.ts / *.stories.tsx
+    ├── src/
+    │   ├── components/        <-- 【実装・納品エリア】
+    │   └── stories/           <-- Storybook Story ファイル（*.stories.tsx）
+    └── tests/                 <-- Playwright 設定・E2E spec
 
-## 4. 開発の共通規格：BOM & @story
-
-- **BOM (Bill of Materials):** 実装前に、共有データ、関数の規格、および**状態遷移図（Mermaid）**を `docs/bom/` に確定させよ。
-- **発注書 (Spec) メイン:** 開発の主軸は `docs/specs/` 配下の `*.spec.ts` とする。監督が Slot 1 の `@story` を書いた時点で発注確定とする。
-
-## 5. ContextMap.html（設計の起点）
+## 6. ContextMap.html（設計の起点）
 
 大まかな画面レイアウトを示し、分割された領域に必要な機能をリストアップするためのHTMLファイル。
 これをもとにAIが技術スタックや必要な部品を提案する。対話的にブラッシュアップし、最終的な構成を決定するための「共通のイメージ」を提供する。
@@ -55,7 +93,7 @@
          frontend: React 18 + TypeScript
          router:   TanStack Router（routing の SSOT）
          state:    Zustand
-         testing:  Vitest + RTL + Playwright
+         testing:  Vitest + RTL + Storybook + Playwright
          package:  pnpm
     ============================================================ -->
 
@@ -140,9 +178,13 @@
 </html>
 ```
 
-## 6. Specファイルのひな型
+## 7. Specファイルのひな型
 
-AIは、`docs/specs/*.spec.ts` 内に以下の **4スロット** を厳密に構成せよ。
+AIは、`docs/specs/` 配下に以下の**3ファイル**を生成せよ。
+
+### 7-1. Vitest/RTL spec（`*.spec.tsx`）
+
+ロジック検証に特化。コンポーネントのレンダリングは最小限。
 
 ```typescript
 /**
@@ -158,21 +200,15 @@ AIは、`docs/specs/*.spec.ts` 内に以下の **4スロット** を厳密に構
 /**
  * Slot 2: 外部依存のインポート (Imports)
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import type { [BOM名] } from '../../bom/[BOMファイル名]';
-import { [ComponentName] } from '@output';
+import type { [BOM名] } from '@/bom/[BOMファイル名]';
+import { [ComponentName] } from '@/components/[ComponentName]';
 
 /**
  * Slot 3: モック・セットアップ (Test Setup)
- * 実装と検証を切り離すための「独立した基準器」。
+ * vi.hoisted() でモック変数を初期化する。
  */
-const setupMock = () => {
-  const mockData: [BOM名] = {
-    // BOMに基づいたダミーデータ定義
-  };
-  return mockData;
-};
 
 /**
  * Slot 4: 挙動の検証コード (Story Verification)
@@ -181,18 +217,57 @@ const setupMock = () => {
 // --- 1. AIの内省 (Logic Verification) ---
 // AIが自己修正ループを回し、ロジックを固めるための高速ループ。
 // test('logic: should handle state transition', () => { ... });
+```
 
-// --- 2. 監督へのプレゼン (Visual Story) ---
-test.describe('[Context] Visual Story', () => {
-  test('should satisfy the story steps with evidence', async ({ page }) => {
-    // @story の手順を実演し、スクリーンショットを撮影。
-    // 修正時は `result_before.png` と `result_after.png` を出力し比較可能にせよ。
-    await page.screenshot({ path: `evidence/[Context]_result.png` });
+### 7-2. Storybook Story（`*.stories.tsx`）
+
+@story の全状態を props の組み合わせで網羅する。視覚的証拠の主軸。
+
+```typescript
+/**
+ * @context [コンポーネント名]
+ * @story
+ * 1. [ユーザー操作]
+ * 2. [システム/UIの反応]
+ */
+import type { Meta, StoryObj } from '@storybook/react';
+import { [ComponentName] } from '@/components/[ComponentName]';
+
+const meta: Meta<typeof [ComponentName]> = {
+  component: [ComponentName],
+};
+export default meta;
+type Story = StoryObj<typeof [ComponentName]>;
+
+// @story の各状態を Story として定義する
+export const [StateName]: Story = {
+  args: {
+    // props DI: 外部依存はここで差し替える
+  },
+};
+```
+
+### 7-3. Playwright E2E spec（`*.e2e.spec.ts`）
+
+**Tauri fs・ルーティング・画面遷移など、Storybook では確認できない結合のみ**を対象とする。
+
+```typescript
+/**
+ * @context [コンポーネント名] E2E
+ * @note Storybook で確認できないことのみをここで検証する
+ */
+import { test, expect } from "@playwright/test";
+
+test.describe("[Context]: Integration", () => {
+  test("should [Tauri fs / routing dependent behavior]", async ({ page }) => {
+    await page.goto("/[route]");
+    // ...
+    await page.screenshot({ path: "evidence/[Context]_result.png" });
   });
 });
 ```
 
-## 7. 実行ワークフロー（フェーズ分離型）
+## 8. 実行ワークフロー（フェーズ分離型）
 
 本プロトコルは**設計フェーズ**と**実装フェーズ**に分離する。
 Specが両フェーズの**境界面**となる。
@@ -225,16 +300,15 @@ ContextMap.html → BOM → Spec  ←【境界面】→  実装 → 証拠
 Specが十分に具体的であれば、追加のプロンプトエンジニアリングは不要。
 
 9. **実装実行:** 実装モデルはSpecの @story を元に `src/` にコードを実装する。
-10. **内省ループ:** 実装モデルは自らテスト（RTL等）を実行し、ロジックの不備を自己修正する。
-11. **ビジュアル出力:** 実装モデルはPlaywrightでスクリーンショットを撮影する。
-12. **人間検品:** 人間が画面を確認。意図と異なる場合はAIが修正し、`evidence/` ディレクトリに `result_before.png`（修正前）および `result_after.png`（修正後）を保存し再提出する。
-13. **ロジック深掘り:** 見た目では分からないエッジケースのテストを追加し、堅牢にする。
-14. **パス確認:** 人間が全テストのパスを確認し、承認する。← **実装フェーズの完了条件**
+10. **内省ループ:** 実装モデルは自らVitest/RTLテストを実行し、ロジックの不備を自己修正する。
+11. **ビジュアル出力:** 実装モデルはStorybookでコンポーネントの全状態を確認できるようにする。
+12. **人間検品:** 人間がStorybookの画面を確認。意図と異なる場合はAIが修正し、再提出する。
+13. **結合確認:** Playwrightで実環境依存の動作のみを確認する。
+14. **ロジック深掘り:** 見た目では分からないエッジケースのテストを追加し、堅牢にする。
+15. **パス確認:** 人間が全テストのパスを確認し、承認する。← **実装フェーズの完了条件**
 
 ---
 
 ### 【次コンテキストへ】
 
-15. **次コンテキスト:** storyが満たされたら、設計フェーズの手順3（構成決定）に戻り、次のコンテキストを開始する。
-
-流れを箇条書きでまとめて
+16. **次コンテキスト:** storyが満たされたら、設計フェーズの手順3（構成決定）に戻り、次のコンテキストを開始する。
