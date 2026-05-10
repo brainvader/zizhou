@@ -83,6 +83,8 @@ test.describe('ProjectDetailTopbar — Visual Story', () => {
 
         test('story step 3: breadcrumb にプロジェクト名が表示される', async ({ page }) => {
             await expect(page.locator(BREADCRUMB_NAME_SELECTOR)).toBeVisible()
+            // NOTE: __mocks__/plugin-fs.ts が返す project.name と一致する文字列を確認すること。
+            //       現状は not.toBeEmpty() のみ。実装後に toHaveText('実際のプロジェクト名') へ強化する。
             await expect(page.locator(BREADCRUMB_NAME_SELECTOR)).not.toBeEmpty()
 
             await page.screenshot({ path: 'evidence/ProjectDetailTopbar_step3_breadcrumb.png' })

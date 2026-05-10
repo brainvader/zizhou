@@ -116,7 +116,8 @@ const setupMocks = (overrides: {
         project = MOCK_PROJECT,
     } = overrides
 
-    mockUseParams.mockReturnValue({ id: project?.id ?? 'proj-001' })
+    // NOTE: undefined 時は存在しない id にして find が undefined になることを明示
+    mockUseParams.mockReturnValue({ id: project?.id ?? 'nonexistent-id' })
 
     mockUseProjectDetailStore.mockImplementation((selector: (s: {
         initStatus: InitStatus
@@ -221,6 +222,8 @@ describe('ProjectDetailTopbar — logic', () => {
         fireEvent.click(screen.getByRole('button', { name: /new graph/i }))
 
         await waitFor(() => {
+            // NOTE: writeTextFile は絶対パスで書き込むため第3引数（options/baseDir）は不要。
+            //       実装側で options を渡した場合はここに第3引数を追加すること。
             expect(mockWriteTextFile).toHaveBeenCalledWith(
                 '/Users/user/projects/zizou-core/graphs/test-graph-id.json',
                 JSON.stringify({ id: 'test-graph-id', nodes: [], edges: [] }, null, 2)
