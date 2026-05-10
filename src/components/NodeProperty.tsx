@@ -1,4 +1,11 @@
+import type { Node } from '@xyflow/react'
+import type { GraphNodeData } from '@/bom/graph'
 import { useGraphStore } from '@/store/useGraphStore'
+
+type NodePropertyProps = {
+    selectedNodeId?: string | null
+    nodes?: Node<GraphNodeData>[]
+}
 
 /**
  * @context  CTX-3 / NodeProperty
@@ -6,10 +13,19 @@ import { useGraphStore } from '@/store/useGraphStore'
  *
  * selectedNodeId が null のとき何も表示しない（空白）。
  * selectedNodeId が設定されているとき、対応するノードの name・description を表示する。
+ *
+ * props DI: selectedNodeId / nodes を props で受け取る。
+ * 省略時は useGraphStore からフォールバックする。
  */
-export const NodeProperty = () => {
-    const selectedNodeId = useGraphStore((s) => s.selectedNodeId)
-    const nodes = useGraphStore((s) => s.nodes)
+export const NodeProperty = ({
+    selectedNodeId: selectedNodeIdProp,
+    nodes: nodesProp,
+}: NodePropertyProps = {}) => {
+    const storeSelectedNodeId = useGraphStore((s) => s.selectedNodeId)
+    const storeNodes = useGraphStore((s) => s.nodes)
+
+    const selectedNodeId = selectedNodeIdProp ?? storeSelectedNodeId
+    const nodes = nodesProp ?? storeNodes
 
     if (!selectedNodeId) return null
 
@@ -20,7 +36,6 @@ export const NodeProperty = () => {
 
     return (
         <div className="flex flex-col gap-3 p-3">
-            {/* name フィールド */}
             <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-mono tracking-widest uppercase text-[--muted-foreground]">
                     name
@@ -29,8 +44,6 @@ export const NodeProperty = () => {
                     {label}
                 </div>
             </div>
-
-            {/* description フィールド（存在するときのみ） */}
             {description && (
                 <div className="flex flex-col gap-1">
                     <span className="text-[10px] font-mono tracking-widest uppercase text-[--muted-foreground]">
