@@ -6,22 +6,36 @@ import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import type { FileTreeNode } from '@/bom/graph'
 
 // ============================================================
+// Types
+// ============================================================
+
+type ReadDirFn = (path: string) => Promise<{ name: string; isDirectory: boolean; isSymlink: boolean }[]>
+type JoinFn = (...paths: string[]) => Promise<string>
+
+export type FileTreeProps = {
+    projectRootPath?: string
+    setActiveGraphId?: (id: string) => void
+    onReadDir?: ReadDirFn
+    onJoin?: JoinFn
+}
+
+// ============================================================
 // Utilities
 // ============================================================
 
-/**
- * plugin-fs v2 の readDir は再帰オプションを持たないため、
- * path を join しながら再帰的に readDir を呼んで FileTreeNode[] を構築する。
- */
-const loadTree = async (dirPath: string): Promise<FileTreeNode[]> => {
-    const entries = await readDir(dirPath)
+const loadTree = async (
+    dirPath: string,
+    onReadDir: ReadDirFn,
+    onJoin: JoinFn,
+): Promise<FileTreeNode[]> => {
+    const entries = await onReadDir(dirPath)
 
     const nodes = await Promise.all(
         entries.map(async (entry): Promise<FileTreeNode> => {
-            const entryPath = await join(dirPath, entry.name)
+            const entryPath = await onJoin(dirPath, entry.name)
 
             if (entry.isDirectory && !entry.isSymlink) {
-                const children = await loadTree(entryPath)
+                const children = await loadTree(entryPath, onReadDir, onJoin)
                 return { name: entry.name, path: entryPath, isDir: true, children }
             }
 
@@ -37,22 +51,14 @@ const loadTree = async (dirPath: string): Promise<FileTreeNode[]> => {
         })
 }
 
-/**
- * graphs/ 配下の .json ファイルかどうかを判定する。
- * @example isGraphJson('/project/graphs/graph-01.json') => true
- */
 const isGraphJson = (path: string): boolean =>
     /[\\/]graphs[\\/][^/\\]+\.json$/.test(path)
 
-/**
- * ファイルパスから graphId（拡張子なしファイル名）を取得する。
- * @example toGraphId('/project/graphs/graph-01.json') => 'graph-01'
- */
 const toGraphId = (path: string): string =>
     path.split(/[\\/]/).pop()?.replace(/\.json$/, '') ?? ''
 
 // ============================================================
-// TreeItem
+// TreeItem（変更なし）
 // ============================================================
 
 type TreeItemProps = {
@@ -152,11 +158,23 @@ const TreeItem = ({
  * @bom      docs/bom/graph.ts (FileTreeNode, ProjectDetailStore)
  *
  * projectRootPath を useProjectDetailStore から取得し、
- * マウント時に Tauri fs.readDir を再帰呼び出しでツリーを構築する。
+ * マウント時に onReadDir を再帰呼び出しでツリーを構築する。
  * graphs/ 配下の .json 選択時は setActiveGraphId を呼ぶ。
+ *
+ * props DI: onReadDir / onJoin / projectRootPath / setActiveGraphId を props で受け取る。
+ * 省略時は Tauri fs 実装・useProjectDetailStore にフォールバックする。
  */
-export const FileTree = () => {
-    const { projectRootPath, setActiveGraphId } = useProjectDetailStore()
+export const FileTree = ({
+    projectRootPath: rootPathProp,
+    setActiveGraphId: setActiveGraphIdProp,
+    onReadDir = readDir as unknown as ReadDirFn,
+    onJoin = join,
+}: FileTreeProps = {}) => {
+    const storeRootPath = useProjectDetailStore((s) => s.projectRootPath)
+    const storeSetActiveGraphId = useProjectDetailStore((s) => s.setActiveGraphId)
+
+    const projectRootPath = rootPathProp ?? storeRootPath
+    const setActiveGraphId = setActiveGraphIdProp ?? storeSetActiveGraphId
 
     const [tree, setTree] = useState<FileTreeNode[]>([])
     const [selectedPath, setSelectedPath] = useState<string | null>(null)
@@ -171,7 +189,7 @@ export const FileTree = () => {
         setIsLoading(true)
         setError(null)
 
-        loadTree(projectRootPath)
+        loadTree(projectRootPath, onReadDir, onJoin)
             .then((nodes) => {
                 if (!cancelled) {
                     setTree(nodes)
@@ -185,10 +203,8 @@ export const FileTree = () => {
                 }
             })
 
-        return () => {
-            cancelled = true
-        }
-    }, [projectRootPath])
+        return () => { cancelled = true }
+    }, [projectRootPath, onReadDir, onJoin])
 
     const handleToggleDir = useCallback((path: string) => {
         setExpandedDirs((prev) => {
@@ -203,7 +219,7 @@ export const FileTree = () => {
         if (isGraphJson(path)) {
             setActiveGraphId(toGraphId(path))
         }
-    }, [setSelectedPath, setActiveGraphId])
+    }, [setActiveGraphId])
 
     return (
         <nav
@@ -211,14 +227,12 @@ export const FileTree = () => {
             className="flex flex-col h-full overflow-hidden border-r border-[--border]"
             style={{ width: 'var(--pane-file-tree-width)' }}
         >
-            {/* ヘッダー */}
             <div className="flex items-center px-3 h-9 shrink-0 border-b border-[--border]">
                 <span className="text-[10px] font-mono tracking-widest uppercase text-[--muted-foreground]">
                     Files
                 </span>
             </div>
 
-            {/* ツリー本体 */}
             <div className="flex-1 overflow-y-auto py-1">
                 {isLoading && (
                     <p className="px-3 py-2 text-xs text-[--muted-foreground]">Loading…</p>
