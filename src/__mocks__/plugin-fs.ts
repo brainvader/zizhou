@@ -4,9 +4,20 @@
  *
  * URL パラメータ ?fs=uninitialized を付けると exists が false を返す。
  * デフォルト（パラメータなし）は exists が true を返す。
+ *
+ * writeTextFile / readTextFile は localStorage をバックエンドとして使用する。
+ * これにより page.reload() を跨いだ永続化の検証が可能。
  */
 
 const fsMode = new URLSearchParams(window.location.search).get('fs')
+
+const DEFAULT_PROJECTS = JSON.stringify([
+    {
+        id: '1',
+        name: 'zizou-core',
+        rootPath: '/Users/user/projects/zizou-core',
+    },
+])
 
 export const exists = async (path: string): Promise<boolean> => {
     // projects.json の存在確認は常に true
@@ -15,16 +26,16 @@ export const exists = async (path: string): Promise<boolean> => {
     return fsMode !== 'uninitialized'
 }
 
-export const readTextFile = async (_path: string): Promise<string> =>
-    JSON.stringify([
-        {
-            id: '1',
-            name: 'zizou-core',
-            rootPath: '/Users/user/projects/zizou-core',
-        },
-    ])
+export const readTextFile = async (path: string): Promise<string> => {
+    const stored = localStorage.getItem(path)
+    if (stored !== null) return stored
+    // デフォルトフィクスチャ（projects.json）
+    return DEFAULT_PROJECTS
+}
 
-export const writeTextFile = async (): Promise<void> => { }
+export const writeTextFile = async (path: string, data: string): Promise<void> => {
+    localStorage.setItem(path, data)
+}
 
 export const readDir = async (path: string) => {
     const tree: Record<string, Array<{
