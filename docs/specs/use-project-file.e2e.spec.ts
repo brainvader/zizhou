@@ -4,10 +4,10 @@
  * @bom docs/bom/project.ts
  * @story
  * 1. アプリ起動時、loadProjects が自動的に呼ばれ projects[] がグリッドに表示される。
- * 2. 新規プロジェクトを作成すると projects.json に自動保存される。
- * 3. アプリを再起動すると保存済みの projects[] が復元される。
+ * 2. 新規プロジェクトを作成すると localStorage に自動保存される。
+ * 3. ページリロード後、保存済みの projects[] が復元される。
  * 4. saveProjects が失敗した場合、toast.error が画面に表示される。
- *    注意: ブラウザモードでは Tauri fs の強制失敗が困難なため、
+ *    注意: alias モック環境では fs の強制失敗が困難なため、
  *          このステップは tauri dev 環境での手動検証とする。
  * @output src/hooks/useProjectFile.ts
  */
@@ -15,55 +15,52 @@
 /**
  * Slot 2: 外部依存のインポート (Imports)
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
 
 /**
  * Slot 3: モック・セットアップ (Test Setup)
- * Playwright は playwright.config.ts の baseURL に接続する。
- * useProjectFile の Hydration・永続化は実 Tauri fs を通じて検証する。
- * 注意: Tauri の fs はブラウザモードでは動作しないため、
- *       このテストは `tauri dev` で起動したアプリを対象とする。
+ * VITE_PLAYWRIGHT=true + src/__mocks__/plugin-fs.ts（localStorage バックエンド）で動作する。
+ * テスト間の干渉を防ぐため beforeEach で localStorage をクリアする。
  */
+
+test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await page.evaluate(() => localStorage.clear())
+    await page.reload()
+    await expect(page.getByText('＋ new project')).toBeVisible()
+})
 
 /**
  * Slot 4: 挙動の検証コード (Story Verification)
  */
 
-// --- 2. 監督へのプレゼン (Visual Story) ---
+test.describe('useProjectFile — Integration', () => {
 
-test.skip('should hydrate projects on launch and persist on add', async ({ page }) => {
-    /**
-     * SKIP REASON: このテストは Tauri fs を使った永続化の検証を含むため、
-     * ブラウザモード（Playwright + Vite dev server）では動作しない。
-     * @tauri-apps/plugin-fs は Tauri ランタイム上でのみ動作する。
-     *
-     * TODO: Tauri の WebDriver サポートが安定した時点で以下を対応する。
-     * @see https://tauri.app/develop/tests/webdriver/
-     * - Step 3: リロード後の projects[] 復元検証
-     * - Step 4: saveProjects 失敗時の toast.error 表示検証
-     *
-     * 現状の検証方法: `pnpm tauri dev` で起動した実機アプリで手動検証。
-     */
-    test('should hydrate projects on launch and persist on add', async ({ page }) => {
-        // Step 1: アプリ起動 → Hydration → グリッド表示
-        await page.goto('/');
-        await expect(page.getByText('＋ new project')).toBeVisible();
-        await page.screenshot({ path: 'evidence/useProjectFile_01_initial.png', fullPage: true });
+    test('Step 1: アプリ起動時にデフォルトプロジェクトが表示される', async ({ page }) => {
+        await expect(page.getByText('zizou-core')).toBeVisible()
+        await page.screenshot({ path: 'evidence/useProjectFile_01_initial.png', fullPage: true })
+    })
 
-        // Step 2: 新規プロジェクト作成 → 自動保存
-        await page.getByText('＋ new project').click();
-        await page.getByPlaceholder('My Awesome App').fill('永続化テストプロジェクト');
-        await page.getByText('作成').click();
-        await expect(page.getByText('永続化テストプロジェクト')).toBeVisible();
-        await page.screenshot({ path: 'evidence/useProjectFile_02_after_save.png', fullPage: true });
+    test('Step 2-3: 新規プロジェクト作成 → リロード後も復元される', async ({ page }) => {
+        // Step 2: 新規プロジェクト作成 → localStorage に保存
+        await page.getByText('＋ new project').click()
+        await page.getByPlaceholder('My Awesome App').fill('永続化テストプロジェクト')
+        await page.getByText('作成').click()
+        await expect(page.getByText('永続化テストプロジェクト')).toBeVisible()
+        await page.screenshot({ path: 'evidence/useProjectFile_02_after_save.png', fullPage: true })
 
-        // Step 3: ページリロード → projects[] が復元される
-        await page.reload();
-        await expect(page.getByText('永続化テストプロジェクト')).toBeVisible();
-        await page.screenshot({ path: 'evidence/useProjectFile_03_after_reload.png', fullPage: true });
+        // Step 3: リロード → localStorage から復元
+        await page.reload()
+        await expect(page.getByText('永続化テストプロジェクト')).toBeVisible()
+        await page.screenshot({ path: 'evidence/useProjectFile_03_after_reload.png', fullPage: true })
+    })
 
-        // Step 4: saveProjects 失敗時の toast.error 表示
-        // TODO: tauri dev 環境での手動検証。
-        //       fs の強制失敗は Tauri のモックコマンド機構が必要なため自動化対象外。
-    });
-});
+    test.skip('Step 4: saveProjects 失敗時に toast.error が表示される', async () => {
+        /**
+         * SKIP REASON: alias モック環境では fs の強制失敗が困難。
+         * TODO: tauri dev 環境での手動検証、または将来の WebDriver 対応時に実装する。
+         * @see https://tauri.app/develop/tests/webdriver/
+         */
+    })
+
+})
