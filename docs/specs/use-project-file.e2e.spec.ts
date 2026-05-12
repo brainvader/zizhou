@@ -45,7 +45,8 @@ test.describe('useProjectFile — Integration', () => {
         // Step 2: 新規プロジェクト作成 → localStorage に保存
         await page.getByText('＋ new project').click()
         await page.getByPlaceholder('My Awesome App').fill('永続化テストプロジェクト')
-        await page.getByText('作成').click()
+        await page.getByPlaceholder('/Users/user/projects/my-app').fill('/Users/user/projects/test')
+        await page.getByRole('button', { name: '作成' }).click()
         await expect(page.getByText('永続化テストプロジェクト')).toBeVisible()
         await page.screenshot({ path: 'evidence/useProjectFile_02_after_save.png', fullPage: true })
 
