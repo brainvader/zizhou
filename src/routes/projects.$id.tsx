@@ -5,7 +5,6 @@ import { GraphEditor } from '@/components/GraphEditor'
 import { NodeProperty } from '@/components/NodeProperty'
 import { ProjectDetailTopbar } from '@/components/ProjectDetailTopbar'
 import { SettingsDialog } from '@/components/SettingsDialog'
-import { useProjectFile } from '@/hooks/useProjectFile'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 
@@ -27,25 +26,17 @@ import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 export const ProjectDetailRoute = () => {
     const { id } = useParams({ from: '/projects/$id' })
     const { graph: activeGraphId } = useSearch({ from: '/projects/$id' })
-    const { loadProjects } = useProjectFile()
     const project = useProjectStore((s) => s.projects.find((p) => p.id === id))
     const setProjectRootPath = useProjectDetailStore((s) => s.setProjectRootPath)
-    const setInitStatus = useProjectDetailStore((s) => s.setInitStatus)
     const setActiveGraphId = useProjectDetailStore((s) => s.setActiveGraphId)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-
-    // 直接アクセス・リロード時も projects[] を hydrate する
-    useEffect(() => {
-        loadProjects()
-    }, [loadProjects])
 
     // projectRootPath を store に注入する
     useEffect(() => {
         if (project?.rootPath) {
             setProjectRootPath(project.rootPath)
-            setInitStatus('checking')
         }
-    }, [project?.rootPath, setProjectRootPath, setInitStatus])
+    }, [project?.rootPath, setProjectRootPath])
 
     // URL の ?graph= を store に同期する（useGraphFile の getState() 参照のため）
     useEffect(() => {
@@ -59,6 +50,7 @@ export const ProjectDetailRoute = () => {
             {/* CTX-Topbar: Breadcrumb + New Graph + Settings */}
             <ProjectDetailTopbar
                 projectId={id}
+                project={project}
                 onSettingsClick={() => setIsSettingsOpen(true)}
             />
 

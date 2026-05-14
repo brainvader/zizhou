@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { useRouter } from '@tanstack/react-router'
+import { useRouter, Link } from '@tanstack/react-router'
 import { nanoid } from 'nanoid'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { toast } from 'sonner'
@@ -80,6 +80,7 @@ export const ProjectDetailTopbar = ({
 
         try {
             await onWriteTextFile(filePath, JSON.stringify(graphFile, null, 2))
+            toast.success('グラフを作成しました')
             navigate(graphId)
         } catch {
             toast.error('グラフファイルの作成に失敗しました')
@@ -113,14 +114,17 @@ export const ProjectDetailTopbar = ({
             </div>
 
             {/* Breadcrumb */}
+            <span className="text-border text-base mx-1.5 select-none">/</span>
+            <Link
+                to="/"
+                search={{}}
+                className="font-mono text-[11px] text-muted-foreground tracking-widest hover:text-foreground transition-colors"
+            >
+                Home
+            </Link>
             {project && (
                 <>
-                    <span
-                        data-testid="breadcrumb-sep"
-                        className="text-border text-base mx-1.5 select-none"
-                    >
-                        /
-                    </span>
+                    <span className="text-border text-base mx-1.5 select-none">/</span>
                     <span
                         data-testid="breadcrumb-project"
                         className="font-mono text-[11px] text-muted-foreground tracking-widest"

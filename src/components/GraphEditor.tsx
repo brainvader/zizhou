@@ -29,7 +29,6 @@ type MkdirFn = (path: string, options?: { recursive: boolean }) => Promise<void>
 type ReadTextFileFn = (path: string) => Promise<string>
 
 export type GraphEditorProps = {
-    // store 系（省略時は Zustand からフォールバック）
     initStatus?: InitStatus
     projectRootPath?: string
     activeGraphId?: string | null
@@ -40,11 +39,8 @@ export type GraphEditorProps = {
     onLoadGraph?: (graph: GraphFile) => void
     onResetGraph?: () => void
     onSetSelectedNodeId?: (id: string | null) => void
-    // Tauri fs 系（省略時は Tauri 実装にフォールバック）
     onExists?: ExistsFn
-    onMkdir?: MkdirFn
     onReadTextFile?: ReadTextFileFn
-    // 自動保存（省略時は useGraphFile を使用）
     setHydrated?: (hydrated: boolean) => void
 }
 
@@ -78,7 +74,6 @@ export function GraphEditor({
     onResetGraph,
     onSetSelectedNodeId,
     onExists = exists,
-    onMkdir = mkdir,
     onReadTextFile = readTextFile,
     setHydrated: setHydratedProp,
 }: GraphEditorProps = {}) {
@@ -111,7 +106,7 @@ export function GraphEditor({
     const setSelectedNodeId = onSetSelectedNodeId ?? storeSetSelectedNodeId
 
     // --- 初期化・ロードロジックを useGraphInit に委譲 ---
-    const { handleInit } = useGraphInit({
+    useGraphInit({
         projectRootPath: projectRootPathProp,
         activeGraphId: activeGraphIdProp,
         initStatus: initStatusProp,
@@ -119,7 +114,6 @@ export function GraphEditor({
         onLoadGraph,
         onResetGraph,
         onExists,
-        onMkdir,
         onReadTextFile,
         setHydrated: setHydratedProp ?? storeSetHydrated,
     })
@@ -160,21 +154,6 @@ export function GraphEditor({
                         onClick={handleAddNode}
                     >
                         ＋ ノード追加
-                    </button>
-                </div>
-            )}
-
-            {initStatus === 'checking' && (
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span>Loading…</span>
-                </div>
-            )}
-
-            {initStatus === 'uninitialized' && (
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-                    <p>graphs/ ディレクトリが見つかりません</p>
-                    <button data-testid="btn-init" onClick={handleInit}>
-                        初期化
                     </button>
                 </div>
             )}

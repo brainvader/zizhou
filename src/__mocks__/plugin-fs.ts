@@ -13,8 +13,6 @@
  *                   graphs/ ディレクトリ自体の存在確認は fsMode で従来通り制御
  */
 
-const fsMode = new URLSearchParams(window.location.search).get('fs')
-
 // ============================================================
 // Utilities
 // ============================================================
@@ -22,22 +20,14 @@ const fsMode = new URLSearchParams(window.location.search).get('fs')
 const isGraphFile = (path: string): boolean =>
     /[\\/]graphs[\\/][^/\\/]+\.json$/.test(path)
 
-const isGraphsDir = (path: string): boolean =>
-    /[\\/]graphs$/.test(path)
-
 // ============================================================
 // exists
 // ============================================================
 
 export const exists = async (path: string): Promise<boolean> => {
-    // projects.json の存在確認は常に true
     if (path === 'projects.json') return true
-    // グラフファイル単体（*.json）は localStorage にキーがあるか確認
     if (isGraphFile(path)) return localStorage.getItem(path) !== null
-    // graphs/ ディレクトリの存在確認は fsMode で切り替える
-    if (isGraphsDir(path)) return fsMode !== 'uninitialized'
-    // その他は fsMode で切り替える
-    return fsMode !== 'uninitialized'
+    return true
 }
 
 // ============================================================

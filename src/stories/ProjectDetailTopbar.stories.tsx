@@ -7,17 +7,27 @@
  * 3. プロジェクトが存在しない場合 breadcrumb は表示されない
  * 4. initStatus が 'ready' のとき New Graph ボタンは有効
  * 5. initStatus が 'checking' のとき New Graph ボタンは disabled
- * 6. initStatus が 'uninitialized' のとき New Graph ボタンは disabled
- * 7. Settings ボタンクリックで onSettingsClick が発火する
+ * 6. Settings ボタンクリックで onSettingsClick が発火する
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn } from 'storybook/test'
+import { RouterProvider, createRouter, createMemoryHistory } from '@tanstack/react-router'
+import { router as appRouter } from '@/router'
 import { ProjectDetailTopbar } from '@/components/ProjectDetailTopbar'
 
 const meta: Meta<typeof ProjectDetailTopbar> = {
     component: ProjectDetailTopbar,
     title: 'Project Detail/Topbar',
     parameters: { layout: 'fullscreen' },
+    decorators: [
+        (Story) => {
+            const memoryRouter = createRouter({
+                ...appRouter.options,
+                history: createMemoryHistory({ initialEntries: ['/projects/proj-001'] }),
+            })
+            return <RouterProvider router={memoryRouter} defaultComponent={() => <Story />} />
+        },
+    ],
     args: {
         onSettingsClick: fn(),
         onWriteTextFile: async () => { },
@@ -78,20 +88,7 @@ export const Checking: Story = {
     },
 }
 
-// @story 状態 5: uninitialized — New Graph disabled
-export const Uninitialized: Story = {
-    args: {
-        projectId: 'proj-001',
-        project: mockProject,
-        initStatus: 'uninitialized',
-        projectRootPath: '/Users/user/projects/zizou-core',
-    },
-    play: async ({ canvas }) => {
-        await expect(canvas.getByRole('button', { name: /new graph/i })).toBeDisabled()
-    },
-}
-
-// @story 状態 6: Settings ボタンクリックで onSettingsClick が発火する
+// @story 状態 5: Settings ボタンクリックで onSettingsClick が発火する
 export const ClickSettings: Story = {
     args: {
         projectId: 'proj-001',

@@ -86,11 +86,10 @@ export type GraphStore = {
 // InitStatus
 // graphs/ ディレクトリの存在確認状態。
 // 'checking':      マウント時の確認中（Tauri fs の非同期処理待ち）
-// 'uninitialized': graphs/ が存在しない → エディタ領域を Setup ビューに切り替える
 // 'ready':         graphs/ が存在する   → エディタを表示する
 // ============================================================
 
-export const InitStatusSchema = z.enum(['checking', 'uninitialized', 'ready'])
+export const InitStatusSchema = z.enum(['checking', 'ready'])
 export type InitStatus = z.infer<typeof InitStatusSchema>
 
 // ============================================================

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from '@tanstack/react-router'
-import { readDir } from '@tauri-apps/plugin-fs'
+import { readDir, watch } from '@tauri-apps/plugin-fs'
 import { join } from '@tauri-apps/api/path'
 import { ChevronRight, ChevronDown, FileText, Folder, FolderOpen } from 'lucide-react'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
@@ -197,24 +197,48 @@ export const FileTree = ({
         if (!projectRootPath) return
 
         let cancelled = false
-        setIsLoading(true)
-        setError(null)
+        let unwatch: (() => void) | null = null
 
-        loadTree(projectRootPath, onReadDir, onJoin)
-            .then((nodes) => {
-                if (!cancelled) {
-                    setTree(nodes)
-                    setIsLoading(false)
+        const refresh = () => {
+            if (cancelled) return
+            setIsLoading(true)
+            setError(null)
+
+            loadTree(projectRootPath, onReadDir, onJoin)
+                .then((nodes) => {
+                    if (!cancelled) {
+                        setTree(nodes)
+                        setIsLoading(false)
+                    }
+                })
+                .catch((err) => {
+                    if (!cancelled) {
+                        setError(String(err))
+                        setIsLoading(false)
+                    }
+                })
+        }
+
+        // 初回ロード
+        refresh()
+
+        // ファイルシステム監視
+        watch(projectRootPath, () => refresh(), { recursive: true })
+            .then((unwatchFn) => {
+                if (cancelled) {
+                    unwatchFn()
+                } else {
+                    unwatch = unwatchFn
                 }
             })
             .catch((err) => {
-                if (!cancelled) {
-                    setError(String(err))
-                    setIsLoading(false)
-                }
+                console.error('watch error:', err)
             })
 
-        return () => { cancelled = true }
+        return () => {
+            cancelled = true
+            unwatch?.()
+        }
     }, [projectRootPath, onReadDir, onJoin])
 
     const handleToggleDir = useCallback((path: string) => {

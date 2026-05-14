@@ -1,56 +1,28 @@
 import { useEffect, useCallback } from 'react'
-import { exists, mkdir, readTextFile } from '@tauri-apps/plugin-fs'
+import { readTextFile } from '@tauri-apps/plugin-fs'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import { useGraphStore } from '@/store/useGraphStore'
 import { useGraphFile } from '@/hooks/useGraphFile'
-import { graphsDir, graphFilePath, GraphFileSchema } from '@/bom/graph'
+import { graphFilePath, GraphFileSchema } from '@/bom/graph'
 import type { InitStatus, GraphFile } from '@/bom/graph'
 
-// ============================================================
-// Types
-// ============================================================
-
-type ExistsFn = (path: string) => Promise<boolean>
-type MkdirFn = (path: string, options?: { recursive: boolean }) => Promise<void>
 type ReadTextFileFn = (path: string) => Promise<string>
+type ExistsFn = (path: string) => Promise<boolean>
 
 export type UseGraphInitOptions = {
-    // store 系（省略時は Zustand からフォールバック）
     projectRootPath?: string
     activeGraphId?: string | null
     initStatus?: InitStatus
     onSetInitStatus?: (status: InitStatus) => void
     onLoadGraph?: (graph: GraphFile) => void
     onResetGraph?: () => void
-    // Tauri fs 系（省略時は Tauri 実装にフォールバック）
     onExists?: ExistsFn
-    onMkdir?: MkdirFn
     onReadTextFile?: ReadTextFileFn
-    // 自動保存ブロック制御（省略時は useGraphFile を使用）
     setHydrated?: (hydrated: boolean) => void
 }
 
-export type UseGraphInitReturn = {
-    /** graphs/ ディレクトリを作成して initStatus を 'ready' に更新する */
-    handleInit: () => Promise<void>
-}
+export type UseGraphInitReturn = void
 
-/**
- * useGraphInit
- *
- * GraphEditor から切り出した初期化・ロード責務を担う hook。
- *
- * 責務:
- * 1. **Init Check** — マウント時に graphs/ の存在確認を行い initStatus を更新する
- * 2. **Load Graph** — activeGraphId 変化時にグラフファイルを読み込み store に反映する
- * 3. **Init Dir**   — handleInit() で graphs/ を作成し initStatus を 'ready' に更新する
- *
- * props DI: onExists / onMkdir / onReadTextFile を引数で受け取る。
- * 省略時は Tauri 実装にフォールバックする。
- *
- * @see docs/bom/graph.ts
- * @see src/hooks/useGraphFile.ts
- */
 export function useGraphInit({
     projectRootPath: projectRootPathProp,
     activeGraphId: activeGraphIdProp,
@@ -58,12 +30,10 @@ export function useGraphInit({
     onSetInitStatus,
     onLoadGraph,
     onResetGraph,
-    onExists = exists,
-    onMkdir = mkdir,
+    onExists,
     onReadTextFile = readTextFile,
     setHydrated: setHydratedProp,
 }: UseGraphInitOptions = {}): UseGraphInitReturn {
-    // --- store フォールバック ---
     const storeProjectRootPath = useProjectDetailStore((s) => s.projectRootPath)
     const storeActiveGraphId = useProjectDetailStore((s) => s.activeGraphId)
     const storeInitStatus = useProjectDetailStore((s) => s.initStatus)
@@ -80,17 +50,11 @@ export function useGraphInit({
     const resetGraph = onResetGraph ?? storeResetGraph
     const setHydrated = setHydratedProp ?? storeSetHydrated
 
-    // --- 1. Init Check ---
-    const checkGraphsDir = useCallback(async () => {
-        if (!projectRootPath) return
-        const dir = graphsDir(projectRootPath)
-        const found = await onExists(dir)
-        setInitStatus(found ? 'ready' : 'uninitialized')
-    }, [projectRootPath, setInitStatus, onExists])
-
+    // --- 1. Init Check: projectRootPath が設定されたら即 'ready' ---
     useEffect(() => {
-        checkGraphsDir()
-    }, [checkGraphsDir])
+        if (!projectRootPath) return
+        setInitStatus('ready')
+    }, [projectRootPath, setInitStatus])
 
     // --- 2. Load Graph ---
     useEffect(() => {
@@ -103,7 +67,8 @@ export function useGraphInit({
             setHydrated(false)
             try {
                 const filePath = graphFilePath(projectRootPath, activeGraphId)
-                const fileExists = await onExists(filePath)
+                const exists = onExists ?? ((await import('@tauri-apps/plugin-fs')).exists)
+                const fileExists = await exists(filePath)
                 if (fileExists) {
                     const text = await onReadTextFile(filePath)
                     const result = GraphFileSchema.safeParse(JSON.parse(text))
@@ -124,13 +89,4 @@ export function useGraphInit({
 
         loadAndHydrate()
     }, [activeGraphId, initStatus, projectRootPath, loadGraph, resetGraph, setHydrated, onExists, onReadTextFile])
-
-    // --- 3. Init Dir ---
-    const handleInit = useCallback(async () => {
-        const dir = graphsDir(projectRootPath)
-        await onMkdir(dir, { recursive: true })
-        setInitStatus('ready')
-    }, [projectRootPath, setInitStatus, onMkdir])
-
-    return { handleInit }
 }

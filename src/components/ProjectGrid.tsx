@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
 import { Link } from '@tanstack/react-router'
+import { mkdir } from '@tauri-apps/plugin-fs'
 import { useProjectStore } from '@/store/useProjectStore'
 import { NewProjectFormSchema, type NewProjectForm } from '@/bom/project'
+import { graphsDir } from '@/bom/graph'
 import {
     Dialog,
     DialogContent,
@@ -14,14 +16,21 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { RootPathInput } from '@/components/RootPathInput'
 
 /** フォームの初期状態 */
 const INITIAL_FORM: NewProjectForm = { name: '', description: '', rootPath: '' }
 const INITIAL_ERRORS = { name: null as string | null, description: null as string | null, rootPath: null as string | null }
 
+type MkdirFn = (path: string, options?: { recursive: boolean }) => Promise<void>
+
 type ProjectGridProps = {
     /** loadProjects 完了後に true になる。false の間は「＋ new project」を disabled にする */
     isHydrated: boolean
+    /** フォルダ選択ダイアログを開く関数（省略時は RootPathInput が Tauri plugin-dialog にフォールバック） */
+    onOpenDirectory?: () => Promise<string | null>
+    /** graphs/ ディレクトリ作成関数（省略時は Tauri plugin-fs にフォールバック） */
+    onMkdir?: MkdirFn
 }
 
 /**
@@ -34,7 +43,7 @@ type ProjectGridProps = {
  * @see docs/bom/project.ts
  * @see docs/specs/project-list.spec.tsx
  */
-export const ProjectGrid = ({ isHydrated }: ProjectGridProps) => {
+export const ProjectGrid = ({ isHydrated, onOpenDirectory, onMkdir = mkdir }: ProjectGridProps) => {
     const { projects, addProject } = useProjectStore()
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [form, setForm] = useState<NewProjectForm>(INITIAL_FORM)
@@ -54,8 +63,8 @@ export const ProjectGrid = ({ isHydrated }: ProjectGridProps) => {
         setIsDialogOpen(false)
     }
 
-    /** 「作成」ボタン押下: Zod バリデーション → addProject → ダイアログを閉じる */
-    const handleSubmit = () => {
+    /** 「作成」ボタン押下: Zod バリデーション → graphs/ 作成 → addProject → ダイアログを閉じる */
+    const handleSubmit = async () => {
         const result = NewProjectFormSchema.safeParse(form)
         if (!result.success) {
             const fieldErrors = result.error.flatten().fieldErrors
@@ -66,6 +75,8 @@ export const ProjectGrid = ({ isHydrated }: ProjectGridProps) => {
             })
             return
         }
+        // graphs/ ディレクトリを作成
+        await onMkdir(graphsDir(result.data.rootPath), { recursive: true })
         // [C] ID生成: nanoid() で id を生成して Project に合成
         addProject({ id: nanoid(), ...result.data })
         setIsDialogOpen(false)
@@ -82,6 +93,7 @@ export const ProjectGrid = ({ isHydrated }: ProjectGridProps) => {
                         key={project.id}
                         to="/projects/$id"
                         params={{ id: project.id }}
+                        search={{ graph: undefined }}
                         data-testid={`card-${project.id}`}
                         className="rounded-md border border-border bg-card p-4 cursor-pointer hover:-translate-y-px transition-transform block no-underline"
                     >
@@ -148,22 +160,13 @@ export const ProjectGrid = ({ isHydrated }: ProjectGridProps) => {
                                 )}
                             </div>
 
-                            {/* rootPath フィールド */}
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="project-root-path" className="font-mono text-xs tracking-wide">
-                                    root path *
-                                </Label>
-                                <Input
-                                    id="project-root-path"
-                                    placeholder="/Users/user/projects/my-app"
-                                    value={form.rootPath}
-                                    onChange={(e) => setForm((f) => ({ ...f, rootPath: e.target.value }))}
-                                    className={errors.rootPath ? 'border-destructive' : ''}
-                                />
-                                {errors.rootPath && (
-                                    <span className="font-mono text-xs text-destructive">{errors.rootPath}</span>
-                                )}
-                            </div>
+                            {/* rootPath フィールド — RootPathInput に委譲 */}
+                            <RootPathInput
+                                value={form.rootPath}
+                                onChange={(v) => setForm((f) => ({ ...f, rootPath: v }))}
+                                error={errors.rootPath}
+                                onOpenDirectory={onOpenDirectory}
+                            />
                         </div>
 
                         <DialogFooter>

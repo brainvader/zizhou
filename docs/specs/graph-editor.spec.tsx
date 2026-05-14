@@ -54,7 +54,12 @@ vi.mock('@/store/useGraphStore', () => ({
 vi.mock('@/store/useProjectDetailStore', () => ({
     useProjectDetailStore: Object.assign(
         vi.fn((selector: (s: any) => any) =>
-            selector({ initStatus: 'ready', projectRootPath: '/mock', activeGraphId: null })
+            selector({
+                initStatus: 'ready',
+                projectRootPath: '/mock',
+                activeGraphId: null,
+                setInitStatus: vi.fn(),
+            })
         ),
         { getState: mockGetState }
     ),
@@ -65,12 +70,11 @@ vi.mock('@/hooks/useGraphFile', () => ({
 }))
 
 vi.mock('@/hooks/useGraphInit', () => ({
-    useGraphInit: () => ({ handleInit: vi.fn() }),
+    useGraphInit: () => ({}),
 }))
 
 vi.mock('@tauri-apps/plugin-fs', () => ({
     exists: vi.fn(),
-    mkdir: vi.fn(),
     readTextFile: vi.fn(),
 }))
 

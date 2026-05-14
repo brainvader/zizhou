@@ -18,6 +18,7 @@
     "@phosphor-icons/react": "^2.1.10",
     "@tanstack/react-router": "^1.169.2",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-fs": "^2.5.1",
     "@tauri-apps/plugin-opener": "^2",
     "@xyflow/react": "^12.10.2",
