@@ -4,32 +4,24 @@
  * @bom docs/bom/graph.ts, docs/bom/project.ts
  * @story
  * 1. New Graph ボタンクリックで writeTextFile が正しいパス・内容で呼ばれる
- * 2. writeTextFile 完了後に setActiveGraphId が graphId で呼ばれる
- * 3. writeTextFile 失敗時に toast.error が呼ばれ setActiveGraphId は呼ばれない
+ * 2. writeTextFile 完了後に onNavigate が graphId で呼ばれる
+ * 3. writeTextFile 失敗時に toast.error が呼ばれ onNavigate は呼ばれない
  * @output src/components/ProjectDetailTopbar.tsx
  */
-
-// =============================================================================
-// Slot 2: Imports
-// =============================================================================
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import type { Project } from '@/bom/project'
 import { ProjectDetailTopbar } from '@/components/ProjectDetailTopbar'
 
-// =============================================================================
-// Slot 3: モック・セットアップ
-// =============================================================================
-
 const {
     mockWriteTextFile,
     mockToastError,
-    mockSetActiveGraphId,
+    mockNavigate,
 } = vi.hoisted(() => ({
     mockWriteTextFile: vi.fn<() => Promise<void>>(),
     mockToastError: vi.fn(),
-    mockSetActiveGraphId: vi.fn(),
+    mockNavigate: vi.fn(),
 }))
 
 vi.mock('@tauri-apps/plugin-fs', () => ({
@@ -53,6 +45,11 @@ vi.mock('@/store/useProjectStore', () => ({
     useProjectStore: vi.fn(() => undefined),
 }))
 
+// useRouter のフォールバックを無効化（onNavigate props DI で完結させる）
+vi.mock('@tanstack/react-router', () => ({
+    useRouter: vi.fn(() => ({ navigate: vi.fn() })),
+}))
+
 const MOCK_PROJECT: Project = {
     id: 'proj-001',
     name: '地蔵 Core',
@@ -67,7 +64,7 @@ const setup = () =>
             project={MOCK_PROJECT}
             initStatus="ready"
             projectRootPath={MOCK_PROJECT.rootPath}
-            onSetActiveGraphId={mockSetActiveGraphId}
+            onNavigate={mockNavigate}
             onWriteTextFile={mockWriteTextFile}
         />
     )
@@ -75,10 +72,6 @@ const setup = () =>
 beforeEach(() => {
     vi.clearAllMocks()
 })
-
-// =============================================================================
-// Slot 4: 挙動の検証
-// =============================================================================
 
 describe('ProjectDetailTopbar: New Graph logic', () => {
     it('logic: New Graph クリックで writeTextFile が正しいパスと内容で呼ばれる', async () => {
@@ -95,18 +88,18 @@ describe('ProjectDetailTopbar: New Graph logic', () => {
         })
     })
 
-    it('logic: writeTextFile 完了後に setActiveGraphId が graphId で呼ばれる', async () => {
+    it('logic: writeTextFile 完了後に onNavigate が graphId で呼ばれる', async () => {
         mockWriteTextFile.mockResolvedValue(undefined)
         setup()
 
         fireEvent.click(screen.getByRole('button', { name: /new graph/i }))
 
         await waitFor(() => {
-            expect(mockSetActiveGraphId).toHaveBeenCalledWith('test-graph-id')
+            expect(mockNavigate).toHaveBeenCalledWith('test-graph-id')
         })
     })
 
-    it('logic: writeTextFile 失敗時に toast.error が呼ばれ setActiveGraphId は呼ばれない', async () => {
+    it('logic: writeTextFile 失敗時に toast.error が呼ばれ onNavigate は呼ばれない', async () => {
         mockWriteTextFile.mockRejectedValue(new Error('fs error'))
         setup()
 
@@ -115,6 +108,6 @@ describe('ProjectDetailTopbar: New Graph logic', () => {
         await waitFor(() => {
             expect(mockToastError).toHaveBeenCalledTimes(1)
         })
-        expect(mockSetActiveGraphId).not.toHaveBeenCalled()
+        expect(mockNavigate).not.toHaveBeenCalled()
     })
 })
