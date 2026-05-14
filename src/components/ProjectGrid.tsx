@@ -85,6 +85,7 @@ export const ProjectGrid = ({ isHydrated, onOpenDirectory }: ProjectGridProps) =
                         key={project.id}
                         to="/projects/$id"
                         params={{ id: project.id }}
+                        search={{ graph: undefined }}
                         data-testid={`card-${project.id}`}
                         className="rounded-md border border-border bg-card p-4 cursor-pointer hover:-translate-y-px transition-transform block no-underline"
                     >
