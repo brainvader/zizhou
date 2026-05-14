@@ -1,5 +1,6 @@
 import { RouterProvider } from '@tanstack/react-router'
 import { router } from '@/router'
+import { Toaster } from 'sonner'
 import './App.css'
 
 /**
@@ -11,7 +12,12 @@ import './App.css'
  * @see src/routes/index.tsx "/" ルート（旧 App.tsx の責務）
  */
 function App() {
-  return <RouterProvider router={router} />
+  return (
+    <>
+      <RouterProvider router={router} />
+      <Toaster richColors />
+    </>
+  )
 }
 
 export default App
