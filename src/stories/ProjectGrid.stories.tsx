@@ -11,7 +11,7 @@
  * 7. 「キャンセル」でダイアログが閉じ form がリセットされる
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, screen } from 'storybook/test'
+import { expect, fn, screen } from 'storybook/test'
 import { RouterProvider, createRouter, createMemoryHistory } from '@tanstack/react-router'
 import { router as appRouter } from '@/router'
 import { ProjectGrid } from '@/components/ProjectGrid'
@@ -31,6 +31,9 @@ const meta: Meta<typeof ProjectGrid> = {
             return <RouterProvider router={memoryRouter} defaultComponent={() => <Story />} />
         },
     ],
+    args: {
+        onMkdir: fn(async () => { }),
+    },
 }
 export default meta
 type Story = StoryObj<typeof ProjectGrid>
@@ -102,7 +105,10 @@ export const ValidationError: Story = {
 
 // @story 状態 6: 正常作成 → ダイアログが閉じる
 export const SubmitSuccess: Story = {
-    args: { isHydrated: true },
+    args: {
+        isHydrated: true,
+        onMkdir: fn(async () => { }),
+    },
     play: async ({ userEvent }) => {
         await userEvent.click(screen.getByText('＋ new project'))
         await userEvent.type(screen.getByPlaceholderText('My Awesome App'), '地蔵 Core')

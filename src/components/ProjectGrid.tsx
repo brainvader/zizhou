@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
 import { Link } from '@tanstack/react-router'
-import { useProjectStore } from '@/store/useProjectStore'
 import { mkdir } from '@tauri-apps/plugin-fs'
-import { graphsDir } from '@/bom/graph'
+import { useProjectStore } from '@/store/useProjectStore'
 import { NewProjectFormSchema, type NewProjectForm } from '@/bom/project'
+import { graphsDir } from '@/bom/graph'
 import {
     Dialog,
     DialogContent,
@@ -22,11 +22,15 @@ import { RootPathInput } from '@/components/RootPathInput'
 const INITIAL_FORM: NewProjectForm = { name: '', description: '', rootPath: '' }
 const INITIAL_ERRORS = { name: null as string | null, description: null as string | null, rootPath: null as string | null }
 
+type MkdirFn = (path: string, options?: { recursive: boolean }) => Promise<void>
+
 type ProjectGridProps = {
     /** loadProjects 完了後に true になる。false の間は「＋ new project」を disabled にする */
     isHydrated: boolean
     /** フォルダ選択ダイアログを開く関数（省略時は RootPathInput が Tauri plugin-dialog にフォールバック） */
     onOpenDirectory?: () => Promise<string | null>
+    /** graphs/ ディレクトリ作成関数（省略時は Tauri plugin-fs にフォールバック） */
+    onMkdir?: MkdirFn
 }
 
 /**
@@ -39,7 +43,7 @@ type ProjectGridProps = {
  * @see docs/bom/project.ts
  * @see docs/specs/project-list.spec.tsx
  */
-export const ProjectGrid = ({ isHydrated, onOpenDirectory }: ProjectGridProps) => {
+export const ProjectGrid = ({ isHydrated, onOpenDirectory, onMkdir = mkdir }: ProjectGridProps) => {
     const { projects, addProject } = useProjectStore()
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [form, setForm] = useState<NewProjectForm>(INITIAL_FORM)
@@ -59,7 +63,7 @@ export const ProjectGrid = ({ isHydrated, onOpenDirectory }: ProjectGridProps) =
         setIsDialogOpen(false)
     }
 
-    /** 「作成」ボタン押下: Zod バリデーション → addProject → ダイアログを閉じる */
+    /** 「作成」ボタン押下: Zod バリデーション → graphs/ 作成 → addProject → ダイアログを閉じる */
     const handleSubmit = async () => {
         const result = NewProjectFormSchema.safeParse(form)
         if (!result.success) {
@@ -72,7 +76,7 @@ export const ProjectGrid = ({ isHydrated, onOpenDirectory }: ProjectGridProps) =
             return
         }
         // graphs/ ディレクトリを作成
-        await mkdir(graphsDir(result.data.rootPath), { recursive: true })
+        await onMkdir(graphsDir(result.data.rootPath), { recursive: true })
         // [C] ID生成: nanoid() で id を生成して Project に合成
         addProject({ id: nanoid(), ...result.data })
         setIsDialogOpen(false)
