@@ -64,16 +64,6 @@ vi.mock('@/hooks/useGraphFile', () => ({
     useGraphFile: () => ({ setHydrated: vi.fn(), saveGraph: vi.fn() }),
 }))
 
-vi.mock('@/hooks/useGraphInit', () => ({
-    useGraphInit: () => ({ handleInit: vi.fn() }),
-}))
-
-vi.mock('@tauri-apps/plugin-fs', () => ({
-    exists: vi.fn(),
-    mkdir: vi.fn(),
-    readTextFile: vi.fn(),
-}))
-
 vi.mock('@xyflow/react', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@xyflow/react')>()
     return {

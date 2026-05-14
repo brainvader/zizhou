@@ -9,17 +9,8 @@
 import { test, expect } from '@playwright/test'
 
 const PROJECT_DETAIL_URL = '/projects/1'
-const PROJECT_DETAIL_UNINITIALIZED_URL = '/projects/1?fs=uninitialized'
 
 test.describe('GraphEditor — Integration', () => {
-
-    test('「初期化」クリックでエディタビューに切り替わる（initStatus 遷移）', async ({ page }) => {
-        await page.goto(PROJECT_DETAIL_UNINITIALIZED_URL)
-        await expect(page.getByRole('button', { name: /初期化/ })).toBeVisible()
-        await page.getByRole('button', { name: /初期化/ }).click()
-        await expect(page.getByTestId('graph-editor')).toBeVisible()
-        await page.screenshot({ path: 'evidence/GraphEditor_after-init.png' })
-    })
 
     test('「＋ ノード追加」クリックで React Flow キャンバスにノードが描画される', async ({ page }) => {
         await page.goto(PROJECT_DETAIL_URL)
