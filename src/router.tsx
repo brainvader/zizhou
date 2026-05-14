@@ -9,7 +9,10 @@ import { ProjectDetailRoute } from '@/routes/projects.$id'
  *
  * ルート構成:
  *   /             → IndexRoute   (CTX-2: PROJECT-GRID)
- *   /projects/$id → ProjectDetailRoute (CTX-5: ROUTING プレースホルダー)
+ *   /projects/$id → ProjectDetailRoute
+ *
+ * search params:
+ *   ?graph={graphId} — 開いているグラフの ID。activeGraphId の SSOT。
  *
  * @see docs/bom/project.ts — routing は TanStack Router に委譲
  * @see docs/specs/routing.spec.tsx
@@ -25,6 +28,9 @@ const indexRoute = createRoute({
 const projectDetailRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/projects/$id',
+    validateSearch: (search: Record<string, unknown>) => ({
+        graph: typeof search.graph === 'string' ? search.graph : undefined,
+    }),
     component: ProjectDetailRoute,
 })
 
