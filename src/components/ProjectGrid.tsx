@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { RootPathInput } from '@/components/RootPathInput'
 
 /** フォームの初期状態 */
 const INITIAL_FORM: NewProjectForm = { name: '', description: '', rootPath: '' }
@@ -22,6 +23,8 @@ const INITIAL_ERRORS = { name: null as string | null, description: null as strin
 type ProjectGridProps = {
     /** loadProjects 完了後に true になる。false の間は「＋ new project」を disabled にする */
     isHydrated: boolean
+    /** フォルダ選択ダイアログを開く関数（省略時は RootPathInput が Tauri plugin-dialog にフォールバック） */
+    onOpenDirectory?: () => Promise<string | null>
 }
 
 /**
@@ -34,7 +37,7 @@ type ProjectGridProps = {
  * @see docs/bom/project.ts
  * @see docs/specs/project-list.spec.tsx
  */
-export const ProjectGrid = ({ isHydrated }: ProjectGridProps) => {
+export const ProjectGrid = ({ isHydrated, onOpenDirectory }: ProjectGridProps) => {
     const { projects, addProject } = useProjectStore()
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [form, setForm] = useState<NewProjectForm>(INITIAL_FORM)
@@ -148,22 +151,13 @@ export const ProjectGrid = ({ isHydrated }: ProjectGridProps) => {
                                 )}
                             </div>
 
-                            {/* rootPath フィールド */}
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="project-root-path" className="font-mono text-xs tracking-wide">
-                                    root path *
-                                </Label>
-                                <Input
-                                    id="project-root-path"
-                                    placeholder="/Users/user/projects/my-app"
-                                    value={form.rootPath}
-                                    onChange={(e) => setForm((f) => ({ ...f, rootPath: e.target.value }))}
-                                    className={errors.rootPath ? 'border-destructive' : ''}
-                                />
-                                {errors.rootPath && (
-                                    <span className="font-mono text-xs text-destructive">{errors.rootPath}</span>
-                                )}
-                            </div>
+                            {/* rootPath フィールド — RootPathInput に委譲 */}
+                            <RootPathInput
+                                value={form.rootPath}
+                                onChange={(v) => setForm((f) => ({ ...f, rootPath: v }))}
+                                error={errors.rootPath}
+                                onOpenDirectory={onOpenDirectory}
+                            />
                         </div>
 
                         <DialogFooter>
