@@ -18,6 +18,7 @@
     {
       "identifier": "fs:scope",
       "allow": [{ "path": "**" }, { "path": "$APPDATA/**" }]
-    }
+    },
+    "fs:allow-watch"
   ]
 }
