@@ -142,3 +142,27 @@ export const ClickAddNode: Story = {
         await expect(args.onAddNode).toHaveBeenCalledOnce()
     },
 }
+// @story 状態 8: ノードを選択して Delete キーで削除される
+export const DeleteNode: Story = {
+    args: {
+        initStatus: 'ready',
+        projectRootPath: '/mock/project',
+        activeGraphId: null,
+        nodes: [{
+            id: 'test-node',
+            position: { x: 100, y: 100 },
+            data: { label: 'New Node' },
+        }],
+        edges: [],
+    },
+    play: async ({ canvas, userEvent }) => {
+        // ノードが表示されている
+        await expect(canvas.getByText('New Node')).toBeVisible()
+        // ノードをクリックして選択
+        await userEvent.click(canvas.getByText('New Node'))
+        // Delete キーで削除
+        await userEvent.keyboard('{Delete}')
+        // ノードが削除されている
+        await expect(canvas.queryByText('New Node')).not.toBeInTheDocument()
+    },
+}

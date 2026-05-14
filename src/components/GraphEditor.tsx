@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import {
     ReactFlow,
     Background,
@@ -90,9 +90,23 @@ export function GraphEditor({
     const storeInitStatus = useProjectDetailStore((s) => s.initStatus)
     const { setHydrated: storeSetHydrated } = useGraphFile()
 
+    const storeSetNodes = useGraphStore((s) => s.setNodes)
+    const storeSetEdges = useGraphStore((s) => s.setEdges)
+
+    // props で渡された nodes/edges はマウント時に store に注入する。
+    // 以降は常に storeNodes/storeEdges を参照することで、
+    // onNodesChange/onEdgesChange による store 更新が正しく反映される。
+    useEffect(() => {
+        if (nodesProp !== undefined) storeSetNodes(nodesProp)
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        if (edgesProp !== undefined) storeSetEdges(edgesProp)
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
     const initStatus = initStatusProp ?? storeInitStatus
-    const nodes = nodesProp ?? storeNodes
-    const edges = edgesProp ?? storeEdges
+    const nodes = storeNodes
+    const edges = storeEdges
     const addNode = onAddNode ?? storeAddNode
     const setSelectedNodeId = onSetSelectedNodeId ?? storeSetSelectedNodeId
 
@@ -119,9 +133,6 @@ export function GraphEditor({
         }
         addNode(node)
     }, [addNode])
-
-    const storeSetNodes = useGraphStore((s) => s.setNodes)
-    const storeSetEdges = useGraphStore((s) => s.setEdges)
 
     // --- Select Node ---
     const handleNodeClick: NodeMouseHandler = useCallback((_event, node) => {
@@ -184,7 +195,6 @@ export function GraphEditor({
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
                         onNodeClick={handleNodeClick}
-                        deleteKeyCode="Delete"
                     >
                         <Background />
                         <Controls />
