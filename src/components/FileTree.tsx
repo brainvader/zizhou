@@ -16,6 +16,7 @@ type NavigateFn = (graphId: string) => void
 
 export type FileTreeProps = {
     projectRootPath?: string
+    projectId?: string
     /** graphs/*.json 選択時のナビゲーション（省略時は router.navigate にフォールバック） */
     onNavigate?: NavigateFn
     onReadDir?: ReadDirFn
@@ -163,11 +164,12 @@ const TreeItem = ({
  * マウント時に onReadDir を再帰呼び出しでツリーを構築する。
  * graphs/ 配下の .json 選択時は onNavigate を呼ぶ。
  *
- * props DI: onReadDir / onJoin / projectRootPath / onNavigate を props で受け取る。
+ * props DI: onReadDir / onJoin / projectRootPath / projectId / onNavigate を props で受け取る。
  * 省略時は Tauri fs 実装・useRouter にフォールバックする。
  */
 export const FileTree = ({
     projectRootPath: rootPathProp,
+    projectId: projectIdProp,
     onNavigate,
     onReadDir = readDir as unknown as ReadDirFn,
     onJoin = join,
@@ -179,7 +181,9 @@ export const FileTree = ({
 
     const navigate = onNavigate ?? ((graphId: string) => {
         router.navigate({
-            search: (prev) => ({ ...prev, graph: graphId }),
+            to: '/projects/$id',
+            params: { id: projectIdProp ?? '' },
+            search: { graph: graphId },
         })
     })
 

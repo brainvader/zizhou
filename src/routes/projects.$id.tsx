@@ -64,7 +64,7 @@ export const ProjectDetailRoute = () => {
 
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
                 {/* CTX-1: FileTree */}
-                <FileTree />
+                <FileTree projectId={id} />
 
                 {/* CTX-2: GraphEditor */}
                 <GraphEditor activeGraphId={activeGraphId ?? null} />
