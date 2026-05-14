@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { readTextFile, writeTextFile, exists, BaseDirectory } from '@tauri-apps/plugin-fs'
+import { readTextFile, writeTextFile, exists, mkdir, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { toast } from 'sonner'
 import { useProjectStore } from '@/store/useProjectStore'
 import { ProjectSchema } from '@/bom/project'
@@ -43,6 +43,11 @@ export const useProjectFile = (): UseProjectFileReturn => {
         if (saving.current) return
         saving.current = true
         try {
+            // AppData ディレクトリが存在しない場合は作成
+            const dirExists = await exists('', { baseDir: BaseDirectory.AppData })
+            if (!dirExists) {
+                await mkdir('', { baseDir: BaseDirectory.AppData, recursive: true })
+            }
             await writeTextFile(FILE_NAME, JSON.stringify(projects, null, 2), FILE_OPTIONS)
         } catch {
             toast.error('projects.json の保存に失敗しました')

@@ -10,7 +10,10 @@
     "fs:allow-read-dir",
     "fs:allow-read-file",
     "fs:allow-write-file",
+    "fs:allow-write-text-file",
     "fs:allow-exists",
+    "fs:allow-appdata-write",
+    "fs:allow-appdata-write-recursive",
     "dialog:allow-open",
     {
       "identifier": "fs:scope",
