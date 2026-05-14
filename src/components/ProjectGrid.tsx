@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { nanoid } from 'nanoid'
 import { Link } from '@tanstack/react-router'
 import { useProjectStore } from '@/store/useProjectStore'
+import { mkdir } from '@tauri-apps/plugin-fs'
+import { graphsDir } from '@/bom/graph'
 import { NewProjectFormSchema, type NewProjectForm } from '@/bom/project'
 import {
     Dialog,
@@ -58,7 +60,7 @@ export const ProjectGrid = ({ isHydrated, onOpenDirectory }: ProjectGridProps) =
     }
 
     /** 「作成」ボタン押下: Zod バリデーション → addProject → ダイアログを閉じる */
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         const result = NewProjectFormSchema.safeParse(form)
         if (!result.success) {
             const fieldErrors = result.error.flatten().fieldErrors
@@ -69,6 +71,8 @@ export const ProjectGrid = ({ isHydrated, onOpenDirectory }: ProjectGridProps) =
             })
             return
         }
+        // graphs/ ディレクトリを作成
+        await mkdir(graphsDir(result.data.rootPath), { recursive: true })
         // [C] ID生成: nanoid() で id を生成して Project に合成
         addProject({ id: nanoid(), ...result.data })
         setIsDialogOpen(false)
