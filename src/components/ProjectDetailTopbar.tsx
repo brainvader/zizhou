@@ -86,6 +86,7 @@ export const ProjectDetailTopbar = ({
                 await mkdir(dir, { recursive: true })
             }
             await onWriteTextFile(filePath, JSON.stringify(graphFile, null, 2))
+            toast.success(`グラフを作成しました`)
             navigate(graphId)
         } catch {
             toast.error('グラフファイルの作成に失敗しました')
