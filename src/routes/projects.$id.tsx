@@ -28,7 +28,6 @@ export const ProjectDetailRoute = () => {
     const { graph: activeGraphId } = useSearch({ from: '/projects/$id' })
     const project = useProjectStore((s) => s.projects.find((p) => p.id === id))
     const setProjectRootPath = useProjectDetailStore((s) => s.setProjectRootPath)
-    const setInitStatus = useProjectDetailStore((s) => s.setInitStatus)
     const setActiveGraphId = useProjectDetailStore((s) => s.setActiveGraphId)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
@@ -36,9 +35,8 @@ export const ProjectDetailRoute = () => {
     useEffect(() => {
         if (project?.rootPath) {
             setProjectRootPath(project.rootPath)
-            setInitStatus('checking')
         }
-    }, [project?.rootPath, setProjectRootPath, setInitStatus])
+    }, [project?.rootPath, setProjectRootPath])
 
     // URL の ?graph= を store に同期する（useGraphFile の getState() 参照のため）
     useEffect(() => {
