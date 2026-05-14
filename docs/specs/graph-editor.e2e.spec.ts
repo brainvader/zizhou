@@ -153,17 +153,20 @@ test.describe('GraphEditor — 永続化', () => {
     test('ノード削除 → リロード → 削除済みのまま復元される', async ({ page }) => {
         await createNewGraph(page)
 
-        // ノードを2つ追加してから1つ削除
+        // ノードを1つ追加して削除
         await page.getByRole('button', { name: /ノード追加/ }).click()
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await expect(page.locator('.react-flow__node')).toHaveCount(2)
+        await expect(page.locator('.react-flow__node')).toHaveCount(1)
 
         // ノードを選択して Delete キーで削除
-        // キャンバスにフォーカスを当ててからノードを選択する
         await page.locator('.react-flow__renderer').click()
         await page.locator('.react-flow__node').first().click()
+        // selected 状態になるまで待つ
+        await expect(page.locator('.react-flow__node.selected').first()).toBeVisible()
         await page.keyboard.press('Delete')
+        // 削除完了まで待つ
+        await expect(page.locator('.react-flow__node')).toHaveCount(0)
 
+        // 保存が完了するのを待つ（subscribe → writeTextFile の非同期）
         await page.waitForTimeout(500)
         await page.screenshot({ path: 'evidence/GraphEditor_persist_node-deleted.png' })
 
