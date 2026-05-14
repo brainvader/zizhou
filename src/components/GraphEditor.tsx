@@ -74,7 +74,6 @@ export function GraphEditor({
     onResetGraph,
     onSetSelectedNodeId,
     onExists = exists,
-    onMkdir = mkdir,
     onReadTextFile = readTextFile,
     setHydrated: setHydratedProp,
 }: GraphEditorProps = {}) {
