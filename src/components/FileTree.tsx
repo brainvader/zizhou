@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from '@tanstack/react-router'
 import { readDir } from '@tauri-apps/plugin-fs'
 import { join } from '@tauri-apps/api/path'
 import { ChevronRight, ChevronDown, FileText, Folder, FolderOpen } from 'lucide-react'
@@ -11,10 +12,12 @@ import type { FileTreeNode } from '@/bom/graph'
 
 type ReadDirFn = (path: string) => Promise<{ name: string; isDirectory: boolean; isSymlink: boolean }[]>
 type JoinFn = (...paths: string[]) => Promise<string>
+type NavigateFn = (graphId: string) => void
 
 export type FileTreeProps = {
     projectRootPath?: string
-    setActiveGraphId?: (id: string) => void
+    /** graphs/*.json 選択時のナビゲーション（省略時は router.navigate にフォールバック） */
+    onNavigate?: NavigateFn
     onReadDir?: ReadDirFn
     onJoin?: JoinFn
 }
@@ -58,7 +61,7 @@ const toGraphId = (path: string): string =>
     path.split(/[\\/]/).pop()?.replace(/\.json$/, '') ?? ''
 
 // ============================================================
-// TreeItem（変更なし）
+// TreeItem
 // ============================================================
 
 type TreeItemProps = {
@@ -107,9 +110,8 @@ const TreeItem = ({
                             ? <FolderOpen size={14} className="text-[--primary]" />
                             : <Folder size={14} className="text-[--muted-foreground]" />}
                     </span>
-                    <span className="text-xs font-mono truncate">{node.name}</span>
+                    <span className="truncate">{node.name}</span>
                 </div>
-
                 {isExpanded && node.children?.map((child) => (
                     <TreeItem
                         key={child.path}
@@ -131,7 +133,7 @@ const TreeItem = ({
             tabIndex={0}
             className={[
                 'flex items-center gap-1.5 px-2 py-0.75 rounded-sm cursor-pointer select-none',
-                'text-xs font-mono truncate transition-colors duration-100',
+                'transition-colors duration-100',
                 isSelected
                     ? 'bg-[--primary-glow] text-[--primary-foreground]'
                     : 'text-[--muted-foreground] hover:text-[--foreground] hover:bg-[--muted]',
@@ -159,22 +161,27 @@ const TreeItem = ({
  *
  * projectRootPath を useProjectDetailStore から取得し、
  * マウント時に onReadDir を再帰呼び出しでツリーを構築する。
- * graphs/ 配下の .json 選択時は setActiveGraphId を呼ぶ。
+ * graphs/ 配下の .json 選択時は onNavigate を呼ぶ。
  *
- * props DI: onReadDir / onJoin / projectRootPath / setActiveGraphId を props で受け取る。
- * 省略時は Tauri fs 実装・useProjectDetailStore にフォールバックする。
+ * props DI: onReadDir / onJoin / projectRootPath / onNavigate を props で受け取る。
+ * 省略時は Tauri fs 実装・useRouter にフォールバックする。
  */
 export const FileTree = ({
     projectRootPath: rootPathProp,
-    setActiveGraphId: setActiveGraphIdProp,
+    onNavigate,
     onReadDir = readDir as unknown as ReadDirFn,
     onJoin = join,
 }: FileTreeProps = {}) => {
+    const router = useRouter()
     const storeRootPath = useProjectDetailStore((s) => s.projectRootPath)
-    const storeSetActiveGraphId = useProjectDetailStore((s) => s.setActiveGraphId)
 
     const projectRootPath = rootPathProp ?? storeRootPath
-    const setActiveGraphId = setActiveGraphIdProp ?? storeSetActiveGraphId
+
+    const navigate = onNavigate ?? ((graphId: string) => {
+        router.navigate({
+            search: (prev) => ({ ...prev, graph: graphId }),
+        })
+    })
 
     const [tree, setTree] = useState<FileTreeNode[]>([])
     const [selectedPath, setSelectedPath] = useState<string | null>(null)
@@ -217,9 +224,9 @@ export const FileTree = ({
     const handleSelectFile = useCallback((path: string) => {
         setSelectedPath(path)
         if (isGraphJson(path)) {
-            setActiveGraphId(toGraphId(path))
+            navigate(toGraphId(path))
         }
-    }, [setActiveGraphId])
+    }, [navigate])
 
     return (
         <nav
