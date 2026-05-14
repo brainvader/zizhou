@@ -3,8 +3,12 @@ import {
     ReactFlow,
     Background,
     Controls,
+    applyNodeChanges,
+    applyEdgeChanges,
     type Node,
     type Edge,
+    type NodeChange,
+    type EdgeChange,
     type NodeMouseHandler,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -116,13 +120,21 @@ export function GraphEditor({
         addNode(node)
     }, [addNode])
 
+    const storeSetNodes = useGraphStore((s) => s.setNodes)
+    const storeSetEdges = useGraphStore((s) => s.setEdges)
+
     // --- Select Node ---
     const handleNodeClick: NodeMouseHandler = useCallback((_event, node) => {
         setSelectedNodeId(node.id)
     }, [setSelectedNodeId])
 
-    const onNodesChange = useCallback((changes: any) => { void changes }, [])
-    const onEdgesChange = useCallback((changes: any) => { void changes }, [])
+    const onNodesChange = useCallback((changes: NodeChange[]) => {
+        storeSetNodes(applyNodeChanges(changes, nodes) as Node<GraphNodeData>[])
+    }, [nodes, storeSetNodes])
+
+    const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+        storeSetEdges(applyEdgeChanges(changes, edges))
+    }, [edges, storeSetEdges])
 
     // --- Render ---
     return (
@@ -172,6 +184,7 @@ export function GraphEditor({
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
                         onNodeClick={handleNodeClick}
+                        deleteKeyCode="Delete"
                     >
                         <Background />
                         <Controls />

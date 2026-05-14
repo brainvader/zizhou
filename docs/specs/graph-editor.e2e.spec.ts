@@ -159,8 +159,10 @@ test.describe('GraphEditor — 永続化', () => {
         await expect(page.locator('.react-flow__node')).toHaveCount(2)
 
         // ノードを選択して Delete キーで削除
+        // キャンバスにフォーカスを当ててからノードを選択する
+        await page.locator('.react-flow__renderer').click()
         await page.locator('.react-flow__node').first().click()
-        await page.keyboard.press('Backspace')
+        await page.keyboard.press('Delete')
 
         await page.waitForTimeout(500)
         await page.screenshot({ path: 'evidence/GraphEditor_persist_node-deleted.png' })
