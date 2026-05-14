@@ -158,12 +158,6 @@ export function GraphEditor({
                 </div>
             )}
 
-            {initStatus === 'checking' && (
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span>Loading…</span>
-                </div>
-            )}
-
             {initStatus === 'ready' && (
                 <>
                     {nodes.length === 0 && (
