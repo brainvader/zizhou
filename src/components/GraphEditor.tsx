@@ -195,6 +195,7 @@ export function GraphEditor({
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
                         onNodeClick={handleNodeClick}
+                        deleteKeyCode="Delete"
                     >
                         <Background />
                         <Controls />
