@@ -1,13 +1,13 @@
 import { useCallback } from 'react'
 import { useRouter, Link } from '@tanstack/react-router'
 import { nanoid } from 'nanoid'
-import { writeTextFile } from '@tauri-apps/plugin-fs'
+import { writeTextFile, exists, mkdir } from '@tauri-apps/plugin-fs'
 import { toast } from 'sonner'
 import { Settings, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
-import { graphFilePath } from '@/bom/graph'
+import { graphsDir, graphFilePath } from '@/bom/graph'
 import type { GraphFile, InitStatus } from '@/bom/graph'
 import type { Project } from '@/bom/project'
 
@@ -75,10 +75,16 @@ export const ProjectDetailTopbar = ({
     // --- New Graph ---
     const handleNewGraph = useCallback(async () => {
         const graphId = nanoid()
+        const dir = graphsDir(projectRootPath)
         const filePath = graphFilePath(projectRootPath, graphId)
         const graphFile: GraphFile = { id: graphId, nodes: [], edges: [] }
 
         try {
+            // graphs/ ディレクトリが存在しない場合は作成
+            const dirExists = await exists(dir)
+            if (!dirExists) {
+                await mkdir(dir, { recursive: true })
+            }
             await onWriteTextFile(filePath, JSON.stringify(graphFile, null, 2))
             navigate(graphId)
         } catch {
