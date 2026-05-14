@@ -54,7 +54,12 @@ vi.mock('@/store/useGraphStore', () => ({
 vi.mock('@/store/useProjectDetailStore', () => ({
     useProjectDetailStore: Object.assign(
         vi.fn((selector: (s: any) => any) =>
-            selector({ initStatus: 'ready', projectRootPath: '/mock', activeGraphId: null })
+            selector({
+                initStatus: 'ready',
+                projectRootPath: '/mock',
+                activeGraphId: null,
+                setInitStatus: vi.fn(),
+            })
         ),
         { getState: mockGetState }
     ),
@@ -62,6 +67,15 @@ vi.mock('@/store/useProjectDetailStore', () => ({
 
 vi.mock('@/hooks/useGraphFile', () => ({
     useGraphFile: () => ({ setHydrated: vi.fn(), saveGraph: vi.fn() }),
+}))
+
+vi.mock('@/hooks/useGraphInit', () => ({
+    useGraphInit: () => ({}),
+}))
+
+vi.mock('@tauri-apps/plugin-fs', () => ({
+    exists: vi.fn(),
+    readTextFile: vi.fn(),
 }))
 
 vi.mock('@xyflow/react', async (importOriginal) => {

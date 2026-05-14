@@ -29,14 +29,16 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
 }))
 
 vi.mock('sonner', () => ({
-    toast: { error: mockToastError },
+    toast: {
+        error: mockToastError,
+        success: vi.fn(),
+    },
 }))
 
 vi.mock('nanoid', () => ({
     nanoid: vi.fn(() => 'test-graph-id'),
 }))
 
-// store フォールバックを無効化（props DI で完結させる）
 vi.mock('@/store/useProjectDetailStore', () => ({
     useProjectDetailStore: vi.fn(() => undefined),
 }))
@@ -45,10 +47,15 @@ vi.mock('@/store/useProjectStore', () => ({
     useProjectStore: vi.fn(() => undefined),
 }))
 
-// useRouter のフォールバックを無効化（onNavigate props DI で完結させる）
-vi.mock('@tanstack/react-router', () => ({
-    useRouter: vi.fn(() => ({ navigate: vi.fn() })),
-}))
+// Link を含めるため importOriginal を使用
+vi.mock('@tanstack/react-router', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@tanstack/react-router')>()
+    return {
+        ...actual,
+        useRouter: vi.fn(() => ({ navigate: vi.fn() })),
+        Link: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    }
+})
 
 const MOCK_PROJECT: Project = {
     id: 'proj-001',

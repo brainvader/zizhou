@@ -3,28 +3,18 @@
  * @context useGraphInit — GraphEditor から切り出した初期化・ロード hook
  * @bom docs/bom/graph.ts
  * @story
- * 1. マウント時に exists({projectRootPath}/graphs/) が呼ばれ initStatus が更新される
- * 2. graphs/ が存在しない場合、setInitStatus('uninitialized') が呼ばれる
- * 3. graphs/ が存在する場合、setInitStatus('ready') が呼ばれる
- * 4. activeGraphId が変化したとき readTextFile でグラフを読み込み loadGraph が呼ばれる
- * 5. グラフファイルが存在しない場合 resetGraph が呼ばれる
- * 6. handleInit() を呼ぶと mkdir が呼ばれ setInitStatus('ready') が呼ばれる
+ * 1. projectRootPath が設定されると setInitStatus('ready') が呼ばれる
+ * 2. activeGraphId が変化したとき readTextFile でグラフを読み込み loadGraph が呼ばれる
+ * 3. グラフファイルが存在しない場合 resetGraph が呼ばれる
+ * 4. setHydrated が false → true の順で呼ばれる
  * @output src/hooks/useGraphInit.ts
  */
 
-// =============================================================================
-// Slot 2: インポート
-// =============================================================================
-
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { renderHook, act, waitFor } from '@testing-library/react'
+import { renderHook, waitFor } from '@testing-library/react'
 import type { InitStatus } from '@/bom/graph'
 import type { UseGraphInitOptions } from '@/hooks/useGraphInit'
 import { useGraphInit } from '@/hooks/useGraphInit'
-
-// =============================================================================
-// Slot 3: モック・セットアップ
-// =============================================================================
 
 const MOCK_ROOT = '/Users/user/projects/zizou-core'
 const MOCK_GRAPH = 'graph-01'
@@ -37,36 +27,28 @@ const mockGraphJson = JSON.stringify({
     edges: [],
 })
 
-// --- vi.hoisted() でモック変数をホイスト ---
-// vi.fn() に型引数は付けず、使用箇所で UseGraphInitOptions の型にキャストする
 const {
     mockExists,
-    mockMkdir,
     mockReadTextFile,
     mockUseProjectDetailStore,
     mockUseGraphStore,
     mockSetHydrated,
 } = vi.hoisted(() => ({
     mockExists: vi.fn(),
-    mockMkdir: vi.fn(),
     mockReadTextFile: vi.fn(),
     mockUseProjectDetailStore: vi.fn(),
     mockUseGraphStore: vi.fn(),
     mockSetHydrated: vi.fn(),
 }))
 
-// props に渡す際に UseGraphInitOptions の型に合わせてキャスト
 type ExistsFn = NonNullable<UseGraphInitOptions['onExists']>
-type MkdirFn = NonNullable<UseGraphInitOptions['onMkdir']>
 type ReadTextFileFn = NonNullable<UseGraphInitOptions['onReadTextFile']>
 
 const existsMock = mockExists as unknown as ExistsFn
-const mkdirMock = mockMkdir as unknown as MkdirFn
 const readTextFileMock = mockReadTextFile as unknown as ReadTextFileFn
 
 vi.mock('@tauri-apps/plugin-fs', () => ({
     exists: mockExists,
-    mkdir: mockMkdir,
     readTextFile: mockReadTextFile,
 }))
 
@@ -82,7 +64,6 @@ vi.mock('@/hooks/useGraphFile', () => ({
     useGraphFile: () => ({ setHydrated: mockSetHydrated }),
 }))
 
-// --- store state ファクトリ ---
 const makeDetailStoreState = (overrides: Partial<{
     initStatus: InitStatus
     projectRootPath: string
@@ -107,8 +88,7 @@ const makeGraphStoreState = (overrides: Partial<{
 
 beforeEach(() => {
     vi.clearAllMocks()
-    mockExists.mockResolvedValue(false)
-    mockMkdir.mockResolvedValue(undefined)
+    mockExists.mockResolvedValue(true)
     mockReadTextFile.mockResolvedValue(mockGraphJson)
 
     mockUseProjectDetailStore.mockImplementation(
@@ -121,31 +101,8 @@ beforeEach(() => {
     )
 })
 
-// =============================================================================
-// Slot 4: 挙動の検証
-// =============================================================================
-
 describe('useGraphInit: Init Check logic', () => {
-    test('マウント時に exists({projectRootPath}/graphs/) が呼ばれる', async () => {
-        mockExists.mockResolvedValueOnce(true)
-
-        renderHook(() =>
-            useGraphInit({
-                projectRootPath: MOCK_ROOT,
-                onExists: existsMock,
-                onMkdir: mkdirMock,
-                onReadTextFile: readTextFileMock,
-                setHydrated: mockSetHydrated,
-            }),
-        )
-
-        await waitFor(() => {
-            expect(mockExists).toHaveBeenCalledWith(MOCK_GRAPHS_DIR)
-        })
-    })
-
-    test('graphs/ が存在しない場合、setInitStatus("uninitialized") が呼ばれる', async () => {
-        mockExists.mockResolvedValue(false)
+    test('projectRootPath が設定されると setInitStatus("ready") が呼ばれる', async () => {
         const setInitStatus = vi.fn()
 
         mockUseProjectDetailStore.mockImplementation(
@@ -157,29 +114,6 @@ describe('useGraphInit: Init Check logic', () => {
             useGraphInit({
                 projectRootPath: MOCK_ROOT,
                 onExists: existsMock,
-                onMkdir: mkdirMock,
-                onReadTextFile: readTextFileMock,
-                setHydrated: mockSetHydrated,
-            }),
-        )
-
-        await waitFor(() => expect(setInitStatus).toHaveBeenCalledWith('uninitialized'))
-    })
-
-    test('graphs/ が存在する場合、setInitStatus("ready") が呼ばれる', async () => {
-        mockExists.mockResolvedValue(true)
-        const setInitStatus = vi.fn()
-
-        mockUseProjectDetailStore.mockImplementation(
-            (selector: (s: ReturnType<typeof makeDetailStoreState>) => unknown) =>
-                selector(makeDetailStoreState({ setInitStatus })),
-        )
-
-        renderHook(() =>
-            useGraphInit({
-                projectRootPath: MOCK_ROOT,
-                onExists: existsMock,
-                onMkdir: mkdirMock,
                 onReadTextFile: readTextFileMock,
                 setHydrated: mockSetHydrated,
             }),
@@ -191,7 +125,6 @@ describe('useGraphInit: Init Check logic', () => {
 
 describe('useGraphInit: Load Graph logic', () => {
     test('initStatus が ready かつ activeGraphId があると readTextFile が呼ばれる', async () => {
-        // exists: graphs/dir=true, file=true
         mockExists.mockResolvedValue(true)
         mockReadTextFile.mockResolvedValue(mockGraphJson)
         const loadGraph = vi.fn()
@@ -212,7 +145,6 @@ describe('useGraphInit: Load Graph logic', () => {
                 activeGraphId: MOCK_GRAPH,
                 onLoadGraph: loadGraph,
                 onExists: existsMock,
-                onMkdir: mkdirMock,
                 onReadTextFile: readTextFileMock,
                 setHydrated: mockSetHydrated,
             }),
@@ -226,7 +158,6 @@ describe('useGraphInit: Load Graph logic', () => {
 
     test('グラフファイルが存在しない場合 resetGraph が呼ばれる', async () => {
         mockExists.mockImplementation(async (path: string) =>
-            // graphs/dir は true, ファイルは false
             path === MOCK_GRAPHS_DIR,
         )
         const resetGraph = vi.fn()
@@ -238,7 +169,6 @@ describe('useGraphInit: Load Graph logic', () => {
                 activeGraphId: MOCK_GRAPH,
                 onResetGraph: resetGraph,
                 onExists: existsMock,
-                onMkdir: mkdirMock,
                 onReadTextFile: readTextFileMock,
                 setHydrated: mockSetHydrated,
             }),
@@ -258,7 +188,6 @@ describe('useGraphInit: Load Graph logic', () => {
                 initStatus: 'ready',
                 activeGraphId: MOCK_GRAPH,
                 onExists: existsMock,
-                onMkdir: mkdirMock,
                 onReadTextFile: readTextFileMock,
                 setHydrated,
             }),
@@ -266,27 +195,5 @@ describe('useGraphInit: Load Graph logic', () => {
 
         await waitFor(() => expect(setHydrated).toHaveBeenLastCalledWith(true))
         expect(setHydrated.mock.calls[0]).toEqual([false])
-    })
-})
-
-describe('useGraphInit: Init Dir logic (handleInit)', () => {
-    test('handleInit() で mkdir が呼ばれ setInitStatus("ready") が呼ばれる', async () => {
-        const setInitStatus = vi.fn()
-
-        const { result } = renderHook(() =>
-            useGraphInit({
-                projectRootPath: MOCK_ROOT,
-                onSetInitStatus: setInitStatus,
-                onExists: existsMock,
-                onMkdir: mkdirMock,
-                onReadTextFile: readTextFileMock,
-                setHydrated: mockSetHydrated,
-            }),
-        )
-
-        await act(() => result.current.handleInit())
-
-        expect(mockMkdir).toHaveBeenCalledWith(MOCK_GRAPHS_DIR, { recursive: true })
-        expect(setInitStatus).toHaveBeenCalledWith('ready')
     })
 })

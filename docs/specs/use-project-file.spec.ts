@@ -196,12 +196,15 @@ describe('useProjectFile: logic', () => {
                 return () => { };
             }
         );
+        mockExists.mockResolvedValue(false)
         mockWriteTextFile.mockResolvedValue(undefined);
         // hydrated.current を true にするため loadProjects を先に実行する
         mockExists.mockResolvedValue(false);
 
         const { result } = renderHook(() => useProjectFile());
         await act(() => result.current.loadProjects());
+
+        mockExists.mockResolvedValue(true)
 
         await act(async () => {
             subscribedCallback?.({ projects: fixtureProjects });
