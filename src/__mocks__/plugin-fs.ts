@@ -5,37 +5,78 @@
  * URL パラメータ ?fs=uninitialized を付けると exists が false を返す。
  * デフォルト（パラメータなし）は exists が true を返す。
  *
- * writeTextFile / readTextFile は localStorage をバックエンドとして使用する。
- * これにより page.reload() を跨いだ永続化の検証が可能。
+ * --- localStorage バックエンド（グラフデータ永続化）---
+ * パスに /graphs/ を含む操作は localStorage を使う。
+ *   writeTextFile → localStorage.setItem(path, contents)
+ *   readTextFile  → localStorage.getItem(path) / なければ throw
+ *   exists        → グラフファイル（*.json）は localStorage にキーがあるか確認
+ *                   graphs/ ディレクトリ自体の存在確認は fsMode で従来通り制御
  */
 
 const fsMode = new URLSearchParams(window.location.search).get('fs')
 
-const DEFAULT_PROJECTS = JSON.stringify([
-    {
-        id: '1',
-        name: 'zizou-core',
-        rootPath: '/Users/user/projects/zizou-core',
-    },
-])
+// ============================================================
+// Utilities
+// ============================================================
+
+const isGraphFile = (path: string): boolean =>
+    /[\\/]graphs[\\/][^/\\/]+\.json$/.test(path)
+
+const isGraphsDir = (path: string): boolean =>
+    /[\\/]graphs$/.test(path)
+
+// ============================================================
+// exists
+// ============================================================
 
 export const exists = async (path: string): Promise<boolean> => {
     // projects.json の存在確認は常に true
     if (path === 'projects.json') return true
-    // graphs/ の存在確認は fsMode で切り替える
+    // グラフファイル単体（*.json）は localStorage にキーがあるか確認
+    if (isGraphFile(path)) return localStorage.getItem(path) !== null
+    // graphs/ ディレクトリの存在確認は fsMode で切り替える
+    if (isGraphsDir(path)) return fsMode !== 'uninitialized'
+    // その他は fsMode で切り替える
     return fsMode !== 'uninitialized'
 }
 
+// ============================================================
+// readTextFile
+// ============================================================
+
 export const readTextFile = async (path: string): Promise<string> => {
-    const stored = localStorage.getItem(path)
-    if (stored !== null) return stored
-    // デフォルトフィクスチャ（projects.json）
-    return DEFAULT_PROJECTS
+    // グラフファイルは localStorage から読む
+    if (isGraphFile(path)) {
+        const value = localStorage.getItem(path)
+        if (value === null) throw new Error(`[mock] file not found: ${path}`)
+        return value
+    }
+    // projects.json（AppData 相対パス）は固定フィクスチャを返す
+    return JSON.stringify([
+        {
+            id: '1',
+            name: 'zizou-core',
+            rootPath: '/Users/user/projects/zizou-core',
+        },
+    ])
 }
 
-export const writeTextFile = async (path: string, data: string): Promise<void> => {
-    localStorage.setItem(path, data)
+// ============================================================
+// writeTextFile
+// ============================================================
+
+export const writeTextFile = async (path: string, contents: string): Promise<void> => {
+    // グラフファイルは localStorage に書く
+    if (isGraphFile(path)) {
+        localStorage.setItem(path, contents)
+        return
+    }
+    // その他は no-op（projects.json 等）
 }
+
+// ============================================================
+// 以下は変更なし
+// ============================================================
 
 export const readDir = async (path: string) => {
     const tree: Record<string, Array<{

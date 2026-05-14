@@ -40,7 +40,7 @@ export const Ready: Story = {
         project: mockProject,
         initStatus: 'ready',
         projectRootPath: '/Users/user/projects/zizou-core',
-        onSetActiveGraphId: fn(),
+        onNavigate: fn(),
     },
     play: async ({ canvas }) => {
         await expect(canvas.getByText('地蔵')).toBeVisible()

@@ -1,4 +1,4 @@
-import { useParams } from '@tanstack/react-router'
+import { useParams, useSearch } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import { FileTree } from '@/components/FileTree'
 import { GraphEditor } from '@/components/GraphEditor'
@@ -14,6 +14,11 @@ import { useProjectDetailStore } from '@/store/useProjectDetailStore'
  * "/projects/$id" ルートのコンポーネント。
  * CTX-Topbar / CTX-1 FileTree / CTX-2 GraphEditor / CTX-3 NodeProperty を組み込む。
  *
+ * activeGraphId の SSOT は URL の ?graph= クエリパラメータ。
+ * useSearch() で取得し、GraphEditor に props として渡すとともに
+ * useProjectDetailStore にも同期する（useGraphFile が getState() で参照するため）。
+ * リロード時も URL から復元されるため Zustand のみへの依存はない。
+ *
  * @see src/router.tsx
  * @see src/components/ProjectDetailTopbar.tsx
  * @see docs/specs/file-tree.spec.tsx
@@ -21,10 +26,12 @@ import { useProjectDetailStore } from '@/store/useProjectDetailStore'
  */
 export const ProjectDetailRoute = () => {
     const { id } = useParams({ from: '/projects/$id' })
+    const { graph: activeGraphId } = useSearch({ from: '/projects/$id' })
     const { loadProjects } = useProjectFile()
     const project = useProjectStore((s) => s.projects.find((p) => p.id === id))
     const setProjectRootPath = useProjectDetailStore((s) => s.setProjectRootPath)
     const setInitStatus = useProjectDetailStore((s) => s.setInitStatus)
+    const setActiveGraphId = useProjectDetailStore((s) => s.setActiveGraphId)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
     // 直接アクセス・リロード時も projects[] を hydrate する
@@ -40,6 +47,11 @@ export const ProjectDetailRoute = () => {
         }
     }, [project?.rootPath, setProjectRootPath, setInitStatus])
 
+    // URL の ?graph= を store に同期する（useGraphFile の getState() 参照のため）
+    useEffect(() => {
+        setActiveGraphId(activeGraphId ?? null)
+    }, [activeGraphId, setActiveGraphId])
+
     return (
         <div
             style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}
@@ -52,10 +64,10 @@ export const ProjectDetailRoute = () => {
 
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
                 {/* CTX-1: FileTree */}
-                <FileTree />
+                <FileTree projectId={id} />
 
                 {/* CTX-2: GraphEditor */}
-                <GraphEditor />
+                <GraphEditor activeGraphId={activeGraphId ?? null} />
 
                 {/* CTX-3: NodeProperty */}
                 <aside

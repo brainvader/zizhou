@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { useRouter } from '@tanstack/react-router'
 import { nanoid } from 'nanoid'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { toast } from 'sonner'
@@ -11,6 +12,7 @@ import type { GraphFile, InitStatus } from '@/bom/graph'
 import type { Project } from '@/bom/project'
 
 type WriteTextFileFn = (path: string, contents: string) => Promise<void>
+type NavigateFn = (graphId: string) => void
 
 export type ProjectDetailTopbarProps = {
     /** TanStack Router の useParams から渡されるプロジェクト ID */
@@ -21,7 +23,8 @@ export type ProjectDetailTopbarProps = {
     project?: Project
     initStatus?: InitStatus
     projectRootPath?: string
-    onSetActiveGraphId?: (id: string) => void
+    /** New Graph 作成後のナビゲーション（省略時は router.navigate にフォールバック） */
+    onNavigate?: NavigateFn
     onWriteTextFile?: WriteTextFileFn
 }
 
@@ -34,9 +37,9 @@ export type ProjectDetailTopbarProps = {
  * - New Graph ボタン（initStatus が 'ready' 以外のとき disabled）
  * - Settings ボタン（onSettingsClick コールバック経由）
  *
- * props DI: project / initStatus / projectRootPath / onSetActiveGraphId /
- *           onWriteTextFile を props で受け取る。
- * 省略時は Tauri 実装・Zustand store にフォールバックする。
+ * New Graph クリック後は ?graph={graphId} を URL に反映する（activeGraphId の SSOT は URL）。
+ * props DI: project / initStatus / projectRootPath / onNavigate / onWriteTextFile を受け取る。
+ * 省略時は Tauri 実装・Zustand store・router にフォールバックする。
  *
  * @see docs/bom/graph.ts
  * @see docs/bom/project.ts
@@ -49,18 +52,25 @@ export const ProjectDetailTopbar = ({
     project: projectProp,
     initStatus: initStatusProp,
     projectRootPath: projectRootPathProp,
-    onSetActiveGraphId,
+    onNavigate,
     onWriteTextFile = writeTextFile,
 }: ProjectDetailTopbarProps) => {
+    const router = useRouter()
     const storeProject = useProjectStore((s) => s.projects.find((p) => p.id === projectId))
     const storeInitStatus = useProjectDetailStore((s) => s.initStatus)
     const storeProjectRootPath = useProjectDetailStore((s) => s.projectRootPath)
-    const storeSetActiveGraphId = useProjectDetailStore((s) => s.setActiveGraphId)
 
     const project = projectProp ?? storeProject
     const initStatus = initStatusProp ?? storeInitStatus
     const projectRootPath = projectRootPathProp ?? storeProjectRootPath
-    const setActiveGraphId = onSetActiveGraphId ?? storeSetActiveGraphId
+
+    const navigate = onNavigate ?? ((graphId: string) => {
+        router.navigate({
+            to: '/projects/$id',
+            params: { id: projectId },
+            search: { graph: graphId },
+        })
+    })
 
     // --- New Graph ---
     const handleNewGraph = useCallback(async () => {
@@ -70,11 +80,11 @@ export const ProjectDetailTopbar = ({
 
         try {
             await onWriteTextFile(filePath, JSON.stringify(graphFile, null, 2))
-            setActiveGraphId(graphId)
+            navigate(graphId)
         } catch {
             toast.error('グラフファイルの作成に失敗しました')
         }
-    }, [projectRootPath, setActiveGraphId, onWriteTextFile])
+    }, [projectRootPath, navigate, onWriteTextFile])
 
     return (
         <header
