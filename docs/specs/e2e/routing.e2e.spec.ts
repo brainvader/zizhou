@@ -7,7 +7,7 @@
  * @story
  * 1. ユーザーがホーム画面（`/`）を開くと ProjectGrid が表示される
  * 2. ユーザーがプロジェクトカードをクリックすると `/projects/:id` へ遷移する
- * 3. `/projects/:id` ページに、その id が表示される（プレースホルダー）
+ * 3. `/projects/:id` ページに FileTree が表示される
  * 4. ブラウザの「戻る」操作で ProjectGrid に戻れる
  *
  * @output
@@ -48,30 +48,16 @@ test.describe('CTX-5 ROUTING — Visual Story (Playwright)', () => {
         });
     });
 
-    test('step 2-3: clicking a card navigates to /projects/:id and shows id', async ({ page }) => {
-        const firstCard = page.locator('[data-testid^="card-"]').first();
-        await expect(firstCard).toBeVisible();
+    test('step 2-3: clicking a card navigates to /projects/:id', async ({ page }) => {
+        const firstCard = page.locator('[data-testid^="card-"]').first()
+        const testId = await firstCard.getAttribute('data-testid') ?? ''
+        const projectId = testId.replace('card-', '')
 
-        const testId = await firstCard.getAttribute('data-testid') ?? '';
-        const projectId = testId.replace('card-', '');
+        await firstCard.click()
+        await expect(page).toHaveURL(new RegExp(`/projects/${projectId}`))
+        await expect(page.getByTestId('file-tree')).toBeVisible()
 
-        await page.screenshot({
-            path: `${EVIDENCE}/routing_step2_before_click.png`,
-            fullPage: true,
-        });
-
-        await firstCard.click();
-
-        await expect(page).toHaveURL(new RegExp(`/projects/${projectId}`));
-
-        const detailId = page.getByTestId('project-detail-id');
-        await expect(detailId).toBeVisible();
-        await expect(detailId).toHaveText(projectId);
-
-        await page.screenshot({
-            path: `${EVIDENCE}/routing_step3_project_detail.png`,
-            fullPage: true,
-        });
+        await page.screenshot({ path: `${EVIDENCE}/routing_step3_project_detail.png`, fullPage: true })
     });
 
     test('step 4: browser back() returns to ProjectGrid', async ({ page }) => {
@@ -95,22 +81,19 @@ test.describe('CTX-5 ROUTING — Visual Story (Playwright)', () => {
         });
     });
 
-    test('direct navigation to /projects/:id renders id placeholder', async ({ page }) => {
-        const firstCard = page.locator('[data-testid^="card-"]').first();
-        const testId = await firstCard.getAttribute('data-testid') ?? '';
-        const projectId = testId.replace('card-', '');
+    test('direct navigation to /projects/:id renders project detail', async ({ page }) => {
+        const firstCard = page.locator('[data-testid^="card-"]').first()
+        const testId = await firstCard.getAttribute('data-testid') ?? ''
+        const projectId = testId.replace('card-', '')
 
-        await page.goto(`/projects/${projectId}`);
-        await expect(page).toHaveURL(`/projects/${projectId}`);
-
-        const detailId = page.getByTestId('project-detail-id');
-        await expect(detailId).toBeVisible();
-        await expect(detailId).toHaveText(projectId);
+        await page.goto(`/projects/${projectId}`)
+        await expect(page).toHaveURL(`/projects/${projectId}`)
+        await expect(page.getByTestId('file-tree')).toBeVisible()
 
         await page.screenshot({
             path: `${EVIDENCE}/routing_direct_nav.png`,
             fullPage: true,
-        });
+        })
     });
 
     test.skip('tauri: native window title and hardware-back navigation', async () => {
