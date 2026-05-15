@@ -5,13 +5,22 @@ import { GraphEditor } from '@/components/GraphEditor'
 import { NodeProperty } from '@/components/NodeProperty'
 import { ProjectDetailTopbar } from '@/components/ProjectDetailTopbar'
 import { SettingsDialog } from '@/components/SettingsDialog'
+import {
+    ResizablePanelGroup,
+    ResizablePanel,
+    ResizableHandle,
+} from '@/components/ui/resizable'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
+import { FILE_TREE_PANEL, GRAPH_EDITOR_PANEL, NODE_PROPERTY_PANEL } from '@/bom/layout'
 
 /**
  * ProjectDetailRoute
  * "/projects/$id" ルートのコンポーネント。
  * CTX-Topbar / CTX-1 FileTree / CTX-2 GraphEditor / CTX-3 NodeProperty を組み込む。
+ *
+ * 3ペインは ResizablePanelGroup（shadcn/ui）で水平リサイズ可能。
+ * パネルサイズの定数は docs/bom/layout.ts に集約。
  *
  * activeGraphId の SSOT は URL の ?graph= クエリパラメータ。
  * useSearch() で取得し、GraphEditor に props として渡すとともに
@@ -20,6 +29,7 @@ import { useProjectDetailStore } from '@/store/useProjectDetailStore'
  *
  * @see src/router.tsx
  * @see src/components/ProjectDetailTopbar.tsx
+ * @see docs/bom/layout.ts
  * @see docs/specs/file-tree.spec.tsx
  * @see docs/specs/graph-editor.spec.tsx
  */
@@ -54,26 +64,52 @@ export const ProjectDetailRoute = () => {
                 onSettingsClick={() => setIsSettingsOpen(true)}
             />
 
-            <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+            {/* 3ペイン水平リサイズレイアウト
+                flex-1 + h-0 でトップバー分を除いた残高を確実に占有させる。
+                flex: 1 + minHeight: 0 で Topbar 分を除いた残高を占有する。 */}
+            <ResizablePanelGroup
+                orientation="horizontal"
+                style={{ flex: 1, minHeight: 0 }}
+            >
                 {/* CTX-1: FileTree */}
-                <FileTree projectId={id} />
+                <ResizablePanel
+                    defaultSize={FILE_TREE_PANEL.defaultSize}
+                    minSize={FILE_TREE_PANEL.minSize}
+                    maxSize={FILE_TREE_PANEL.maxSize}
+                >
+                    <FileTree projectId={id} />
+                </ResizablePanel>
+
+                <ResizableHandle withHandle />
 
                 {/* CTX-2: GraphEditor */}
-                <GraphEditor activeGraphId={activeGraphId ?? null} />
+                <ResizablePanel
+                    defaultSize={GRAPH_EDITOR_PANEL.defaultSize}
+                    minSize={GRAPH_EDITOR_PANEL.minSize}
+                >
+                    <GraphEditor activeGraphId={activeGraphId ?? null} />
+                </ResizablePanel>
+
+                <ResizableHandle withHandle />
 
                 {/* CTX-3: NodeProperty */}
-                <aside
-                    data-testid="node-property"
-                    style={{
-                        width: '200px',
-                        flexShrink: 0,
-                        borderLeft: '1px solid var(--border)',
-                        overflowY: 'auto',
-                    }}
+                <ResizablePanel
+                    defaultSize={NODE_PROPERTY_PANEL.defaultSize}
+                    minSize={NODE_PROPERTY_PANEL.minSize}
+                    maxSize={NODE_PROPERTY_PANEL.maxSize}
                 >
-                    <NodeProperty />
-                </aside>
-            </div>
+                    <aside
+                        data-testid="node-property"
+                        style={{
+                            height: '100%',
+                            borderLeft: '1px solid var(--border)',
+                            overflowY: 'auto',
+                        }}
+                    >
+                        <NodeProperty />
+                    </aside>
+                </ResizablePanel>
+            </ResizablePanelGroup>
 
             <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
         </div>
