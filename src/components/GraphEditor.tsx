@@ -145,7 +145,7 @@ export function GraphEditor({
     return (
         <div
             data-testid="graph-editor"
-            style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
+            style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}
         >
             {initStatus === 'ready' && (
                 <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10 }}>

@@ -260,7 +260,6 @@ export const FileTree = ({
         <nav
             data-testid="file-tree"
             className="flex flex-col h-full overflow-hidden border-r border-[--border]"
-            style={{ width: 'var(--pane-file-tree-width)' }}
         >
             <div className="flex items-center px-3 h-9 shrink-0 border-b border-[--border]">
                 <span className="text-[10px] font-mono tracking-widest uppercase text-[--muted-foreground]">
