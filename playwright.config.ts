@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-    testDir: './docs/specs',
+    testDir: './docs/specs/e2e',
     testMatch: '**/*.e2e.spec.ts',
     outputDir: './evidence',
     use: {
