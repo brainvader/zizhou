@@ -98,3 +98,11 @@ export const mkdir = async (): Promise<void> => { }
 export const BaseDirectory = {
     AppData: 14,
 }
+
+export const watch = async (
+    _path: string,
+    _callback: () => void,
+    _options?: { recursive?: boolean }
+): Promise<() => void> => {
+    return () => { }
+}
