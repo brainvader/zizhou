@@ -16,23 +16,7 @@
  *   src/routes/projects.$id.tsx
  */
 
-// =============================================================================
-// Slot 2: 外部依存のインポート (Imports)
-// =============================================================================
 import { test, expect } from '@playwright/test';
-
-// =============================================================================
-// Slot 3: モック・セットアップ (Test Setup)
-// =============================================================================
-
-/**
- * playwright.config.ts の webServer は `pnpm dev`（Vite のみ）で起動する。
- * Tauri fs は使用できないため projects[] は常に空で起動する。
- * CTX-2 の E2E と同様に、「＋ new project」でプロジェクトを作成してから
- * カードを操作するアプローチを採用する。
- *
- * スクリーンショットはすべて evidence/ に保存する（AGENTS.md §2 人間の検品）。
- */
 
 const EVIDENCE = 'evidence';
 const TEST_PROJECT_NAME = 'Routing Test Project';
@@ -42,25 +26,18 @@ const createProject = async (page: import('@playwright/test').Page, name: string
     await page.getByText('＋ new project').click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByPlaceholder('My Awesome App').fill(name);
-    await page.getByText('作成').click();
+    await page.getByPlaceholder('/Users/user/projects/my-app').fill('/Users/user/projects/test');
+    await page.getByRole('button', { name: '作成' }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible();
 };
-
-// =============================================================================
-// Slot 4: 挙動の検証コード (Story Verification)
-// =============================================================================
 
 test.describe('CTX-5 ROUTING — Visual Story (Playwright)', () => {
 
     test.beforeEach(async ({ page }) => {
         await page.goto('/');
-        // Tauri fs が使えない環境でも card-* を確保するため事前にプロジェクトを作成する
         await createProject(page, TEST_PROJECT_NAME);
     });
 
-    // ---------------------------------------------------------------------------
-    // Step 1: ホーム画面で ProjectGrid とカードが表示される
-    // ---------------------------------------------------------------------------
     test('step 1: ProjectGrid and cards are visible on "/"', async ({ page }) => {
         await expect(page.getByTestId('project-grid')).toBeVisible();
         await expect(page.locator('[data-testid^="card-"]').first()).toBeVisible();
@@ -71,9 +48,6 @@ test.describe('CTX-5 ROUTING — Visual Story (Playwright)', () => {
         });
     });
 
-    // ---------------------------------------------------------------------------
-    // Step 2-3: カードクリック → /projects/:id 遷移 → id 表示
-    // ---------------------------------------------------------------------------
     test('step 2-3: clicking a card navigates to /projects/:id and shows id', async ({ page }) => {
         const firstCard = page.locator('[data-testid^="card-"]').first();
         await expect(firstCard).toBeVisible();
@@ -86,13 +60,10 @@ test.describe('CTX-5 ROUTING — Visual Story (Playwright)', () => {
             fullPage: true,
         });
 
-        // step 2: カードをクリック
         await firstCard.click();
 
-        // URL が /projects/:id に変わっている
         await expect(page).toHaveURL(new RegExp(`/projects/${projectId}`));
 
-        // step 3: id がプレースホルダーとして表示される
         const detailId = page.getByTestId('project-detail-id');
         await expect(detailId).toBeVisible();
         await expect(detailId).toHaveText(projectId);
@@ -103,9 +74,6 @@ test.describe('CTX-5 ROUTING — Visual Story (Playwright)', () => {
         });
     });
 
-    // ---------------------------------------------------------------------------
-    // Step 4: ブラウザ「戻る」で ProjectGrid に戻れる
-    // ---------------------------------------------------------------------------
     test('step 4: browser back() returns to ProjectGrid', async ({ page }) => {
         const firstCard = page.locator('[data-testid^="card-"]').first();
         await firstCard.click();
@@ -127,9 +95,6 @@ test.describe('CTX-5 ROUTING — Visual Story (Playwright)', () => {
         });
     });
 
-    // ---------------------------------------------------------------------------
-    // エッジケース: /projects/:id への直接アクセス（任意の id で検証）
-    // ---------------------------------------------------------------------------
     test('direct navigation to /projects/:id renders id placeholder', async ({ page }) => {
         const firstCard = page.locator('[data-testid^="card-"]').first();
         const testId = await firstCard.getAttribute('data-testid') ?? '';
@@ -148,9 +113,6 @@ test.describe('CTX-5 ROUTING — Visual Story (Playwright)', () => {
         });
     });
 
-    // ---------------------------------------------------------------------------
-    // TODO: Tauri WebDriver が安定したら有効化
-    // ---------------------------------------------------------------------------
     test.skip('tauri: native window title and hardware-back navigation', async () => {
         // Tauri WebDriver セットアップ後に実装する
     });
