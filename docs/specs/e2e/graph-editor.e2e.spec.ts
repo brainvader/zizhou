@@ -5,16 +5,41 @@
  *       - ノード追加ボタン非表示（Checking / Uninitialized Story）
  *       - Empty State 表示（ReadyEmpty Story）
  *       ここでは Storybook では確認できない実画面の結合のみ検証する。
+ *
+ * @note reload() はモック環境では Zustand store がリセットされ projectRootPath が空になるため使用しない。
+ *       代わりに / → カードクリック → ?graph= 復元のフローで「リロード」を模倣する。
+ *       localStorage はページ遷移をまたいで保持されるため永続化の検証が成立する。
  */
 import { test, expect } from '@playwright/test'
 
-const PROJECT_DETAIL_URL = '/projects/1'
+/** / に goto → loadProjects → カードクリック → /projects/1 に遷移して store を hydrate */
+const gotoProjectDetail = async (page: import('@playwright/test').Page) => {
+    await page.goto('/')
+    await expect(page.getByText('zizou-core')).toBeVisible()
+    await page.locator('[data-testid^="card-"]').first().click()
+    await expect(page.getByText('Loading…')).toBeHidden({ timeout: 10000 })
+}
+
+/** reload() の代替: / 経由で store を hydrate し直し、?graph= パラメータを復元する */
+const renavigateWithGraph = async (page: import('@playwright/test').Page, graphParam: string | null) => {
+    await page.goto('/')
+    await expect(page.getByText('zizou-core')).toBeVisible()
+    await page.locator('[data-testid^="card-"]').first().click()
+    await expect(page.getByText('Loading…')).toBeHidden({ timeout: 10000 })
+    // store hydrate 後に ?graph= を付けて遷移
+    if (graphParam) {
+        await page.evaluate((param) => {
+            window.history.pushState({}, '', `/projects/1?graph=${param}`)
+        }, graphParam)
+        // URL 変更を React Router に検知させる
+        await page.waitForTimeout(500)
+    }
+}
 
 test.describe('GraphEditor — Integration', () => {
 
     test('「＋ ノード追加」クリックで React Flow キャンバスにノードが描画される', async ({ page }) => {
-        await page.goto(PROJECT_DETAIL_URL)
-        await expect(page.getByText('Loading…')).toBeHidden()
+        await gotoProjectDetail(page)
         await page.getByRole('button', { name: /ノード追加/ }).click()
         await expect(page.locator('.react-flow__node').first()).toBeVisible()
         await page.screenshot({ path: 'evidence/GraphEditor_add-node.png' })
@@ -24,67 +49,53 @@ test.describe('GraphEditor — Integration', () => {
 
 // =============================================================================
 // グラフ永続化シナリオ
-// 前提: plugin-fs モックの localStorage バックエンドが有効であること
-//       （VITE_PLAYWRIGHT=true で writeTextFile/readTextFile/exists が
-//         /graphs/*.json パスに対して localStorage を使う）
-//
-// 各テストは New Graph 作成を起点とし、リロード後の復元を検証する。
-// テスト間の localStorage 干渉を防ぐため beforeEach で localStorage をクリアする。
 // =============================================================================
 
 test.describe('GraphEditor — 永続化', () => {
 
     test.beforeEach(async ({ page }) => {
-        // テスト間の localStorage 干渉を防ぐ
-        await page.goto(PROJECT_DETAIL_URL)
+        await page.goto('/')
+        await expect(page.getByText('zizou-core')).toBeVisible()
         await page.evaluate(() => localStorage.clear())
     })
 
     // ヘルパー: New Graph を作成してエディタが ready になるまで待つ
     const createNewGraph = async (page: import('@playwright/test').Page) => {
-        await page.goto(PROJECT_DETAIL_URL)
-        await expect(page.getByText('Loading…')).toBeHidden()
+        await gotoProjectDetail(page)
         await page.locator('[data-testid="new-graph-btn"]').click()
-        // activeGraphId が設定されエディタが表示されるまで待つ
         await expect(page.getByTestId('graph-editor')).toBeVisible()
         await expect(page.getByRole('button', { name: /ノード追加/ })).toBeVisible()
     }
 
     /**
      * シナリオ 1: ノード位置の永続化
-     * ノード追加 → ドラッグで位置移動 → リロード → 同じ位置に復元される
      */
-    test('ノード追加 → 位置移動 → リロード → 同じ位置に復元される', async ({ page }) => {
+    test('ノード追加 → 位置移動 → 再ナビゲーション → 同じ位置に復元される', async ({ page }) => {
         await createNewGraph(page)
 
-        // ノードを追加
         await page.getByRole('button', { name: /ノード追加/ }).click()
         const node = page.locator('.react-flow__node').first()
         await expect(node).toBeVisible()
 
-        // ノードをドラッグして位置を移動
         const nodeBefore = await node.boundingBox()
         await page.mouse.move(nodeBefore!.x + nodeBefore!.width / 2, nodeBefore!.y + nodeBefore!.height / 2)
         await page.mouse.down()
         await page.mouse.move(nodeBefore!.x + 200, nodeBefore!.y + 150, { steps: 10 })
         await page.mouse.up()
 
-        // 保存が完了するのを少し待つ（subscribe → writeTextFile の非同期）
         await page.waitForTimeout(500)
 
         const nodeAfterMove = await node.boundingBox()
         await page.screenshot({ path: 'evidence/GraphEditor_persist_node-moved.png' })
 
-        // リロード
-        await page.reload()
-        await expect(page.getByText('Loading…')).toBeHidden()
+        // 再ナビゲーション（reload の代替）
+        const graphParam = new URL(page.url()).searchParams.get('graph')
+        await renavigateWithGraph(page, graphParam)
         await expect(page.getByTestId('graph-editor')).toBeVisible()
+        await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10000 })
 
-        // ノードが復元されている
         const nodeAfterReload = await page.locator('.react-flow__node').first().boundingBox()
         expect(nodeAfterReload).not.toBeNull()
-
-        // 移動後の位置と近い位置に復元されていること（±20px の許容範囲）
         expect(Math.abs(nodeAfterReload!.x - nodeAfterMove!.x)).toBeLessThan(20)
         expect(Math.abs(nodeAfterReload!.y - nodeAfterMove!.y)).toBeLessThan(20)
 
@@ -93,17 +104,14 @@ test.describe('GraphEditor — 永続化', () => {
 
     /**
      * シナリオ 2: エッジの永続化
-     * ノード A・B 追加 → エッジ接続 → リロード → エッジが復元される
      */
-    test('ノード A・B 追加 → エッジ接続 → リロード → エッジが復元される', async ({ page }) => {
+    test('ノード A・B 追加 → エッジ接続 → 再ナビゲーション → エッジが復元される', async ({ page }) => {
         await createNewGraph(page)
 
-        // ノードを2つ追加
         await page.getByRole('button', { name: /ノード追加/ }).click()
         await page.getByRole('button', { name: /ノード追加/ }).click()
         await expect(page.locator('.react-flow__node')).toHaveCount(2)
 
-        // ノード A の source ハンドルからノード B の target ハンドルへドラッグしてエッジを接続
         const nodeA = page.locator('.react-flow__node').nth(0)
         const nodeB = page.locator('.react-flow__node').nth(1)
         const sourceHandle = nodeA.locator('.react-flow__handle-right, .react-flow__handle-bottom').first()
@@ -124,12 +132,12 @@ test.describe('GraphEditor — 永続化', () => {
 
         const edgeCountBefore = await page.locator('.react-flow__edge').count()
 
-        // リロード
-        await page.reload()
-        await expect(page.getByText('Loading…')).toBeHidden()
+        // 再ナビゲーション（reload の代替）
+        const graphParam = new URL(page.url()).searchParams.get('graph')
+        await renavigateWithGraph(page, graphParam)
         await expect(page.getByTestId('graph-editor')).toBeVisible()
+        await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10000 })
 
-        // ノードとエッジが復元されている
         await expect(page.locator('.react-flow__node')).toHaveCount(2)
         const edgeCountAfter = await page.locator('.react-flow__edge').count()
         expect(edgeCountAfter).toBe(edgeCountBefore)
@@ -139,36 +147,29 @@ test.describe('GraphEditor — 永続化', () => {
 
     /**
      * シナリオ 3: ノード削除の永続化
-     * ノード追加 → 削除 → リロード → 削除済みのまま復元される
      */
-    test('ノード削除 → リロード → 削除済みのまま復元される', async ({ page }) => {
+    test('ノード削除 → 再ナビゲーション → 削除済みのまま復元される', async ({ page }) => {
         await createNewGraph(page)
 
-        // ノードを1つ追加して削除
         await page.getByRole('button', { name: /ノード追加/ }).click()
         await expect(page.locator('.react-flow__node')).toHaveCount(1)
 
-        // ノードを選択して Delete キーで削除
         await page.locator('.react-flow__renderer').click()
         await page.locator('.react-flow__node').first().click()
-        // selected 状態になるまで待つ
         await expect(page.locator('.react-flow__node.selected').first()).toBeVisible()
         await page.keyboard.press('Delete')
-        // 削除完了まで待つ
         await expect(page.locator('.react-flow__node')).toHaveCount(0)
 
-        // 保存が完了するのを待つ（subscribe → writeTextFile の非同期）
         await page.waitForTimeout(500)
         await page.screenshot({ path: 'evidence/GraphEditor_persist_node-deleted.png' })
 
         const nodeCountAfterDelete = await page.locator('.react-flow__node').count()
 
-        // リロード
-        await page.reload()
-        await expect(page.getByText('Loading…')).toBeHidden()
+        // 再ナビゲーション（reload の代替）
+        const graphParam = new URL(page.url()).searchParams.get('graph')
+        await renavigateWithGraph(page, graphParam)
         await expect(page.getByTestId('graph-editor')).toBeVisible()
 
-        // 削除後のノード数が復元されている
         await expect(page.locator('.react-flow__node')).toHaveCount(nodeCountAfterDelete)
 
         await page.screenshot({ path: 'evidence/GraphEditor_persist_node-delete-restored.png' })
