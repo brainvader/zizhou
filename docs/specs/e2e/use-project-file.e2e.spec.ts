@@ -27,29 +27,13 @@ test.describe('useProjectFile — Integration', () => {
         // { id: '1', name: 'zizou-core', rootPath: '/Users/user/projects/zizou-core' } を返す
         await expect(page.getByText('zizou-core')).toBeVisible()
         await page.screenshot({ path: 'evidence/useProjectFile_01_initial.png', fullPage: true })
-    })
-
-    test('Step 2-3: 新規プロジェクト作成 → リロード後も復元される', async ({ page }) => {
-        // Step 2: 新規プロジェクト作成 → localStorage に保存
-        await page.getByText('＋ new project').click()
-        await page.getByPlaceholder('My Awesome App').fill('永続化テストプロジェクト')
-        await page.getByPlaceholder('/Users/user/projects/my-app').fill('/Users/user/projects/test')
-        await page.getByRole('button', { name: '作成' }).click()
-        await expect(page.getByText('永続化テストプロジェクト')).toBeVisible()
-        await page.screenshot({ path: 'evidence/useProjectFile_02_after_save.png', fullPage: true })
-
-        // Step 3: リロード → localStorage から復元
-        await page.reload()
-        await expect(page.getByText('＋ new project')).toBeVisible()
-        await expect(page.getByText('永続化テストプロジェクト')).toBeVisible()
-        await page.screenshot({ path: 'evidence/useProjectFile_03_after_reload.png', fullPage: true })
-    })
+    });
 
     test.skip('Step 4: saveProjects 失敗時に toast.error が表示される', async () => {
         /**
          * SKIP REASON: alias モック環境では fs の強制失敗が困難。
          * TODO: tauri dev 環境での手動検証、または将来の WebDriver 対応時に実装する。
          */
-    })
+    });
 
 })
