@@ -5,13 +5,13 @@
  */
 import { test, expect } from '@playwright/test'
 
-const PROJECT_DETAIL_URL = '/projects/1'
-
 test.describe('NodeProperty — Integration', () => {
 
     test.beforeEach(async ({ page }) => {
-        await page.goto(PROJECT_DETAIL_URL)
-        await expect(page.getByText('Loading…')).toBeHidden()
+        await page.goto('/')
+        await expect(page.getByText('zizou-core')).toBeVisible()
+        await page.locator('[data-testid^="card-"]').first().click()
+        await expect(page.getByText('Loading…')).toBeHidden({ timeout: 10000 })
     })
 
     test('ノード追加 → クリックで NodeProperty にプロパティが表示される', async ({ page }) => {
