@@ -15,8 +15,7 @@
  */
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import type { NodeProps } from '@xyflow/react'
-import type { GraphNodeData } from '@/bom/graph'
+import type { EditableNodeProps } from '@/components/nodes/EditableNode'
 
 /**
  * Slot 3: モック・セットアップ (Test Setup)
@@ -42,17 +41,20 @@ vi.mock('@xyflow/react', () => ({
 
 import { EditableNode } from '@/components/nodes/EditableNode'
 
-// NodeProps の最小フィクスチャ
-const makeProps = (overrides?: Partial<NodeProps<GraphNodeData>>): NodeProps<GraphNodeData> => ({
+// EditableNodeProps の最小フィクスチャ
+const makeProps = (overrides?: Partial<EditableNodeProps>): EditableNodeProps => ({
     id: 'node-001',
     data: { label: 'ProjectGrid.tsx', description: 'カードグリッド表示' },
     selected: false,
-    type: 'editableNode',
+    type: 'editableNode' as const,
     zIndex: 0,
     isConnectable: true,
     positionAbsoluteX: 0,
     positionAbsoluteY: 0,
     dragging: false,
+    selectable: true,
+    deletable: true,
+    draggable: true,
     ...overrides,
 })
 
@@ -69,7 +71,6 @@ describe('EditableNode: label edit logic', () => {
     test('logic: label が空文字で Enter 確定しても updateNodeData は呼ばれない', () => {
         render(<EditableNode {...makeProps()} />)
 
-        // ダブルクリックで編集モードに入る
         fireEvent.dblClick(screen.getByTestId('editable-node-node-001'))
 
         const input = screen.getByTestId('inline-input') as HTMLInputElement

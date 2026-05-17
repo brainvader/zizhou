@@ -11,36 +11,42 @@
  * 7. label を空にして Enter で確定しても updateNodeData は呼ばれない
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
+import { ReactFlowProvider } from '@xyflow/react'
 import { expect, fn } from 'storybook/test'
-import type { NodeProps } from '@xyflow/react'
-import type { GraphNodeData } from '@/bom/graph'
+import type { EditableNodeProps } from '@/components/nodes/EditableNode'
 import { EditableNode } from '@/components/nodes/EditableNode'
 
-const meta: Meta<typeof EditableNode> = {
+const meta: Meta<EditableNodeProps> = {
     component: EditableNode,
     title: 'Project Detail/EditableNode',
     parameters: { layout: 'centered' },
     decorators: [
         (Story) => (
-            <div style={{ width: 200, padding: 24 }}>
-                <Story />
-            </div>
+            <ReactFlowProvider>
+                <div style={{ width: 200, padding: 24 }}>
+                    <Story />
+                </div>
+            </ReactFlowProvider>
         ),
     ],
     args: {
         id: 'node-001',
+        data: { label: 'ProjectGrid.tsx' },
         selected: false,
-        type: 'editableNode',
+        type: 'editableNode' as const,
         zIndex: 0,
         isConnectable: true,
         positionAbsoluteX: 0,
         positionAbsoluteY: 0,
         dragging: false,
+        selectable: true,
+        deletable: true,
+        draggable: true,
         onUpdateNode: fn(),
-    } satisfies Partial<NodeProps<GraphNodeData> & { onUpdateNode?: (id: string, data: Partial<GraphNodeData>) => void }>,
+    },
 }
 export default meta
-type Story = StoryObj<typeof EditableNode>
+type Story = StoryObj<EditableNodeProps>
 
 // @story 状態 1: 通常状態（label + description）
 export const Default: Story = {
