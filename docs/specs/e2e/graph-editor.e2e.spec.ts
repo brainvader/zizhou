@@ -1,5 +1,5 @@
 /**
- * @context CTX-2 / CTX-4: GraphEditor — E2E
+ * @context CTX-2 / CTX-4 / CTX-5: GraphEditor — E2E
  * @note 以下は Storybook play 関数でカバー済みのため削除：
  *       - Setup ビュー表示（Uninitialized Story）
  *       - ノード追加ボタン非表示（Checking / Uninitialized Story）
@@ -38,15 +38,12 @@ const renavigateWithGraph = async (page: import('@playwright/test').Page, graphP
 const createNewGraph = async (page: import('@playwright/test').Page) => {
     await gotoProjectDetail(page)
     await page.locator('[data-testid="new-graph-btn"]').click()
-    // graph-editor コンテナが実際に幅・高さを持つまで待つ
-    // ReactFlow は親コンテナのサイズが 0 のとき visibility: hidden のままになる（error#004）
     await page.waitForFunction(() => {
         const el = document.querySelector('[data-testid="graph-editor"]')
         if (!el) return false
         const { width, height } = el.getBoundingClientRect()
         return width > 0 && height > 0
     }, { timeout: 10000 })
-    // サイズ確定後に resize を発火して ReactFlow に認識させる
     await page.evaluate(() => window.dispatchEvent(new Event('resize')))
     await page.waitForTimeout(500)
 }
@@ -58,7 +55,6 @@ const createNewGraph = async (page: import('@playwright/test').Page) => {
 test.describe('GraphEditor — Integration', () => {
 
     test('「＋ ノード追加」クリックで React Flow キャンバスにノードが描画される', async ({ page }) => {
-        // グラフが選択された状態（ready）で開始する必要があるため createNewGraph を使う
         await createNewGraph(page)
         await page.getByRole('button', { name: /ノード追加/ }).click()
         await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10000 })
@@ -234,7 +230,6 @@ test.describe('GraphEditor — ラベル編集 [CTX-4]', () => {
 
     /**
      * シナリオ 6: NodeProperty フォーム — blur で確定
-     * @note NodeProperty の編集フォームは CTX-4 NodeProperty 実装後に有効化する
      */
     test('NodeProperty フォーム → blur でラベルが更新される', async ({ page }) => {
         await createNewGraph(page)
@@ -269,6 +264,104 @@ test.describe('GraphEditor — ラベル編集 [CTX-4]', () => {
         await renavigateWithGraph(page, graphParam)
         await expect(page.locator('.react-flow__node').first().getByText('PersistLabel')).toBeVisible({ timeout: 10000 })
         await page.screenshot({ path: 'evidence/CTX4_label_persisted.png' })
+    })
+
+})
+
+// =============================================================================
+// [CTX-5] 複数選択シナリオ
+// =============================================================================
+
+test.describe('GraphEditor — 複数選択 [CTX-5]', () => {
+
+    test.beforeEach(async ({ page }) => {
+        await page.goto('/')
+        await expect(page.getByText('zizou-core')).toBeVisible()
+        await page.evaluate(() => localStorage.clear())
+    })
+
+    /**
+     * シナリオ 8: Shift+クリックで複数選択 → NodeProperty が非表示になる
+     */
+    test('Shift+クリックで 2 ノード選択 → NodeProperty が非表示になる', async ({ page }) => {
+        await createNewGraph(page)
+
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
+
+        // 1枚目をクリック → NodeProperty が表示される
+        await page.locator('.react-flow__node').nth(0).click()
+        await expect(page.getByTestId('node-property')).toBeVisible({ timeout: 5000 })
+
+        // 2枚目を Shift+クリック → 複数選択 → NodeProperty が非表示になる
+        await page.locator('.react-flow__node').nth(1).click({ modifiers: ['Shift'] })
+        await expect(page.getByTestId('node-property')).toHaveCount(0)
+
+        await page.screenshot({ path: 'evidence/CTX5_multi_select_property_hidden.png' })
+    })
+
+    /**
+     * シナリオ 9: 複数選択 → 選択ノードにハイライトが当たる
+     */
+    test('Shift+クリックで 2 ノード選択 → 両ノードに selected クラスが付く', async ({ page }) => {
+        await createNewGraph(page)
+
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
+
+        const nodes = page.locator('.react-flow__node')
+        await expect(nodes).toHaveCount(2, { timeout: 10000 })
+        await nodes.nth(0).click()
+        await page.waitForTimeout(300)
+        await nodes.nth(1).click({ modifiers: ['Shift'] })
+        await page.waitForTimeout(300)
+
+        await expect(page.locator('.react-flow__node.selected')).toHaveCount(2)
+
+        await page.screenshot({ path: 'evidence/CTX5_multi_select_highlight.png' })
+    })
+
+    /**
+     * シナリオ 10: 複数選択 → Delete で一括削除される
+     */
+    test('Shift+クリックで 2 ノード選択 → Delete で一括削除される', async ({ page }) => {
+        await createNewGraph(page)
+
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
+
+        await page.locator('.react-flow__node').nth(0).click()
+        await page.locator('.react-flow__node').nth(1).click({ modifiers: ['Shift'] })
+        await expect(page.locator('.react-flow__node.selected')).toHaveCount(2)
+
+        await page.keyboard.press('Delete')
+        await expect(page.locator('.react-flow__node')).toHaveCount(0)
+
+        await page.screenshot({ path: 'evidence/CTX5_multi_select_delete.png' })
+    })
+
+    /**
+     * シナリオ 11: 選択解除 → NodeProperty が再表示される
+     */
+    test('複数選択後にキャンバスをクリック → 選択解除 → NodeProperty が非表示のまま', async ({ page }) => {
+        await createNewGraph(page)
+
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
+
+        await page.locator('.react-flow__node').nth(0).click()
+        await page.locator('.react-flow__node').nth(1).click({ modifiers: ['Shift'] })
+        await expect(page.getByTestId('node-property')).not.toBeVisible()
+
+        // キャンバスの空白をクリックして選択解除
+        await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } })
+        await expect(page.getByTestId('node-property')).not.toBeVisible()
+
+        await page.screenshot({ path: 'evidence/CTX5_deselect.png' })
     })
 
 })

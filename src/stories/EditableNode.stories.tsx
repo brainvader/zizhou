@@ -1,5 +1,5 @@
 /**
- * @context CTX-4: EditableNode — インライン編集の視覚・インタラクション検証
+ * @context CTX-4/5: EditableNode — インライン編集の視覚・インタラクション検証
  * @bom docs/bom/graph.ts (GraphNodeData)
  * @story
  * 1. 通常状態: label と description が表示される
@@ -9,6 +9,7 @@
  * 5. inline input に新しい値を入力して blur で確定すると updateNodeData が呼ばれる
  * 6. Escape でキャンセルすると label 表示に戻り updateNodeData は呼ばれない
  * 7. label を空にして Enter で確定しても updateNodeData は呼ばれない
+ * 8. [CTX-5] 選択中: border が vermillion になる
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ReactFlowProvider } from '@xyflow/react'
@@ -141,5 +142,16 @@ export const EmptyLabelNoCommit: Story = {
         await userEvent.clear(input)
         await userEvent.keyboard('{Enter}')
         await expect(args.onUpdateNode).not.toHaveBeenCalled()
+    },
+}
+
+// @story 状態 8: [CTX-5] 選択中ハイライト — border が vermillion になる（視覚確認）
+export const Selected: Story = {
+    args: {
+        data: { label: 'ProjectGrid.tsx', description: 'カードグリッド表示' },
+        selected: true,
+    },
+    play: async ({ canvas }) => {
+        await expect(canvas.getByTestId('editable-node-node-001')).toBeVisible()
     },
 }

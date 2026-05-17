@@ -757,12 +757,12 @@
                     [✓][Logic]   Inline Cancel     — Escape でキャンセルし元の label に戻す
                     [✓][Logic]   EditingNodeId     — editingNodeId を useState で管理（Zustand には持たない）
 
-                    [ ][Feature] Multi Select      — Shift+クリック / ドラッグで複数ノードを選択できる
-                    [ ][Feature] Multi Move        — 複数選択中のノードをまとめてドラッグ移動できる
-                    [ ][Feature] Multi Delete      — 複数選択中に Delete キーで一括削除できる
-                    [ ][Feature] Selection Highlight — 選択中ノードを視覚的に強調する（単一・複数共通）
-                    [ ][Logic]   selectedNodeIds   — ReactFlow の onSelectionChange で selectedNodeIds[] を更新する
-                    [ ][Logic]   Single Guard      — selectedNodeIds.length === 1 のときのみ selectedNodeId を更新する
+                    [✓][Feature] Multi Select      — Shift+クリック / ドラッグで複数ノードを選択できる
+                    [✓][Feature] Multi Move        — 複数選択中のノードをまとめてドラッグ移動できる
+                    [✓][Feature] Multi Delete      — 複数選択中に Delete キーで一括削除できる
+                    [✓][Feature] Selection Highlight — 選択中ノードを視覚的に強調する（単一・複数共通）
+                    [✓][Logic]   selectedNodeIds   — ReactFlow の onSelectionChange で selectedNodeIds[] を更新する
+                    [✓][Logic]   Single Guard      — selectedNodeIds.length === 1 のときのみ selectedNodeId を更新する
 
                     [ ][Feature] Edge Connect      — ノードのハンドルをドラッグして別ノードに繋ぐとエッジが作成される
                     [ ][Feature] Edge Delete       — エッジを選択して Delete キーで削除できる
@@ -817,8 +817,8 @@
                     [✓][Logic]   onUpdateNode      — 確定時に呼ぶコールバック prop（props DI）
                                                      省略時は store.updateNodeData() に直接 commit する
 
-                    [ ][Feature] Hide on Multi Select — 複数ノード選択中は NodeProperty を非表示にする
-                    [ ][Logic]   Visibility Guard     — selectedNodeIds.length !== 1 のとき null を返す
+                    [✓][Feature] Hide on Multi Select — 複数ノード選択中は NodeProperty を非表示にする
+                    [✓[Logic]   Visibility Guard     — selectedNodeIds.length !== 1 のとき null を返す
                 -->
             </aside>
 

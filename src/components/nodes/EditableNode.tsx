@@ -3,39 +3,29 @@ import { Handle, Position, type NodeProps, type Node } from '@xyflow/react'
 import { useGraphStore } from '@/store/useGraphStore'
 import type { GraphNodeData } from '@/bom/graph'
 
-// v12 の正しいカスタムノード型定義パターン:
-// Node<DataType, 'nodeTypeName'> を先に定義し NodeProps に渡す
 export type EditableNodeType = Node<GraphNodeData, 'editableNode'>
 
 export type EditableNodeProps = NodeProps<EditableNodeType> & {
-    // props DI: 省略時は store.updateNodeData() に直接 commit する
     onUpdateNode?: (id: string, data: Partial<GraphNodeData>) => void
 }
 
 /**
  * EditableNode
  *
- * 責務: ラベルのインライン編集が可能な ReactFlow カスタムノード。
+ * [CTX-5] Selection Highlight:
+ *   selected prop（ReactFlow が自動で渡す）に応じてスタイルを切り替える。
+ *   - 単一選択: vermillion border + glow
+ *   - 複数選択: ReactFlow の標準 selected クラスが付与されるため追加スタイル不要だが、
+ *               同じスタイルを適用して一貫性を保つ
  *
- * - 通常状態: label / description をテキスト表示する
- * - ダブルクリックで inline <input> に切り替わる
- * - Enter / blur で確定 → onUpdateNode / store.updateNodeData() に commit する
- * - Escape でキャンセル → 元の label に戻る
- * - label が空文字の場合は commit しない
- * - <input> には className="nodrag" を付与してドラッグと競合させない
- *
- * @see docs/bom/graph.ts (GraphNodeData, GraphStore.updateNodeData)
- * @see docs/specs/EditableNode.spec.tsx
- * @see src/stories/EditableNode.stories.tsx
+ * @see docs/bom/graph.ts (GraphNodeData)
  */
-export function EditableNode({ id, data, onUpdateNode }: EditableNodeProps) {
+export function EditableNode({ id, data, selected, onUpdateNode }: EditableNodeProps) {
     const storeUpdateNodeData = useGraphStore((s) => s.updateNodeData)
     const updateNodeData = onUpdateNode ?? ((nodeId, nodeData) => storeUpdateNodeData(nodeId, nodeData))
 
     const [isEditing, setIsEditing] = useState(false)
     const [draft, setDraft] = useState(data.label)
-
-    // Escape キャンセル時の二重 commit を防ぐフラグ
     const cancelledRef = useRef(false)
 
     const startEditing = useCallback(() => {
@@ -58,19 +48,19 @@ export function EditableNode({ id, data, onUpdateNode }: EditableNodeProps) {
     }, [])
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') {
-            e.preventDefault()
-            commit()
-        }
-        if (e.key === 'Escape') {
-            cancel()
-        }
+        if (e.key === 'Enter') { e.preventDefault(); commit() }
+        if (e.key === 'Escape') { cancel() }
     }, [commit, cancel])
+
+    // [CTX-5] selected に応じてボーダー・グローを切り替える
+    const selectedStyle = selected
+        ? 'border-(--primary) shadow-[0_0_12px_var(--primary-glow)]'
+        : 'border-(--border)'
 
     return (
         <div
             data-testid={`editable-node-${id}`}
-            className="bg-[--card] border border-[--border] rounded-[--radius] px-3 py-2 min-w-35 cursor-grab"
+            className={`bg-[--card] border rounded-[--radius] px-3 py-2 min-w-35 cursor-grab ${selectedStyle}`}
             onDoubleClick={startEditing}
         >
             <Handle type="target" position={Position.Left} />
