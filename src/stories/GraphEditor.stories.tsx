@@ -5,12 +5,6 @@
  * 1. initStatus が 'ready' かつ nodes[] が空のとき Empty State を表示する
  * 2. initStatus が 'ready' かつ nodes[] があるとき React Flow を表示する
  * 3. 「＋ ノード追加」ボタンをクリックすると onAddNode が呼ばれる
- *
- * @note ノード削除（Delete キー）の検証は以下の理由により E2E に委譲する：
- *   - React Flow は ResizeObserver によるサイズ計測完了まで visibility: hidden を維持する
- *   - Vitest browser mode (Chromium) では ResizeObserver が発火しない場合があり toBeVisible() が不安定
- *   - ロジック検証（onNodesChange の remove 処理）は docs/specs/graph-editor.spec.tsx でカバー済み
- *   - 実際のキーボード操作からの削除フローは docs/specs/graph-editor.e2e.spec.ts でカバー済み
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn } from 'storybook/test'

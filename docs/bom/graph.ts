@@ -72,19 +72,21 @@ export type GraphStore = {
     nodes: Node<GraphNodeData>[]
     edges: Edge[]
     selectedNodeId: string | null
+    // [CTX-5] 複数選択中のノード ID 配列。ReactFlow の onSelectionChange で更新する。
+    selectedNodeIds: string[]
 
     // Actions
     setNodes: (nodes: Node<GraphNodeData>[]) => void
     setEdges: (edges: Edge[]) => void
     setSelectedNodeId: (id: string | null) => void
+    // [CTX-5] onSelectionChange 経由で selectedNodeIds を更新する。
+    // Single Guard を内包する: ids.length === 1 のときのみ selectedNodeId も更新する。
+    setSelectedNodeIds: (ids: string[]) => void
     addNode: (node: Node<GraphNodeData>) => void
     loadGraph: (graph: GraphFile) => void
     resetGraph: () => void
 
     // [CTX-4] 指定 id のノードの data のみを部分更新する。
-    // inline 編集・NodeProperty フォームの両エントリーポイントから呼ぶ。
-    // setNodes() 全件更新より意図が明確なため専用アクションとして定義する。
-    // Partial<GraphNodeData> のスプレッドマージのため、label のみ更新しても description は保持される。
     updateNodeData: (id: string, data: Partial<GraphNodeData>) => void
 }
 

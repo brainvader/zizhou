@@ -7,24 +7,42 @@ export const useGraphStore = create<GraphStore>((set) => ({
     nodes: [],
     edges: [],
     selectedNodeId: null,
+    selectedNodeIds: [],
 
     // Actions
     setNodes: (nodes: Node<GraphNodeData>[]) => set({ nodes }),
     setEdges: (edges: Edge[]) => set({ edges }),
     setSelectedNodeId: (id: string | null) => set({ selectedNodeId: id }),
+
+    // [CTX-5] Single Guard:
+    // ids.length === 1 → selectedNodeId も更新する
+    // ids.length === 0 → selectedNodeId を null にクリアする
+    // ids.length > 1   → selectedNodeId は変更しない（NodeProperty は Visibility Guard で非表示）
+    setSelectedNodeIds: (ids: string[]) =>
+        set((state) => ({
+            selectedNodeIds: ids,
+            selectedNodeId:
+                ids.length === 1
+                    ? ids[0]
+                    : ids.length === 0
+                        ? null
+                        : state.selectedNodeId,
+        })),
+
     addNode: (node: Node<GraphNodeData>) =>
         set((state) => ({ nodes: [...state.nodes, node] })),
+
     loadGraph: (graph) =>
         set({
             nodes: graph.nodes as Node<GraphNodeData>[],
             edges: graph.edges as Edge[],
             selectedNodeId: null,
+            selectedNodeIds: [],
         }),
-    resetGraph: () => set({ nodes: [], edges: [], selectedNodeId: null }),
 
-    // [CTX-4] 指定 id のノードの data を部分更新する。
-    // Partial<GraphNodeData> のスプレッドマージのため、
-    // label のみ更新しても description は保持される。
+    resetGraph: () =>
+        set({ nodes: [], edges: [], selectedNodeId: null, selectedNodeIds: [] }),
+
     updateNodeData: (id, data) =>
         set((state) => ({
             nodes: state.nodes.map((n) =>

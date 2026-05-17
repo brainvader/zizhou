@@ -1,5 +1,5 @@
 /**
- * @context CTX-4: NodeProperty — フォーム編集
+ * @context CTX-4/5: NodeProperty — フォーム編集
  * @bom docs/bom/graph.ts (GraphNodeData, GraphStore.updateNodeData)
  * @story
  * 1. ノード選択時: label・description が input/textarea に表示される
@@ -8,6 +8,7 @@
  * 4. description を変更して blur → onUpdateNode が呼ばれる
  * 5. 未選択状態（Empty）: 何も表示されない
  * 6. description なしのノード: description フィールドは空 textarea で表示される
+ * 7. [CTX-5] 複数選択中: 何も表示されない（Visibility Guard）
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, userEvent } from 'storybook/test'
@@ -40,6 +41,7 @@ const mockNodes: Node<GraphNodeData>[] = [
 export const Empty: Story = {
     args: {
         selectedNodeId: null,
+        selectedNodeIds: [],
         nodes: mockNodes,
         onUpdateNode: fn(),
     },
@@ -53,6 +55,7 @@ export const Empty: Story = {
 export const WithoutDescription: Story = {
     args: {
         selectedNodeId: 'node-002',
+        selectedNodeIds: ['node-002'],
         nodes: mockNodes,
         onUpdateNode: fn(),
     },
@@ -64,10 +67,11 @@ export const WithoutDescription: Story = {
     },
 }
 
-// @story 状態 1: ノード選択済み（description あり）— 初期値確認
+// @story 状態 1: ノード選択済み（description あり）
 export const WithDescription: Story = {
     args: {
         selectedNodeId: 'node-001',
+        selectedNodeIds: ['node-001'],
         nodes: mockNodes,
         onUpdateNode: fn(),
     },
@@ -83,6 +87,7 @@ export const WithDescription: Story = {
 export const LabelEdit: Story = {
     args: {
         selectedNodeId: 'node-001',
+        selectedNodeIds: ['node-001'],
         nodes: mockNodes,
         onUpdateNode: fn(),
     },
@@ -90,7 +95,7 @@ export const LabelEdit: Story = {
         const input = canvas.getByTestId('input-label')
         await userEvent.clear(input)
         await userEvent.type(input, 'NewComponent.tsx')
-        await userEvent.tab() // blur
+        await userEvent.tab()
         await expect(args.onUpdateNode).toHaveBeenCalledOnce()
         await expect(args.onUpdateNode).toHaveBeenCalledWith('node-001', { label: 'NewComponent.tsx' })
     },
@@ -100,13 +105,14 @@ export const LabelEdit: Story = {
 export const LabelEmptyValidation: Story = {
     args: {
         selectedNodeId: 'node-001',
+        selectedNodeIds: ['node-001'],
         nodes: mockNodes,
         onUpdateNode: fn(),
     },
     play: async ({ canvas, args }) => {
         const input = canvas.getByTestId('input-label')
         await userEvent.clear(input)
-        await userEvent.tab() // blur
+        await userEvent.tab()
         await expect(args.onUpdateNode).not.toHaveBeenCalled()
         const error = canvas.getByTestId('error-label')
         await expect(error).toBeVisible()
@@ -117,6 +123,7 @@ export const LabelEmptyValidation: Story = {
 export const DescriptionEdit: Story = {
     args: {
         selectedNodeId: 'node-001',
+        selectedNodeIds: ['node-001'],
         nodes: mockNodes,
         onUpdateNode: fn(),
     },
@@ -124,8 +131,22 @@ export const DescriptionEdit: Story = {
         const textarea = canvas.getByTestId('input-description')
         await userEvent.clear(textarea)
         await userEvent.type(textarea, '更新した説明文')
-        await userEvent.tab() // blur
+        await userEvent.tab()
         await expect(args.onUpdateNode).toHaveBeenCalledOnce()
         await expect(args.onUpdateNode).toHaveBeenCalledWith('node-001', { description: '更新した説明文' })
+    },
+}
+
+// @story 状態 7: [CTX-5] 複数選択中 — Visibility Guard により非表示
+export const MultiSelectHidden: Story = {
+    args: {
+        selectedNodeId: 'node-001',
+        selectedNodeIds: ['node-001', 'node-002'],
+        nodes: mockNodes,
+        onUpdateNode: fn(),
+    },
+    play: async ({ canvas }) => {
+        await expect(canvas.queryByTestId('input-label')).not.toBeInTheDocument()
+        await expect(canvas.queryByTestId('input-description')).not.toBeInTheDocument()
     },
 }

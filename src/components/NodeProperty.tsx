@@ -4,39 +4,42 @@ import { z } from 'zod'
 import type { GraphNodeData } from '@/bom/graph'
 import { useGraphStore } from '@/store/useGraphStore'
 
-// Zod バリデーション: label は最低1文字必要
 const LabelSchema = z.string().min(1)
 
 type NodePropertyProps = {
     selectedNodeId?: string | null
+    // [CTX-5] Visibility Guard 用。省略時は store.selectedNodeIds を使用する。
+    selectedNodeIds?: string[]
     nodes?: Node<GraphNodeData>[]
-    // props DI: 省略時は store.updateNodeData() に直接 commit する
     onUpdateNode?: (id: string, data: Partial<GraphNodeData>) => void
 }
 
 /**
- * @context  CTX-4 / NodeProperty — 編集フォーム
+ * @context  CTX-3/4/5 / NodeProperty — 編集フォーム
  * @bom      docs/bom/graph.ts (GraphStore, GraphNodeData)
  *
- * selectedNodeId が null のとき何も表示しない（空白）。
- * selectedNodeId が設定されているとき、label / description を編集フォームで表示する。
+ * [CTX-5] Visibility Guard:
+ *   selectedNodeIds.length !== 1 のとき（未選択・複数選択）は null を返す。
+ *   単一選択時のみフォームを表示・編集可能にする。
  *
  * - label   → <input type="text">  / blur で commit / 空文字は Zod min(1) で弾く
  * - description → <textarea>       / blur で commit
  * - selectedNodeId が変わるたびにフォームを store の値で reset する
- * - onUpdateNode: 確定時に呼ぶコールバック prop（props DI）
- *                 省略時は store.updateNodeData() に直接 commit する
+ * - onUpdateNode: 省略時は store.updateNodeData() に直接 commit する（props DI）
  */
 export const NodeProperty = ({
     selectedNodeId: selectedNodeIdProp,
+    selectedNodeIds: selectedNodeIdsProp,
     nodes: nodesProp,
     onUpdateNode,
 }: NodePropertyProps = {}) => {
     const storeSelectedNodeId = useGraphStore((s) => s.selectedNodeId)
+    const storeSelectedNodeIds = useGraphStore((s) => s.selectedNodeIds)
     const storeNodes = useGraphStore((s) => s.nodes)
     const storeUpdateNodeData = useGraphStore((s) => s.updateNodeData)
 
     const selectedNodeId = selectedNodeIdProp ?? storeSelectedNodeId
+    const selectedNodeIds = selectedNodeIdsProp ?? storeSelectedNodeIds
     const nodes = nodesProp ?? storeNodes
     const commitUpdate = onUpdateNode ?? storeUpdateNodeData
 
@@ -46,14 +49,16 @@ export const NodeProperty = ({
     const [descriptionDraft, setDescriptionDraft] = useState(node?.data.description ?? '')
     const [labelError, setLabelError] = useState(false)
 
-    // selectedNodeId が変わるたびにフォームを store の値で reset する
     useEffect(() => {
         setLabelDraft(node?.data.label ?? '')
         setDescriptionDraft(node?.data.description ?? '')
         setLabelError(false)
-    }, [selectedNodeId, node?.data.label, node?.data.description])
+    }, [selectedNodeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    if (!selectedNodeId || !node) return null
+    // [CTX-5] Visibility Guard: 単一選択以外は非表示
+    if (selectedNodeIds.length !== 1) return null
+
+    if (!node) return null
 
     const handleLabelBlur = () => {
         const result = LabelSchema.safeParse(labelDraft)
@@ -62,53 +67,35 @@ export const NodeProperty = ({
             return
         }
         setLabelError(false)
-        commitUpdate(selectedNodeId, { label: labelDraft })
+        commitUpdate(node.id, { label: labelDraft })
     }
 
     const handleDescriptionBlur = () => {
-        commitUpdate(selectedNodeId, { description: descriptionDraft })
+        commitUpdate(node.id, { description: descriptionDraft })
     }
 
     return (
-        <div data-testid="node-property" className="flex flex-col gap-3 p-3">
-            {/* label フィールド */}
-            <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-mono tracking-widest uppercase text-[--muted-foreground]">
-                    name
-                </span>
+        <div data-testid="node-property">
+            <div>
+                <label>name</label>
                 <input
                     data-testid="input-label"
                     type="text"
                     value={labelDraft}
-                    onChange={(e) => {
-                        setLabelDraft(e.target.value)
-                        if (labelError) setLabelError(false)
-                    }}
+                    onChange={(e) => setLabelDraft(e.target.value)}
                     onBlur={handleLabelBlur}
-                    className="text-xs font-mono bg-transparent border border-[--border] rounded px-2 py-1 text-[--foreground] focus:outline-none focus:border-[--ring]"
                 />
                 {labelError && (
-                    <span
-                        data-testid="error-label"
-                        className="text-[10px] font-mono text-[--destructive]"
-                    >
-                        name は必須です
-                    </span>
+                    <span data-testid="error-label">name は必須です</span>
                 )}
             </div>
-
-            {/* description フィールド */}
-            <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-mono tracking-widest uppercase text-[--muted-foreground]">
-                    description
-                </span>
+            <div>
+                <label>description</label>
                 <textarea
                     data-testid="input-description"
                     value={descriptionDraft}
                     onChange={(e) => setDescriptionDraft(e.target.value)}
                     onBlur={handleDescriptionBlur}
-                    rows={4}
-                    className="text-xs font-mono bg-transparent border border-[--border] rounded px-2 py-1 text-[--foreground] focus:outline-none focus:border-[--ring] resize-none whitespace-pre-wrap"
                 />
             </div>
         </div>

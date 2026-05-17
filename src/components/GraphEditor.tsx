@@ -10,6 +10,7 @@ import {
     type NodeChange,
     type EdgeChange,
     type NodeMouseHandler,
+    type OnSelectionChangeParams,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { nanoid } from 'nanoid'
@@ -21,14 +22,7 @@ import { useGraphInit } from '@/hooks/useGraphInit'
 import { EditableNode } from '@/components/nodes/EditableNode'
 import type { GraphNodeData, GraphFile, InitStatus } from '@/bom/graph'
 
-// nodeTypes: コンポーネント外で定義し参照を固定する。
-// コンポーネント内で定義すると re-render のたびに新しい参照が生まれ
-// ReactFlow が内部状態をリセットして visibility: hidden のままになる。
 const NODE_TYPES = { editableNode: EditableNode }
-
-// ============================================================
-// Types
-// ============================================================
 
 type ExistsFn = (path: string) => Promise<boolean>
 type ReadTextFileFn = (path: string) => Promise<string>
@@ -44,6 +38,8 @@ export type GraphEditorProps = {
     onLoadGraph?: (graph: GraphFile) => void
     onResetGraph?: () => void
     onSetSelectedNodeId?: (id: string | null) => void
+    // [CTX-5] props DI: 省略時は store.setSelectedNodeIds() を使用する
+    onSetSelectedNodeIds?: (ids: string[]) => void
     onExists?: ExistsFn
     onReadTextFile?: ReadTextFileFn
     setHydrated?: (hydrated: boolean) => void
@@ -57,11 +53,10 @@ export type GraphEditorProps = {
  * - initStatus: 'checking' → ローディングスピナーを表示
  * - initStatus: 'ready'    → React Flow エディタを表示
  *
- * 初期化・ロードロジックは useGraphInit に委譲する。
- * インライン編集は EditableNode カスタムノードに委譲する。
- *
- * props DI: Tauri fs 依存・store 依存を props で受け取る。
- * 省略時は Tauri 実装・Zustand store にフォールバックする。
+ * [CTX-5] 複数選択:
+ * - onSelectionChange で selectedNodeIds[] を store に反映する
+ * - Single Guard は store.setSelectedNodeIds() 内に実装済み
+ * - 複数選択中の移動・削除は ReactFlow 標準動作に委ねる
  *
  * @see docs/bom/graph.ts
  * @see src/components/nodes/EditableNode.tsx
@@ -79,6 +74,7 @@ export function GraphEditor({
     onLoadGraph,
     onResetGraph,
     onSetSelectedNodeId,
+    onSetSelectedNodeIds,
     onExists = exists,
     onReadTextFile = readTextFile,
     setHydrated: setHydratedProp,
@@ -88,6 +84,7 @@ export function GraphEditor({
     const storeEdges = useGraphStore((s) => s.edges)
     const storeAddNode = useGraphStore((s) => s.addNode)
     const storeSetSelectedNodeId = useGraphStore((s) => s.setSelectedNodeId)
+    const storeSetSelectedNodeIds = useGraphStore((s) => s.setSelectedNodeIds)
     const storeInitStatus = useProjectDetailStore((s) => s.initStatus)
     const { setHydrated: storeSetHydrated } = useGraphFile()
 
@@ -107,9 +104,8 @@ export function GraphEditor({
     const edges = storeEdges
     const addNode = onAddNode ?? storeAddNode
     const setSelectedNodeId = onSetSelectedNodeId ?? storeSetSelectedNodeId
+    const setSelectedNodeIds = onSetSelectedNodeIds ?? storeSetSelectedNodeIds
 
-
-    // --- 初期化・ロードロジックを useGraphInit に委譲 ---
     useGraphInit({
         projectRootPath: projectRootPathProp,
         activeGraphId: activeGraphIdProp,
@@ -126,18 +122,30 @@ export function GraphEditor({
     const handleAddNode = useCallback(() => {
         const node: Node<GraphNodeData> = {
             id: nanoid(),
-            type: 'editableNode', // [CTX-4] EditableNode を使用する
+            type: 'editableNode',
             position: { x: 100, y: 100 },
             data: { label: 'New Node' },
         }
         addNode(node)
     }, [addNode])
 
-    // --- Select Node ---
+    // --- Select Node (single click) ---
     const handleNodeClick: NodeMouseHandler = useCallback((_event, node) => {
         setSelectedNodeId(node.id)
     }, [setSelectedNodeId])
 
+    // --- [CTX-5] Selection Change (multi select) ---
+    // onSelectionChange は単一選択・複数選択・選択解除すべてで発火する。
+    // Single Guard は setSelectedNodeIds 内に実装済み。
+    const handleSelectionChange = useCallback(
+        ({ nodes: selectedNodes }: OnSelectionChangeParams) => {
+            const ids = selectedNodes.map((n) => n.id)
+            setSelectedNodeIds(ids)
+        },
+        [setSelectedNodeIds]
+    )
+
+    // --- Nodes / Edges Change ---
     const onNodesChange = useCallback((changes: NodeChange[]) => {
         storeSetNodes(applyNodeChanges(changes, nodes) as Node<GraphNodeData>[])
     }, [nodes, storeSetNodes])
@@ -146,7 +154,6 @@ export function GraphEditor({
         storeSetEdges(applyEdgeChanges(changes, edges))
     }, [edges, storeSetEdges])
 
-    // --- Render ---
     return (
         <div
             data-testid="graph-editor"
@@ -168,7 +175,15 @@ export function GraphEditor({
                     {nodes.length === 0 && (
                         <div
                             data-testid="graph-editor-empty"
-                            style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', opacity: 0.3 }}
+                            style={{
+                                position: 'absolute',
+                                inset: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                pointerEvents: 'none',
+                                opacity: 0.3,
+                            }}
                         >
                             <span>ノードを追加してください</span>
                         </div>
@@ -179,6 +194,7 @@ export function GraphEditor({
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
                         onNodeClick={handleNodeClick}
+                        onSelectionChange={handleSelectionChange}
                         nodeTypes={NODE_TYPES}
                         deleteKeyCode="Delete"
                     >
