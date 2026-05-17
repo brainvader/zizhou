@@ -1,5 +1,5 @@
 /**
- * @context CTX-2/5: GraphEditor — ロジック検証
+ * @context CTX-2/5/6: GraphEditor — ロジック検証
  * @bom docs/bom/graph.ts
  * @story
  * 1. onNodesChange に remove タイプの変更が渡されると store からノードが削除される
@@ -7,6 +7,7 @@
  * 3. onNodesChange に position タイプの変更が渡されると store のノード位置が更新される
  * 4. [CTX-5] onSelectionChange で複数ノードが選択されると setSelectedNodeIds が呼ばれる
  * 5. [CTX-5] onSelectionChange で単一ノードが選択されると setSelectedNodeIds が呼ばれる
+ * 6. [CTX-6] onConnect が呼ばれると addEdge が呼ばれる
  * @output src/components/GraphEditor.tsx
  */
 
@@ -20,6 +21,7 @@ const {
     mockSetNodes,
     mockSetEdges,
     mockSetSelectedNodeIds,
+    mockAddEdge,
     mockGetState,
     mockNodes,
     mockEdges,
@@ -35,6 +37,7 @@ const {
         mockSetNodes: vi.fn(),
         mockSetEdges: vi.fn(),
         mockSetSelectedNodeIds: vi.fn(),
+        mockAddEdge: vi.fn(),
         mockGetState: vi.fn(() => ({ activeGraphId: null, projectRootPath: '' })),
         mockNodes,
         mockEdges,
@@ -47,6 +50,7 @@ vi.mock('@/store/useGraphStore', () => ({
             nodes: mockNodes,
             edges: mockEdges,
             addNode: vi.fn(),
+            addEdge: mockAddEdge,
             setNodes: mockSetNodes,
             setEdges: mockSetEdges,
             setSelectedNodeId: vi.fn(),
@@ -86,7 +90,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@xyflow/react')>()
     return {
         ...actual,
-        ReactFlow: ({ onNodesChange, onEdgesChange, onSelectionChange }: any) => (
+        ReactFlow: ({ onNodesChange, onEdgesChange, onSelectionChange, onConnect }: any) => (
             <div data-testid="mock-react-flow">
                 <button
                     data-testid="trigger-remove-node"
@@ -130,6 +134,17 @@ vi.mock('@xyflow/react', async (importOriginal) => {
                     })}
                 >
                     single select
+                </button>
+                <button
+                    data-testid="trigger-connect"
+                    onClick={() => onConnect?.({
+                        source: 'node-001',
+                        target: 'node-002',
+                        sourceHandle: null,
+                        targetHandle: null,
+                    })}
+                >
+                    connect
                 </button>
             </div>
         ),
@@ -189,6 +204,22 @@ describe('GraphEditor: [CTX-5] onSelectionChange', () => {
         await act(async () => { screen.getByTestId('trigger-single-select').click() })
         expect(mockSetSelectedNodeIds).toHaveBeenCalledOnce()
         expect(mockSetSelectedNodeIds).toHaveBeenCalledWith(['node-001'])
+    })
+
+})
+
+describe('GraphEditor: [CTX-6] onConnect', () => {
+
+    test('logic: onConnect が呼ばれると addEdge が connection オブジェクトで呼ばれる', async () => {
+        render(<GraphEditor initStatus="ready" />)
+        await act(async () => { screen.getByTestId('trigger-connect').click() })
+        expect(mockAddEdge).toHaveBeenCalledOnce()
+        expect(mockAddEdge).toHaveBeenCalledWith({
+            source: 'node-001',
+            target: 'node-002',
+            sourceHandle: null,
+            targetHandle: null,
+        })
     })
 
 })

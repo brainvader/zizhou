@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { Node, Edge } from '@xyflow/react'
+import type { Node, Edge, Connection } from '@xyflow/react'
 
 // ============================================================
 // Utilities
@@ -88,6 +88,9 @@ export type GraphStore = {
 
     // [CTX-4] 指定 id のノードの data のみを部分更新する。
     updateNodeData: (id: string, data: Partial<GraphNodeData>) => void
+
+    // [CTX-6] ReactFlow の onConnect から呼ばれる。Connection を Edge に変換して edges[] に追加する。
+    addEdge: (connection: Connection) => void
 }
 
 // ============================================================
