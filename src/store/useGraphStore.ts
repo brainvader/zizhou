@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { addEdge as rfAddEdge } from '@xyflow/react'
 import type { Node, Edge } from '@xyflow/react'
 import type { GraphNodeData, GraphStore } from '@/bom/graph'
 
@@ -31,6 +32,10 @@ export const useGraphStore = create<GraphStore>((set) => ({
 
     addNode: (node: Node<GraphNodeData>) =>
         set((state) => ({ nodes: [...state.nodes, node] })),
+
+    // [CTX-6] rfAddEdge は重複エッジを自動排除して新しい Edge[] を返す。
+    addEdge: (connection) =>
+        set((state) => ({ edges: rfAddEdge(connection, state.edges) })),
 
     loadGraph: (graph) =>
         set({

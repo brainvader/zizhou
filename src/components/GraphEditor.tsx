@@ -7,6 +7,7 @@ import {
     applyEdgeChanges,
     type Node,
     type Edge,
+    type Connection,
     type NodeChange,
     type EdgeChange,
     type OnSelectionChangeParams,
@@ -39,6 +40,8 @@ export type GraphEditorProps = {
     onSetSelectedNodeId?: (id: string | null) => void
     // [CTX-5] props DI: 省略時は store.setSelectedNodeIds() を使用する
     onSetSelectedNodeIds?: (ids: string[]) => void
+    // [CTX-6] props DI: 省略時は store.addEdge() を使用する
+    onAddEdge?: (connection: Connection) => void
     onExists?: ExistsFn
     onReadTextFile?: ReadTextFileFn
     setHydrated?: (hydrated: boolean) => void
@@ -57,6 +60,10 @@ export type GraphEditorProps = {
  * - Single Guard は store.setSelectedNodeIds() 内に実装済み
  * - 複数選択中の移動・削除は ReactFlow 標準動作に委ねる
  *
+ * [CTX-6] Edge Connect:
+ * - onConnect で addEdge() を呼び store に反映する
+ * - Edge Delete は ReactFlow の deleteKeyCode="Delete" 標準動作 + onEdgesChange(remove) で処理済み
+ *
  * @see docs/bom/graph.ts
  * @see src/components/nodes/EditableNode.tsx
  * @see src/hooks/useGraphInit.ts
@@ -72,8 +79,8 @@ export function GraphEditor({
     onAddNode,
     onLoadGraph,
     onResetGraph,
-    onSetSelectedNodeId,
     onSetSelectedNodeIds,
+    onAddEdge,
     onExists = exists,
     onReadTextFile = readTextFile,
     setHydrated: setHydratedProp,
@@ -82,7 +89,7 @@ export function GraphEditor({
     const storeNodes = useGraphStore((s) => s.nodes)
     const storeEdges = useGraphStore((s) => s.edges)
     const storeAddNode = useGraphStore((s) => s.addNode)
-    const storeSetSelectedNodeId = useGraphStore((s) => s.setSelectedNodeId)
+    const storeAddEdge = useGraphStore((s) => s.addEdge)
     const storeSetSelectedNodeIds = useGraphStore((s) => s.setSelectedNodeIds)
     const storeInitStatus = useProjectDetailStore((s) => s.initStatus)
     const { setHydrated: storeSetHydrated } = useGraphFile()
@@ -102,6 +109,7 @@ export function GraphEditor({
     const nodes = storeNodes
     const edges = storeEdges
     const addNode = onAddNode ?? storeAddNode
+    const addEdge = onAddEdge ?? storeAddEdge
     const setSelectedNodeIds = onSetSelectedNodeIds ?? storeSetSelectedNodeIds
 
     useGraphInit({
@@ -147,6 +155,14 @@ export function GraphEditor({
             setSelectedNodeIds(ids)
         },
         [setSelectedNodeIds]
+    )
+
+    // --- [CTX-6] Connect ---
+    const handleConnect = useCallback(
+        (connection: Connection) => {
+            addEdge(connection)
+        },
+        [addEdge]
     )
 
     // --- Nodes / Edges Change ---
@@ -199,6 +215,7 @@ export function GraphEditor({
                         onEdgesChange={onEdgesChange}
                         onNodeClick={handleNodeClick}
                         onSelectionChange={handleSelectionChange}
+                        onConnect={handleConnect}
                         nodeTypes={NODE_TYPES}
                         deleteKeyCode="Delete"
                         multiSelectionKeyCode="Shift"

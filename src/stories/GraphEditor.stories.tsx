@@ -97,3 +97,32 @@ export const ClickAddNode: Story = {
         await expect(args.onAddNode).toHaveBeenCalledOnce()
     },
 }
+
+// @story 状態 4: [CTX-6] Edge Connect — 2ノード間にエッジが描画される（視覚確認）
+export const EdgeConnect: Story = {
+    args: {
+        initStatus: 'ready',
+        projectRootPath: '/mock/project',
+        activeGraphId: 'graph-01',
+        nodes: [
+            { id: 'n1', type: 'editableNode', position: { x: 100, y: 150 }, data: { label: 'Node A' } },
+            { id: 'n2', type: 'editableNode', position: { x: 380, y: 150 }, data: { label: 'Node B' } },
+        ],
+        edges: [
+            { id: 'e1', source: 'n1', target: 'n2' },
+        ],
+        onReadTextFile: async () => JSON.stringify({
+            id: 'graph-01',
+            nodes: [
+                { id: 'n1', type: 'editableNode', position: { x: 100, y: 150 }, data: { label: 'Node A' } },
+                { id: 'n2', type: 'editableNode', position: { x: 380, y: 150 }, data: { label: 'Node B' } },
+            ],
+            edges: [
+                { id: 'e1', source: 'n1', target: 'n2' },
+            ],
+        }),
+    },
+    play: async ({ canvas }) => {
+        await expect(canvas.getByRole('button', { name: /ノード追加/ })).toBeVisible()
+    },
+}
