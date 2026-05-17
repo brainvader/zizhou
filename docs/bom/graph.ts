@@ -80,6 +80,12 @@ export type GraphStore = {
     addNode: (node: Node<GraphNodeData>) => void
     loadGraph: (graph: GraphFile) => void
     resetGraph: () => void
+
+    // [CTX-4] 指定 id のノードの data のみを部分更新する。
+    // inline 編集・NodeProperty フォームの両エントリーポイントから呼ぶ。
+    // setNodes() 全件更新より意図が明確なため専用アクションとして定義する。
+    // Partial<GraphNodeData> のスプレッドマージのため、label のみ更新しても description は保持される。
+    updateNodeData: (id: string, data: Partial<GraphNodeData>) => void
 }
 
 // ============================================================

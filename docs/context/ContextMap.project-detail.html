@@ -26,8 +26,7 @@
              グラフデータは Tauri fs プラグインで {projectRootPath}/graphs/{graphId}.json に保存する。
              activeGraphId: 現在表示中のグラフID（ファイルツリーで graphs/ 配下の .json を選択して切り替える）
                             初期値は null（グラフ未選択）
-             initStatus: graphs/ ディレクトリの存在確認状態（'checking': 確認中 / 'uninitialized': 未存在 / 'ready': 存在）
-                         'uninitialized' のときエディタ領域を Setup ビューに切り替える
+             initStatus: graphs/ ディレクトリの存在確認状態（'checking': 確認中 / 'ready': 存在）
              activeProjectId: 現在表示中のプロジェクトID（TanStack Router の useParams から取得）
              projectRootPath: 現在プロジェクトのルートパス（BOM で型定義する: string）
              注意: projects[] はここでは持たない。SSOTはZustandのuseProjectStore。
@@ -42,7 +41,6 @@
         </script>
 
         <!-- ctx-file-tree のローカル状態 -->
-        <!-- 注意: projectRootPath は global-store から参照する。BOM で string 型として定義する。 -->
         <script data-context="ctx-file-tree" class="local-state" type="application/json">
             {
                 "selectedPath": null,
@@ -55,20 +53,22 @@
             {
                 "nodes": [],
                 "edges": [],
-                "selectedNodeId": null
+                "selectedNodeId": null,
+                "editingNodeId": null
             }
         </script>
 
-        <!-- ctx-node-property のローカル状態 -->
+        <!-- ctx-node-property のローカル状態
+             [CTX-4] 読み取り専用 → 編集フォーム化に伴い form を追加。
+             - form: NodeProperty 内のフォームフィールド値（編集中の一時状態）
+             - 書き込み先は store.updateNodeData() で一本化。blur で commit。
+        -->
         <script data-context="ctx-node-property" class="local-state" type="application/json">
             {
-                "selectedNode": null
+                "selectedNode": null,
+                "form": { "label": "", "description": "" }
             }
         </script>
-
-        <!-- ctx-topbar: local-state なし（ステートレス）
-             breadcrumb のプロジェクト名は useProjectStore から引く。
-             Settings ボタンのコールバックは onSettingsClick prop として受け取る。 -->
 
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500&family=DM+Mono:wght@300;400&family=Outfit:wght@400;500;600;700&display=swap');
@@ -134,71 +134,52 @@
             }
 
             .dot {
-                width: 10px;
-                height: 10px;
+                width: 12px;
+                height: 12px;
                 border-radius: 50%;
             }
 
             .dot.r {
-                background: #6b2a2a;
+                background: #ff5f57;
             }
 
             .dot.y {
-                background: #6b5a2a;
+                background: #ffbd2e;
             }
 
             .dot.g {
-                background: #2a4a35;
+                background: #28c840;
             }
 
-            /* ── TOPBAR ── */
+            /* ── CTX-TOPBAR ── */
             #ctx-topbar {
                 height: var(--topbar-height);
                 background: var(--card);
                 border-bottom: 1px solid var(--border);
                 display: flex;
                 align-items: center;
-                padding: 0 22px;
-                gap: 16px;
+                padding: 0 16px;
+                gap: 8px;
                 flex-shrink: 0;
-                box-shadow: inset 0 1px 0 #c0392b28;
             }
 
             .logo {
                 display: flex;
                 align-items: center;
-                gap: 12px;
-            }
-
-            .logo-kanji-wrap {
-                position: relative;
-                display: inline-block;
+                gap: 8px;
             }
 
             .logo-kanji {
                 font-family: var(--font-serif);
                 font-size: 20px;
-                font-weight: 400;
+                font-weight: 300;
                 color: var(--foreground);
-                letter-spacing: 0.15em;
-                line-height: 1;
-            }
-
-            .logo-kanji-wrap::after {
-                content: '';
-                position: absolute;
-                bottom: -3px;
-                left: 0;
-                right: 0;
-                height: 2px;
-                background: var(--primary);
-                border-radius: 1px;
-                opacity: 0.8;
+                letter-spacing: 0.05em;
             }
 
             .logo-sep {
                 width: 1px;
-                height: 18px;
+                height: 20px;
                 background: var(--border);
             }
 
@@ -210,24 +191,22 @@
 
             .logo-romaji {
                 font-family: var(--font-mono);
-                font-size: 9px;
-                color: var(--muted-foreground);
-                letter-spacing: 0.25em;
-                text-transform: uppercase;
+                font-size: 11px;
+                color: var(--foreground);
+                letter-spacing: 0.15em;
             }
 
             .logo-ver {
                 font-family: var(--font-mono);
-                font-size: 8px;
-                color: #454a52;
-                letter-spacing: 0.15em;
+                font-size: 9px;
+                color: var(--muted-foreground);
+                letter-spacing: 0.1em;
             }
 
-            /* プロジェクト名 breadcrumb */
             .breadcrumb-sep {
                 color: var(--border);
                 font-size: 16px;
-                margin: 0 6px;
+                margin: 0 4px;
             }
 
             .breadcrumb-project {
@@ -350,14 +329,12 @@
                 overflow: hidden;
             }
 
-            /* React Flow のキャンバス領域 */
             .graph-canvas {
                 width: 100%;
                 height: 100%;
                 position: relative;
             }
 
-            /* ツールバー */
             .graph-toolbar {
                 position: absolute;
                 top: 12px;
@@ -386,7 +363,7 @@
                 border-color: var(--primary);
             }
 
-            /* ノード（React Flow カスタムノードのモックアップ） */
+            /* ノード */
             .mock-node {
                 position: absolute;
                 background: var(--card);
@@ -406,7 +383,7 @@
                 box-shadow: 0 0 12px var(--primary-glow);
             }
 
-            .mock-node::before {
+            .mock-node.selected::before {
                 content: '';
                 position: absolute;
                 left: 0;
@@ -416,6 +393,23 @@
                 background: var(--primary);
                 border-radius: 1px;
                 opacity: 0.7;
+            }
+
+            /* [CTX-4] インライン編集中ノード */
+            .mock-node.editing {
+                border-color: var(--primary);
+                box-shadow: 0 0 0 2px var(--primary-glow);
+            }
+
+            .node-inline-input {
+                background: transparent;
+                border: none;
+                outline: none;
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--card-foreground);
+                width: 100%;
+                font-family: var(--font-sans);
             }
 
             .node-label {
@@ -432,7 +426,7 @@
                 margin-top: 3px;
             }
 
-            /* ハンドル（接続点）モックアップ */
+            /* ハンドル */
             .handle {
                 width: 8px;
                 height: 8px;
@@ -452,13 +446,6 @@
                 left: -4px;
                 top: 50%;
                 transform: translateY(-50%);
-            }
-
-            /* エッジ（SVG） */
-            .graph-svg {
-                position: absolute;
-                inset: 0;
-                pointer-events: none;
             }
 
             /* 空状態 */
@@ -530,26 +517,48 @@
                 text-transform: uppercase;
             }
 
-            .property-value {
+            /* [CTX-4] 編集可能フィールド */
+            .property-input {
                 font-size: 12px;
                 color: var(--foreground);
-                background: var(--background);
+                background: var(--muted);
                 border: 1px solid var(--border);
                 border-radius: var(--radius);
                 padding: 6px 8px;
                 font-family: var(--font-sans);
+                width: 100%;
+                outline: none;
+            }
+
+            .property-input:focus {
+                border-color: var(--primary);
+                box-shadow: 0 0 0 2px var(--primary-glow);
             }
 
             .property-textarea {
                 font-size: 12px;
                 color: var(--foreground);
-                background: var(--background);
+                background: var(--muted);
                 border: 1px solid var(--border);
                 border-radius: var(--radius);
                 padding: 6px 8px;
                 font-family: var(--font-sans);
                 resize: vertical;
                 min-height: 80px;
+                width: 100%;
+                outline: none;
+            }
+
+            .property-textarea:focus {
+                border-color: var(--primary);
+                box-shadow: 0 0 0 2px var(--primary-glow);
+            }
+
+            /* [CTX-4] バリデーションエラー */
+            .property-error {
+                font-size: 10px;
+                color: var(--primary);
+                font-family: var(--font-mono);
             }
         </style>
     </head>
@@ -569,9 +578,6 @@
              責務: アプリ識別 + プロジェクト名 breadcrumb + New Graph + Settings
              注意: ProjectDetailTopbar.tsx として独立コンポーネントで実装。
                    breadcrumb のプロジェクト名は useProjectStore から引く。
-                   router 依存（useParams）は呼び出し側（projects.$id.tsx）に委譲し
-                   projectId prop として受け取る。
-                   Settings ボタンのコールバックは onSettingsClick prop として受け取る。
         ============================================================ -->
         <header id="ctx-topbar">
             <div class="logo">
@@ -585,41 +591,37 @@
                 </div>
             </div>
             <span class="breadcrumb-sep">/</span>
-            <span class="breadcrumb-project">地蔵 Core</span>
+            <span class="breadcrumb-project" data-testid="breadcrumb-project">地蔵 Core</span>
             <div class="topbar-spacer"></div>
-            <button class="btn-ghost" title="New Graph">＋</button>
+            <button class="btn-tool">＋ New Graph</button>
             <button class="btn-ghost" title="Settings">⚙</button>
 
             <!--
-                [✓][Feature] Settings   — ContextMap.projects.html と同じ
-                [✓][Feature] Breadcrumb — Topbar にプロジェクト名を breadcrumb として表示する
-                [✓][Logic]   Breadcrumb — projectId prop に対応するプロジェクト名を
-                                          useProjectStore から引いて表示する
-                [✓][Feature] New Graph  — 「＋」ボタンクリックで新しいグラフを作成し、エディタに切り替える
-                                          initStatus が 'ready' 以外のときはボタンを disabled にする
-                [✓][Logic]   New Graph  — nanoid() で graphId を生成し {projectRootPath}/graphs/{graphId}.json を
-                                          空の nodes[], edges[] で作成後、activeGraphId を更新する
+                [✓][Feature] Logo        — 地蔵（漢字）/ Zizou（ローマ字）/ Protocol v7.00 を表示する
+                [✓][Feature] Breadcrumb  — プロジェクト名を表示する（useProjectStore から引く）
+                [✓][Feature] New Graph   — クリックで graphs/{nanoid()}.json を作成し ?graph= に遷移する
+                [✓][Feature] Settings    — アイコンボタンクリックで Settings ダイアログを開く
+                [✓][Logic]   New Graph   — writeTextFile 完了後に onNavigate(graphId) を呼ぶ
+                                           失敗時は toast.error() を表示する
             -->
         </header>
 
         <div class="workspace">
 
             <!-- ============================================================
-                 CTX-1: FILE TREE
-                 責務: プロジェクト配下の実ファイルシステムをツリー表示する
-                 注意: Tauri fs でディレクトリを再帰的に読み込む
-                       projectRootPath は global-store から参照する（BOM で string 型として定義する）
+                 CTX-1: FILE TREE [✓]
+                 責務: プロジェクトルート配下のファイルツリーを表示する
+                 注意: graphs/ 配下の .json を選択すると activeGraphId が更新される
             ============================================================ -->
             <nav id="ctx-file-tree">
                 <div class="pane-header">
                     <span class="pane-title">Files</span>
                 </div>
                 <div class="file-tree">
-                    <!-- モックアップ -->
                     <div class="tree-item dir">
                         <span class="tree-icon">▾</span> src
                     </div>
-                    <div class="tree-item depth-1">
+                    <div class="tree-item depth-1 dir">
                         <span class="tree-icon">▾</span> components
                     </div>
                     <div class="tree-item depth-2 selected">
@@ -628,7 +630,7 @@
                     <div class="tree-item depth-2">
                         <span class="tree-icon">·</span> Topbar.tsx
                     </div>
-                    <div class="tree-item depth-1">
+                    <div class="tree-item depth-1 dir">
                         <span class="tree-icon">▾</span> routes
                     </div>
                     <div class="tree-item depth-2">
@@ -646,120 +648,126 @@
                 </div>
 
                 <!--
-                    [✓][Feature] File Tree Display — Tauri fs でプロジェクトルート配下を
-                                                     再帰的に読み込みツリー表示する
+                    [✓][Feature] File Tree Display — Tauri fs でプロジェクトルート配下を再帰的に読み込みツリー表示する
                     [✓][Feature] Expand/Collapse   — ディレクトリをクリックで展開・折りたたむ
                     [✓][Feature] File Select       — ファイルをクリックで selectedPath を更新する
                                                      （graphs/ 配下の .json を選択した場合は activeGraphId を更新し
                                                      グラフエディタにロードする）
                     [✓][Logic]   fs Read           — Tauri fs の readDir で再帰読み込み
-                    [✓][Logic]   Root Path         — projectRootPath を global-store（Zustand経由）から取得する。
-                                                     型は BOM（docs/bom/project.ts）で string として定義する
+                    [✓][Logic]   Root Path         — projectRootPath を global-store（Zustand経由）から取得する
                 -->
             </nav>
 
             <!-- ============================================================
-                 CTX-2: GRAPH EDITOR
-                 責務: ノードの手動配置・接続・選択を管理するグラフエディタ
+                 CTX-2: GRAPH EDITOR [✓ + CTX-4]
+                 責務: ノードの手動配置・接続・選択・インライン編集を管理するグラフエディタ
                  注意: React Flow を使用する
                        nodes[], edges[] は Zustand で管理する
-                       ノード追加はダイアログなし（インライン操作）。
-                       「＋ ノード追加」ボタンクリックでデフォルト位置に直接追加する。
-                       initStatus が 'checking' の場合はエディタ領域にローディングスピナーを表示する。
-                       initStatus が 'uninitialized' の場合はエディタ領域全体を Setup ビューに切り替える。
-                       Setup ビューで「初期化」ボタンを押すと graphs/ を作成し initStatus が 'ready' になる。
+                       ノード追加はダイアログなし（インライン操作）
+                       initStatus が 'checking' の場合はエディタ領域にローディングスピナーを表示する
+                       initStatus が 'ready' の場合はエディタを表示する
+
+                 [CTX-4] インライン編集:
+                       editingNodeId を useState で管理する（GraphEditor ローカル状態。Zustand には持たない）
+                       ダブルクリックで label を inline <input> に切り替える
+                       Blur / Enter で store.updateNodeData() に commit する
+                       Escape でキャンセルし元の label に戻す
+
+                 [CTX-4][Note] 同期競合:
+                       inline 編集中に NodeProperty を操作した場合、後から blur した方が
+                       store に上書き commit される。意図的な排他制御は行わない。
+                       データ破損はなく上書きのみ。仕様として許容する。
             ============================================================ -->
             <main id="ctx-graph-editor">
-
-                <!-- ツールバー -->
-                <div class="graph-toolbar">
-                    <button class="btn-tool">＋ ノード追加</button>
-                </div>
-
-                <!-- React Flow キャンバス -->
                 <div class="graph-canvas">
 
-                    <!-- エッジ（SVG モックアップ） -->
-                    <svg class="graph-svg">
-                        <line x1="280" y1="100" x2="420" y2="180" stroke="#30343a" stroke-width="1.5" />
-                    </svg>
+                    <div class="graph-toolbar">
+                        <button class="btn-tool">＋ ノード追加</button>
+                    </div>
 
-                    <!-- ノード A -->
-                    <div class="mock-node selected" style="left: 120px; top: 60px;">
+                    <!-- 通常ノード（選択済み） -->
+                    <div class="mock-node selected" style="top:100px;left:120px;">
                         <div class="handle left"></div>
                         <div class="node-label">ProjectGrid.tsx</div>
                         <div class="node-desc">カードグリッド表示</div>
                         <div class="handle right"></div>
                     </div>
 
-                    <!-- ノード B -->
-                    <div class="mock-node" style="left: 420px; top: 150px;">
+                    <!-- [CTX-4] インライン編集中ノード（ダブルクリック後） -->
+                    <div class="mock-node editing" style="top:240px;left:320px;">
                         <div class="handle left"></div>
-                        <div class="node-label">useProjectStore</div>
-                        <div class="node-desc">projects[] の SSOT</div>
+                        <input class="node-inline-input" value="useProjectStore" />
                         <div class="handle right"></div>
                     </div>
 
-                    <!-- 空状態（nodes[] が空のとき表示） -->
-                    <!--
-                    <div class="graph-empty">
-                        <span class="graph-empty-text">ノードを追加してください</span>
-                    </div>
-                    -->
+                    <!-- エッジ（SVG） -->
+                    <svg class="graph-svg" style="position:absolute;inset:0;pointer-events:none;">
+                        <line x1="268" y1="130" x2="320" y2="270" stroke="#30343a" stroke-width="1.5" />
+                    </svg>
                 </div>
 
                 <!--
-                    [✓][Feature] Loading    — initStatus が 'checking' のときエディタ領域にローディングスピナーを表示する
-                    [✓][Feature] Setup View    — initStatus が 'uninitialized' のときエディタ領域全体を
-                                                 Setup ビューに切り替え「初期化」ボタンを表示する
-                    [✓][Feature] Add Node      — 「＋ ノード追加」ボタンでデフォルト位置に汎用ノードを追加する
-                                                 （ダイアログなし・インライン操作）
-                                                 initStatus が 'ready' 以外のときはボタンを disabled にする
-                    [✓][Feature] Move Node     — ノードをドラッグで移動する（React Flow 標準）
-                    [✓][Feature] Connect Nodes — ハンドルからドラッグしてエッジを接続する（React Flow 標準）
-                    [✓][Feature] Select Node   — ノードをクリックで選択し selectedNodeId を更新する
-                    [✓][Feature] Empty State   — nodes[] が空のとき「ノードを追加してください」を表示する
-                    [✓][Logic]   Init Check    — マウント時に Tauri fs で {projectRootPath}/graphs/ の存在を確認し
-                                                 initStatus を更新する（'checking': 確認中 / 'uninitialized': 未存在 / 'ready': 存在）
-                    [✓][Logic]   Init Dir      — 「初期化」ボタンで Tauri fs の mkdir を呼び graphs/ を作成後
-                                                 initStatus を 'ready' に更新しエディタビューに切り替える
-                                                 作成後にファイルツリーが graphs/ を表示することをテストで検証する
-                    [✓][Logic]   State         — nodes[], edges[], selectedNodeId を Zustand で管理する
-                    [✓][Logic]   Persist       — nodes[], edges[] の変化を subscribe で監視し
-                                                 Tauri fs で {projectRootPath}/graphs/{graphId}.json に保存する
-                    [✓][Logic]   React Flow    — <ReactFlow> コンポーネントに nodes/edges/onNodesChange/onEdgesChange を渡す
+                    [✓][Feature] Add Node          — 「＋ ノード追加」クリックでノードを追加する
+                    [✓][Feature] Select Node       — ノードをクリックで選択 → selectedNodeId を更新
+                    [✓][Logic]   onNodesChange     — remove / position 変更を store に反映する
+                    [✓][Logic]   Persist           — nodes[], edges[] の変化を subscribe で自動保存する
+
+                    [CTX-4][Feature] Inline Edit   — ノードのダブルクリックで label をインライン <input> に切り替える
+                    [CTX-4][Logic]   Inline Commit — Blur / Enter で store.updateNodeData() に label を commit する
+                    [CTX-4][Logic]   Inline Cancel — Escape でキャンセルし元の label に戻す
+                    [CTX-4][Logic]   EditingNodeId — editingNodeId を useState で管理（Zustand には持たない）
                 -->
             </main>
 
             <!-- ============================================================
-                 CTX-3: NODE PROPERTY
-                 責務: 選択中ノードの名前・説明を表示する（読み取り専用）
-                 注意: selectedNodeId が null のときは何も表示しない（空白）
+                 CTX-3: NODE PROPERTY [✓ + CTX-4]
+                 責務: 選択中ノードの label・description を編集するフォームを提供する
+
+                 [CTX-4] 読み取り専用 → 編集フォームに変更。
+                       label:       <input type="text"> で編集
+                       description: <textarea> で編集
+                       確定タイミング: blur（フォーカスが外れた瞬間）
+                       確定動作: store.updateNodeData() で該当ノードの data を部分更新
+                       フォームの初期値: selectedNodeId が変わるたびに store の値で reset
+                       label の空文字: Zod バリデーション（min(1)）でエラー表示、commit しない
+
+                 [CTX-4][Note] 同期競合:
+                       NodeProperty 編集中に inline 編集を開いた場合も後勝ちで commit される。
+                       NodeProperty の blur は ダブルクリック前に走るため自然に排他となる。
+                       仕様として許容する。
             ============================================================ -->
             <aside id="ctx-node-property">
                 <div class="pane-header">
                     <span class="pane-title">Properties</span>
                 </div>
 
-                <!-- ノード選択中の表示 -->
+                <!-- ノード選択中: 編集フォーム [CTX-4 変更] -->
                 <div class="property-body">
                     <div class="property-field">
                         <span class="property-label">name</span>
-                        <div class="property-value">ProjectGrid.tsx</div>
+                        <input class="property-input" type="text" value="ProjectGrid.tsx" />
+                        <!-- バリデーションエラー（label が空のとき表示） -->
+                        <!-- <span class="property-error">name は必須です</span> -->
                     </div>
                     <div class="property-field">
                         <span class="property-label">description</span>
-                        <div class="property-textarea">カードグリッド表示。global-store の projects[] を一覧表示し、新規作成のエントリーポイントを提供する。
-                        </div>
+                        <textarea class="property-textarea">カードグリッド表示。projects[] を一覧表示する。</textarea>
                     </div>
                 </div>
 
                 <!-- 空状態（selectedNodeId が null のとき）: 何も表示しない -->
 
                 <!--
-                    [✓][Feature] Property Display — 選択中ノードの name・description を表示する
-                    [✓][Feature] Empty State      — selectedNodeId が null のとき何も表示しない（空白）
-                    [✓][Logic]   Sync             — selectedNodeId の変化を購読し、対応するノードのデータを表示する
+                    [✓][Feature] Property Display  — 選択中ノードの name・description を表示する
+                    [✓][Feature] Empty State       — selectedNodeId が null のとき何も表示しない
+
+                    [CTX-4][Feature] Label Edit    — name フィールドを <input> で編集できる
+                    [CTX-4][Feature] Desc Edit     — description フィールドを <textarea> で編集できる
+                    [CTX-4][Logic]   Blur Commit   — blur で store.updateNodeData() に commit する
+                    [CTX-4][Logic]   Form Reset    — selectedNodeId 変化時にフォームを store の値で reset する
+                    [CTX-4][Logic]   Validation    — label が空のとき commit せずエラーを表示する（Zod min(1)）
+                    [CTX-4][Logic]   onUpdateNode  — 確定時に呼ぶコールバック prop（props DI）
+                                                    省略時は store.updateNodeData() に直接 commit する
                 -->
             </aside>
 

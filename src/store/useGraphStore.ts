@@ -21,4 +21,14 @@ export const useGraphStore = create<GraphStore>((set) => ({
             selectedNodeId: null,
         }),
     resetGraph: () => set({ nodes: [], edges: [], selectedNodeId: null }),
+
+    // [CTX-4] 指定 id のノードの data を部分更新する。
+    // Partial<GraphNodeData> のスプレッドマージのため、
+    // label のみ更新しても description は保持される。
+    updateNodeData: (id, data) =>
+        set((state) => ({
+            nodes: state.nodes.map((n) =>
+                n.id === id ? { ...n, data: { ...n.data, ...data } } : n
+            ),
+        })),
 }))
