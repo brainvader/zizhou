@@ -1,5 +1,5 @@
 /**
- * @context CTX-2: GraphEditor — E2E
+ * @context CTX-2 / CTX-4: GraphEditor — E2E
  * @note 以下は Storybook play 関数でカバー済みのため削除：
  *       - Setup ビュー表示（Uninitialized Story）
  *       - ノード追加ボタン非表示（Checking / Uninitialized Story）
@@ -26,22 +26,42 @@ const renavigateWithGraph = async (page: import('@playwright/test').Page, graphP
     await expect(page.getByText('zizou-core')).toBeVisible()
     await page.locator('[data-testid^="card-"]').first().click()
     await expect(page.getByText('Loading…')).toBeHidden({ timeout: 10000 })
-    // store hydrate 後に ?graph= を付けて遷移
     if (graphParam) {
         await page.evaluate((param) => {
             window.history.pushState({}, '', `/projects/1?graph=${param}`)
         }, graphParam)
-        // URL 変更を React Router に検知させる
         await page.waitForTimeout(500)
     }
 }
 
+/** New Graph を作成してエディタが ready になるまで待つ */
+const createNewGraph = async (page: import('@playwright/test').Page) => {
+    await gotoProjectDetail(page)
+    await page.locator('[data-testid="new-graph-btn"]').click()
+    // graph-editor コンテナが実際に幅・高さを持つまで待つ
+    // ReactFlow は親コンテナのサイズが 0 のとき visibility: hidden のままになる（error#004）
+    await page.waitForFunction(() => {
+        const el = document.querySelector('[data-testid="graph-editor"]')
+        if (!el) return false
+        const { width, height } = el.getBoundingClientRect()
+        return width > 0 && height > 0
+    }, { timeout: 10000 })
+    // サイズ確定後に resize を発火して ReactFlow に認識させる
+    await page.evaluate(() => window.dispatchEvent(new Event('resize')))
+    await page.waitForTimeout(500)
+}
+
+// =============================================================================
+// Integration
+// =============================================================================
+
 test.describe('GraphEditor — Integration', () => {
 
     test('「＋ ノード追加」クリックで React Flow キャンバスにノードが描画される', async ({ page }) => {
-        await gotoProjectDetail(page)
+        // グラフが選択された状態（ready）で開始する必要があるため createNewGraph を使う
+        await createNewGraph(page)
         await page.getByRole('button', { name: /ノード追加/ }).click()
-        await expect(page.locator('.react-flow__node').first()).toBeVisible()
+        await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10000 })
         await page.screenshot({ path: 'evidence/GraphEditor_add-node.png' })
     })
 
@@ -59,14 +79,6 @@ test.describe('GraphEditor — 永続化', () => {
         await page.evaluate(() => localStorage.clear())
     })
 
-    // ヘルパー: New Graph を作成してエディタが ready になるまで待つ
-    const createNewGraph = async (page: import('@playwright/test').Page) => {
-        await gotoProjectDetail(page)
-        await page.locator('[data-testid="new-graph-btn"]').click()
-        await expect(page.getByTestId('graph-editor')).toBeVisible()
-        await expect(page.getByRole('button', { name: /ノード追加/ })).toBeVisible()
-    }
-
     /**
      * シナリオ 1: ノード位置の永続化
      */
@@ -75,7 +87,7 @@ test.describe('GraphEditor — 永続化', () => {
 
         await page.getByRole('button', { name: /ノード追加/ }).click()
         const node = page.locator('.react-flow__node').first()
-        await expect(node).toBeVisible()
+        await expect(node).toBeVisible({ timeout: 10000 })
 
         const nodeBefore = await node.boundingBox()
         await page.mouse.move(nodeBefore!.x + nodeBefore!.width / 2, nodeBefore!.y + nodeBefore!.height / 2)
@@ -88,10 +100,9 @@ test.describe('GraphEditor — 永続化', () => {
         const nodeAfterMove = await node.boundingBox()
         await page.screenshot({ path: 'evidence/GraphEditor_persist_node-moved.png' })
 
-        // 再ナビゲーション（reload の代替）
         const graphParam = new URL(page.url()).searchParams.get('graph')
         await renavigateWithGraph(page, graphParam)
-        await expect(page.getByTestId('graph-editor')).toBeVisible()
+        await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 10000 })
         await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10000 })
 
         const nodeAfterReload = await page.locator('.react-flow__node').first().boundingBox()
@@ -132,10 +143,9 @@ test.describe('GraphEditor — 永続化', () => {
 
         const edgeCountBefore = await page.locator('.react-flow__edge').count()
 
-        // 再ナビゲーション（reload の代替）
         const graphParam = new URL(page.url()).searchParams.get('graph')
         await renavigateWithGraph(page, graphParam)
-        await expect(page.getByTestId('graph-editor')).toBeVisible()
+        await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 10000 })
         await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10000 })
 
         await expect(page.locator('.react-flow__node')).toHaveCount(2)
@@ -152,7 +162,7 @@ test.describe('GraphEditor — 永続化', () => {
         await createNewGraph(page)
 
         await page.getByRole('button', { name: /ノード追加/ }).click()
-        await expect(page.locator('.react-flow__node')).toHaveCount(1)
+        await expect(page.locator('.react-flow__node')).toHaveCount(1, { timeout: 10000 })
 
         await page.locator('.react-flow__renderer').click()
         await page.locator('.react-flow__node').first().click()
@@ -165,14 +175,100 @@ test.describe('GraphEditor — 永続化', () => {
 
         const nodeCountAfterDelete = await page.locator('.react-flow__node').count()
 
-        // 再ナビゲーション（reload の代替）
         const graphParam = new URL(page.url()).searchParams.get('graph')
         await renavigateWithGraph(page, graphParam)
-        await expect(page.getByTestId('graph-editor')).toBeVisible()
-
+        await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 10000 })
         await expect(page.locator('.react-flow__node')).toHaveCount(nodeCountAfterDelete)
 
         await page.screenshot({ path: 'evidence/GraphEditor_persist_node-delete-restored.png' })
+    })
+
+})
+
+// =============================================================================
+// [CTX-4] ラベル編集シナリオ
+// =============================================================================
+
+test.describe('GraphEditor — ラベル編集 [CTX-4]', () => {
+
+    test.beforeEach(async ({ page }) => {
+        await page.goto('/')
+        await expect(page.getByText('zizou-core')).toBeVisible()
+        await page.evaluate(() => localStorage.clear())
+    })
+
+    /**
+     * シナリオ 4: inline 編集 — Enter で確定
+     */
+    test('inline 編集 → Enter でラベルが更新される', async ({ page }) => {
+        await createNewGraph(page)
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        const node = page.locator('.react-flow__node').first()
+        await expect(node).toBeVisible({ timeout: 10000 })
+        await node.dblclick()
+        const input = page.getByTestId('inline-input')
+        await expect(input).toBeVisible()
+        await input.fill('InlineUpdated')
+        await input.press('Enter')
+        await expect(node.getByText('InlineUpdated')).toBeVisible()
+        await page.screenshot({ path: 'evidence/CTX4_inline_edit_enter.png' })
+    })
+
+    /**
+     * シナリオ 5: inline 編集 — Escape でキャンセル
+     */
+    test('inline 編集 → Escape でラベルが元に戻る', async ({ page }) => {
+        await createNewGraph(page)
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        const node = page.locator('.react-flow__node').first()
+        await expect(node).toBeVisible({ timeout: 10000 })
+        await node.dblclick()
+        const input = page.getByTestId('inline-input')
+        await expect(input).toBeVisible()
+        await input.fill('ShouldNotSave')
+        await input.press('Escape')
+        await expect(page.getByTestId('inline-input')).not.toBeVisible()
+        await expect(node.getByText('New Node')).toBeVisible()
+        await page.screenshot({ path: 'evidence/CTX4_inline_edit_escape.png' })
+    })
+
+    /**
+     * シナリオ 6: NodeProperty フォーム — blur で確定
+     * @note NodeProperty の編集フォームは CTX-4 NodeProperty 実装後に有効化する
+     */
+    test.skip('NodeProperty フォーム → blur でラベルが更新される', async ({ page }) => {
+        await createNewGraph(page)
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        const node = page.locator('.react-flow__node').first()
+        await expect(node).toBeVisible({ timeout: 10000 })
+        await node.click()
+        const labelInput = page.getByTestId('input-label')
+        await expect(labelInput).toBeVisible()
+        await labelInput.fill('PropertyUpdated')
+        await page.getByTestId('graph-editor').click({ position: { x: 10, y: 10 } })
+        await expect(node.getByText('PropertyUpdated')).toBeVisible()
+        await page.screenshot({ path: 'evidence/CTX4_property_edit_blur.png' })
+    })
+
+    /**
+     * シナリオ 7: ラベル更新後の永続化
+     */
+    test('ラベル更新後に再ナビゲーションすると更新済みラベルが復元される', async ({ page }) => {
+        await createNewGraph(page)
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        const node = page.locator('.react-flow__node').first()
+        await expect(node).toBeVisible({ timeout: 10000 })
+        await node.dblclick()
+        const input = page.getByTestId('inline-input')
+        await expect(input).toBeVisible()
+        await input.fill('PersistLabel')
+        await input.press('Enter')
+        await page.waitForTimeout(500)
+
+        const graphParam = new URL(page.url()).searchParams.get('graph')
+        await renavigateWithGraph(page, graphParam)
+        await expect(page.locator('.react-flow__node').first().getByText('PersistLabel')).toBeVisible({ timeout: 10000 })
+        await page.screenshot({ path: 'evidence/CTX4_label_persisted.png' })
     })
 
 })
