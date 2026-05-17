@@ -123,16 +123,22 @@ export function GraphEditor({
         const node: Node<GraphNodeData> = {
             id: nanoid(),
             type: 'editableNode',
-            position: { x: 100, y: 100 },
+            position: {
+                x: 100 + Math.random() * 200,
+                y: 100 + Math.random() * 200,
+            },
             data: { label: 'New Node' },
         }
         addNode(node)
     }, [addNode])
 
     // --- Select Node (single click) ---
-    const handleNodeClick: NodeMouseHandler = useCallback((_event, node) => {
-        setSelectedNodeId(node.id)
-    }, [setSelectedNodeId])
+    const handleNodeClick = useCallback(
+        (_: React.MouseEvent, node: Node) => {
+            setSelectedNodeIds([node.id])
+        },
+        [setSelectedNodeIds]
+    )
 
     // --- [CTX-5] Selection Change (multi select) ---
     // onSelectionChange は単一選択・複数選択・選択解除すべてで発火する。
@@ -197,6 +203,7 @@ export function GraphEditor({
                         onSelectionChange={handleSelectionChange}
                         nodeTypes={NODE_TYPES}
                         deleteKeyCode="Delete"
+                        multiSelectionKeyCode="Shift"
                     >
                         <Background />
                         <Controls />

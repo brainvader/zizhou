@@ -99,7 +99,6 @@ export const ProjectDetailRoute = () => {
                     maxSize={NODE_PROPERTY_PANEL.maxSize}
                 >
                     <aside
-                        data-testid="node-property"
                         style={{
                             height: '100%',
                             borderLeft: '1px solid var(--border)',
