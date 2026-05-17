@@ -130,8 +130,8 @@ export function GraphEditor({
             id: nanoid(),
             type: 'editableNode',
             position: {
-                x: 100 + Math.random() * 200,
-                y: 100 + Math.random() * 200,
+                x: 80 + Math.random() * 400,
+                y: 80 + Math.random() * 300,
             },
             data: { label: 'New Node' },
         }
