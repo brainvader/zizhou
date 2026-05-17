@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import {
     ReactFlow,
     Background,
@@ -13,11 +13,12 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { nanoid } from 'nanoid'
-import { exists, mkdir, readTextFile } from '@tauri-apps/plugin-fs'
+import { exists, readTextFile } from '@tauri-apps/plugin-fs'
 import { useGraphStore } from '@/store/useGraphStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import { useGraphFile } from '@/hooks/useGraphFile'
 import { useGraphInit } from '@/hooks/useGraphInit'
+import { EditableNode } from '@/components/nodes/EditableNode'
 import type { GraphNodeData, GraphFile, InitStatus } from '@/bom/graph'
 
 // ============================================================
@@ -25,7 +26,6 @@ import type { GraphNodeData, GraphFile, InitStatus } from '@/bom/graph'
 // ============================================================
 
 type ExistsFn = (path: string) => Promise<boolean>
-type MkdirFn = (path: string, options?: { recursive: boolean }) => Promise<void>
 type ReadTextFileFn = (path: string) => Promise<string>
 
 export type GraphEditorProps = {
@@ -47,18 +47,19 @@ export type GraphEditorProps = {
 /**
  * GraphEditor
  *
- * 責務: ノードの手動配置・接続・選択を管理するグラフエディタ。
+ * 責務: ノードの手動配置・接続・選択・インライン編集を管理するグラフエディタ。
  *
- * - initStatus: 'checking'      → ローディングスピナーを表示
- * - initStatus: 'uninitialized' → Setup ビューを表示（「初期化」ボタン）
- * - initStatus: 'ready'         → React Flow エディタを表示
+ * - initStatus: 'checking' → ローディングスピナーを表示
+ * - initStatus: 'ready'    → React Flow エディタを表示
  *
  * 初期化・ロードロジックは useGraphInit に委譲する。
+ * インライン編集は EditableNode カスタムノードに委譲する。
  *
  * props DI: Tauri fs 依存・store 依存を props で受け取る。
  * 省略時は Tauri 実装・Zustand store にフォールバックする。
  *
  * @see docs/bom/graph.ts
+ * @see src/components/nodes/EditableNode.tsx
  * @see src/hooks/useGraphInit.ts
  * @see src/hooks/useGraphFile.ts
  */
@@ -77,7 +78,7 @@ export function GraphEditor({
     onReadTextFile = readTextFile,
     setHydrated: setHydratedProp,
 }: GraphEditorProps = {}) {
-    // --- store フォールバック (描画用) ---
+    // --- store フォールバック ---
     const storeNodes = useGraphStore((s) => s.nodes)
     const storeEdges = useGraphStore((s) => s.edges)
     const storeAddNode = useGraphStore((s) => s.addNode)
@@ -88,9 +89,6 @@ export function GraphEditor({
     const storeSetNodes = useGraphStore((s) => s.setNodes)
     const storeSetEdges = useGraphStore((s) => s.setEdges)
 
-    // props で渡された nodes/edges はマウント時に store に注入する。
-    // 以降は常に storeNodes/storeEdges を参照することで、
-    // onNodesChange/onEdgesChange による store 更新が正しく反映される。
     useEffect(() => {
         if (nodesProp !== undefined) storeSetNodes(nodesProp)
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -104,6 +102,11 @@ export function GraphEditor({
     const edges = storeEdges
     const addNode = onAddNode ?? storeAddNode
     const setSelectedNodeId = onSetSelectedNodeId ?? storeSetSelectedNodeId
+
+    // --- [CTX-4] nodeTypes: EditableNode を登録する ---
+    // コンポーネント外で定義すると re-render のたびに新しい参照が生まれ
+    // React Flow が無限ループに入るため useMemo で固定する
+    const nodeTypes = useMemo(() => ({ editableNode: EditableNode }), [])
 
     // --- 初期化・ロードロジックを useGraphInit に委譲 ---
     useGraphInit({
@@ -122,6 +125,7 @@ export function GraphEditor({
     const handleAddNode = useCallback(() => {
         const node: Node<GraphNodeData> = {
             id: nanoid(),
+            type: 'editableNode', // [CTX-4] EditableNode を使用する
             position: { x: 100, y: 100 },
             data: { label: 'New Node' },
         }
@@ -145,7 +149,7 @@ export function GraphEditor({
     return (
         <div
             data-testid="graph-editor"
-            style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}
+            style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
         >
             {initStatus === 'ready' && (
                 <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10 }}>
@@ -174,6 +178,7 @@ export function GraphEditor({
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
                         onNodeClick={handleNodeClick}
+                        nodeTypes={nodeTypes}
                         deleteKeyCode="Delete"
                     >
                         <Background />
