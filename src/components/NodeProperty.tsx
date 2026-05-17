@@ -75,27 +75,42 @@ export const NodeProperty = ({
     }
 
     return (
-        <div data-testid="node-property">
-            <div>
-                <label>name</label>
+        <div data-testid="node-property" className="flex flex-col gap-3 p-3">
+            {/* name フィールド */}
+            <div className="flex flex-col gap-1">
+                <label className="font-mono text-[9px] text-[--muted-foreground] tracking-[0.15em] uppercase">
+                    name
+                </label>
                 <input
                     data-testid="input-label"
                     type="text"
                     value={labelDraft}
                     onChange={(e) => setLabelDraft(e.target.value)}
                     onBlur={handleLabelBlur}
+                    className="text-xs text-[--foreground] bg-[--muted] border border-[--border] rounded-[--radius] px-2 py-1.5 font-sans w-full outline-none focus:border-[--primary] focus:shadow-[0_0_0_2px_var(--primary-glow)]"
                 />
                 {labelError && (
-                    <span data-testid="error-label">name は必須です</span>
+                    <span
+                        data-testid="error-label"
+                        className="text-[10px] text-[--primary] font-mono"
+                    >
+                        name は必須です
+                    </span>
                 )}
             </div>
-            <div>
-                <label>description</label>
+
+            {/* description フィールド */}
+            <div className="flex flex-col gap-1">
+                <label className="font-mono text-[9px] text-[--muted-foreground] tracking-[0.15em] uppercase">
+                    description
+                </label>
                 <textarea
                     data-testid="input-description"
                     value={descriptionDraft}
                     onChange={(e) => setDescriptionDraft(e.target.value)}
                     onBlur={handleDescriptionBlur}
+                    rows={4}
+                    className="text-xs text-[--foreground] bg-[--muted] border border-[--border] rounded-[--radius] px-2 py-1.5 font-sans w-full outline-none focus:border-[--primary] focus:shadow-[0_0_0_2px_var(--primary-glow)] resize-none"
                 />
             </div>
         </div>
