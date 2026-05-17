@@ -1,4 +1,22 @@
-import { useState, useRef, useCallback } from 'react'
+/**
+ * EditableNode
+ *
+ * [CTX-5] Selection Highlight:
+ *   selected prop（ReactFlow が自動で渡す）に応じてスタイルを切り替える。
+ *
+ * [CTX-7] isEditing 外部制御:
+ *   isEditing は GraphEditor の editingNodeId (useState) から prop で受け取る。
+ *   - ダブルクリック → onStartEditing() を呼ぶ（GraphEditor が editingNodeId をセット）
+ *   - commit (Enter/blur) → updateNodeData() + onStopEditing() を呼ぶ
+ *   - cancel (Escape) → onStopEditing() を呼ぶ（store 更新なし）
+ *
+ * @context CTX-4/5/7
+ * @see docs/bom/graph.ts (GraphNodeData)
+ * @see docs/specs/EditableNode.spec.tsx
+ * @see src/stories/EditableNode.stories.tsx
+ */
+
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react'
 import { useGraphStore } from '@/store/useGraphStore'
 import type { GraphNodeData } from '@/bom/graph'
@@ -6,51 +24,60 @@ import type { GraphNodeData } from '@/bom/graph'
 export type EditableNodeType = Node<GraphNodeData, 'editableNode'>
 
 export type EditableNodeProps = NodeProps<EditableNodeType> & {
+    /** props DI: 省略時は store.updateNodeData() を使用する */
     onUpdateNode?: (id: string, data: Partial<GraphNodeData>) => void
+    /** [CTX-7] GraphEditor の editingNodeId から渡される。true のとき inline input を表示する */
+    isEditing?: boolean
+    /** [CTX-7] ダブルクリック時に GraphEditor へ通知する */
+    onStartEditing?: () => void
+    /** [CTX-7] commit / cancel 完了時に GraphEditor へ通知する */
+    onStopEditing?: () => void
 }
 
-/**
- * EditableNode
- *
- * [CTX-5] Selection Highlight:
- *   selected prop（ReactFlow が自動で渡す）に応じてスタイルを切り替える。
- *   - 単一選択: vermillion border + glow
- *   - 複数選択: ReactFlow の標準 selected クラスが付与されるため追加スタイル不要だが、
- *               同じスタイルを適用して一貫性を保つ
- *
- * @see docs/bom/graph.ts (GraphNodeData)
- */
-export function EditableNode({ id, data, selected, onUpdateNode }: EditableNodeProps) {
+export function EditableNode({
+    id,
+    data,
+    selected,
+    onUpdateNode,
+    isEditing = false,
+    onStartEditing,
+    onStopEditing,
+}: EditableNodeProps) {
     const storeUpdateNodeData = useGraphStore((s) => s.updateNodeData)
     const updateNodeData = onUpdateNode ?? ((nodeId, nodeData) => storeUpdateNodeData(nodeId, nodeData))
 
-    const [isEditing, setIsEditing] = useState(false)
     const [draft, setDraft] = useState(data.label)
     const cancelledRef = useRef(false)
 
-    const startEditing = useCallback(() => {
-        setDraft(data.label)
-        cancelledRef.current = false
-        setIsEditing(true)
-    }, [data.label])
+    // isEditing が true になったとき draft を現在の label で初期化する
+    useEffect(() => {
+        if (isEditing) {
+            setDraft(data.label)
+            cancelledRef.current = false
+        }
+    }, [isEditing, data.label])
 
     const commit = useCallback(() => {
         if (cancelledRef.current) return
         if (draft.trim()) {
             updateNodeData(id, { label: draft.trim() })
         }
-        setIsEditing(false)
-    }, [draft, id, updateNodeData])
+        onStopEditing?.()
+    }, [draft, id, updateNodeData, onStopEditing])
 
     const cancel = useCallback(() => {
         cancelledRef.current = true
-        setIsEditing(false)
-    }, [])
+        onStopEditing?.()
+    }, [onStopEditing])
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') { e.preventDefault(); commit() }
         if (e.key === 'Escape') { cancel() }
     }, [commit, cancel])
+
+    const handleDoubleClick = useCallback(() => {
+        onStartEditing?.()
+    }, [onStartEditing])
 
     // [CTX-5] selected に応じてボーダー・グローを切り替える
     const selectedStyle = selected
@@ -61,7 +88,7 @@ export function EditableNode({ id, data, selected, onUpdateNode }: EditableNodeP
         <div
             data-testid={`editable-node-${id}`}
             className={`bg-[--card] border rounded-[--radius] px-3 py-2 min-w-35 cursor-grab ${selectedStyle}`}
-            onDoubleClick={startEditing}
+            onDoubleClick={handleDoubleClick}
         >
             <Handle type="target" position={Position.Left} />
 

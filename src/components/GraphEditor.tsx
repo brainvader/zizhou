@@ -1,4 +1,35 @@
-import { useCallback, useEffect } from 'react'
+/**
+ * GraphEditor
+ *
+ * 責務: ノードの手動配置・接続・選択・インライン編集を管理するグラフエディタ。
+ *
+ * - initStatus: 'checking' → ローディングスピナーを表示
+ * - initStatus: 'ready'    → React Flow エディタを表示
+ *
+ * [CTX-5] 複数選択:
+ * - onSelectionChange で selectedNodeIds[] を store に反映する
+ * - Single Guard は store.setSelectedNodeIds() 内に実装済み
+ *
+ * [CTX-6] Edge Connect:
+ * - onConnect で addEdge() を呼び store に反映する
+ *
+ * [CTX-7] Context Menu:
+ * - contextMenu: { type, id, x, y } | null を useState で管理する（ローカル状態）
+ * - onNodeContextMenu / onEdgeContextMenu でセットする
+ * - onPaneClick で null にクリアする
+ * - editingNodeId を useState で管理する（ローカル状態。Zustand には持たない）
+ * - NODE_TYPES を useMemo 化し editingNodeId を EditableNode に prop で注入する
+ * - Delete Node/Edge は onNodesChange/onEdgesChange(remove) 経由で処理する（ReactFlow の想定フロー）
+ *
+ * @context CTX-2/5/6/7
+ * @see docs/bom/graph.ts
+ * @see src/components/nodes/EditableNode.tsx
+ * @see src/components/ContextMenu.tsx
+ * @see src/hooks/useGraphInit.ts
+ * @see src/hooks/useGraphFile.ts
+ */
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
     ReactFlow,
     Background,
@@ -11,6 +42,8 @@ import {
     type NodeChange,
     type EdgeChange,
     type OnSelectionChangeParams,
+    type NodeMouseHandler,
+    type EdgeMouseHandler,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { nanoid } from 'nanoid'
@@ -20,12 +53,19 @@ import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import { useGraphFile } from '@/hooks/useGraphFile'
 import { useGraphInit } from '@/hooks/useGraphInit'
 import { EditableNode } from '@/components/nodes/EditableNode'
+import { ContextMenu } from '@/components/ContextMenu'
 import type { GraphNodeData, GraphFile, InitStatus } from '@/bom/graph'
-
-const NODE_TYPES = { editableNode: EditableNode }
 
 type ExistsFn = (path: string) => Promise<boolean>
 type ReadTextFileFn = (path: string) => Promise<string>
+
+// [CTX-7] コンテキストメニューのローカル状態型
+type ContextMenuState = {
+    type: 'node' | 'edge'
+    id: string
+    x: number
+    y: number
+} | null
 
 export type GraphEditorProps = {
     initStatus?: InitStatus
@@ -47,28 +87,6 @@ export type GraphEditorProps = {
     setHydrated?: (hydrated: boolean) => void
 }
 
-/**
- * GraphEditor
- *
- * 責務: ノードの手動配置・接続・選択・インライン編集を管理するグラフエディタ。
- *
- * - initStatus: 'checking' → ローディングスピナーを表示
- * - initStatus: 'ready'    → React Flow エディタを表示
- *
- * [CTX-5] 複数選択:
- * - onSelectionChange で selectedNodeIds[] を store に反映する
- * - Single Guard は store.setSelectedNodeIds() 内に実装済み
- * - 複数選択中の移動・削除は ReactFlow 標準動作に委ねる
- *
- * [CTX-6] Edge Connect:
- * - onConnect で addEdge() を呼び store に反映する
- * - Edge Delete は ReactFlow の deleteKeyCode="Delete" 標準動作 + onEdgesChange(remove) で処理済み
- *
- * @see docs/bom/graph.ts
- * @see src/components/nodes/EditableNode.tsx
- * @see src/hooks/useGraphInit.ts
- * @see src/hooks/useGraphFile.ts
- */
 export function GraphEditor({
     initStatus: initStatusProp,
     projectRootPath: projectRootPathProp,
@@ -124,6 +142,22 @@ export function GraphEditor({
         setHydrated: setHydratedProp ?? storeSetHydrated,
     })
 
+    // --- [CTX-7] ローカル状態 ---
+    const [contextMenu, setContextMenu] = useState<ContextMenuState>(null)
+    const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
+
+    // --- [CTX-7] NODE_TYPES: editingNodeId を EditableNode に注入するため useMemo 化 ---
+    const nodeTypes = useMemo(() => ({
+        editableNode: (props: React.ComponentProps<typeof EditableNode>) => (
+            <EditableNode
+                {...props}
+                isEditing={editingNodeId === props.id}
+                onStartEditing={() => setEditingNodeId(props.id)}
+                onStopEditing={() => setEditingNodeId(null)}
+            />
+        ),
+    }), [editingNodeId])
+
     // --- Add Node ---
     const handleAddNode = useCallback(() => {
         const node: Node<GraphNodeData> = {
@@ -147,8 +181,6 @@ export function GraphEditor({
     )
 
     // --- [CTX-5] Selection Change (multi select) ---
-    // onSelectionChange は単一選択・複数選択・選択解除すべてで発火する。
-    // Single Guard は setSelectedNodeIds 内に実装済み。
     const handleSelectionChange = useCallback(
         ({ nodes: selectedNodes }: OnSelectionChangeParams) => {
             const ids = selectedNodes.map((n) => n.id)
@@ -173,6 +205,38 @@ export function GraphEditor({
     const onEdgesChange = useCallback((changes: EdgeChange[]) => {
         storeSetEdges(applyEdgeChanges(changes, edges))
     }, [edges, storeSetEdges])
+
+    // --- [CTX-7] Context Menu ハンドラ ---
+    const handleNodeContextMenu: NodeMouseHandler = useCallback((e, node) => {
+        e.preventDefault()
+        setContextMenu({ type: 'node', id: node.id, x: e.clientX, y: e.clientY })
+    }, [])
+
+    const handleEdgeContextMenu: EdgeMouseHandler = useCallback((e, edge) => {
+        e.preventDefault()
+        setContextMenu({ type: 'edge', id: edge.id, x: e.clientX, y: e.clientY })
+    }, [])
+
+    const handlePaneClick = useCallback(() => {
+        setContextMenu(null)
+    }, [])
+
+    // --- [CTX-7] メニューアクション ---
+    const handleDeleteFromMenu = useCallback(() => {
+        if (!contextMenu) return
+        if (contextMenu.type === 'node') {
+            onNodesChange([{ type: 'remove', id: contextMenu.id }])
+        } else {
+            onEdgesChange([{ type: 'remove', id: contextMenu.id }])
+        }
+        setContextMenu(null)
+    }, [contextMenu, onNodesChange, onEdgesChange])
+
+    const handleEditLabelFromMenu = useCallback(() => {
+        if (!contextMenu) return
+        setEditingNodeId(contextMenu.id)
+        setContextMenu(null)
+    }, [contextMenu])
 
     return (
         <div
@@ -216,13 +280,28 @@ export function GraphEditor({
                         onNodeClick={handleNodeClick}
                         onSelectionChange={handleSelectionChange}
                         onConnect={handleConnect}
-                        nodeTypes={NODE_TYPES}
+                        onNodeContextMenu={handleNodeContextMenu}
+                        onEdgeContextMenu={handleEdgeContextMenu}
+                        onPaneClick={handlePaneClick}
+                        nodeTypes={nodeTypes}
                         deleteKeyCode="Delete"
                         multiSelectionKeyCode="Shift"
                     >
                         <Background />
                         <Controls />
                     </ReactFlow>
+
+                    {/* [CTX-7] Context Menu */}
+                    {contextMenu && (
+                        <ContextMenu
+                            type={contextMenu.type}
+                            x={contextMenu.x}
+                            y={contextMenu.y}
+                            onDelete={handleDeleteFromMenu}
+                            onEditLabel={handleEditLabelFromMenu}
+                            onClose={() => setContextMenu(null)}
+                        />
+                    )}
                 </>
             )}
         </div>
