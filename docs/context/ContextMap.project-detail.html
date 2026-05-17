@@ -54,14 +54,14 @@
                 "nodes": [],
                 "edges": [],
                 "selectedNodeId": null,
+                "selectedNodeIds": [],
                 "editingNodeId": null
             }
         </script>
 
         <!-- ctx-node-property のローカル状態
-             [CTX-4] 読み取り専用 → 編集フォーム化に伴い form を追加。
-             - form: NodeProperty 内のフォームフィールド値（編集中の一時状態）
-             - 書き込み先は store.updateNodeData() で一本化。blur で commit。
+             form: NodeProperty 内のフォームフィールド値（編集中の一時状態）
+             書き込み先は store.updateNodeData() で一本化。blur で commit。
         -->
         <script data-context="ctx-node-property" class="local-state" type="application/json">
             {
@@ -395,6 +395,13 @@
                 opacity: 0.7;
             }
 
+            /* [CTX-5] 複数選択中ノード */
+            .mock-node.multi-selected {
+                border-color: var(--primary-soft);
+                box-shadow: 0 0 8px var(--primary-glow);
+                opacity: 0.85;
+            }
+
             /* [CTX-4] インライン編集中ノード */
             .mock-node.editing {
                 border-color: var(--primary);
@@ -468,6 +475,35 @@
                 letter-spacing: 0.12em;
             }
 
+            /* [CTX-7] コンテキストメニュー */
+            .context-menu {
+                position: absolute;
+                background: var(--card);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                padding: 4px 0;
+                min-width: 140px;
+                z-index: 100;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+            }
+
+            .context-menu-item {
+                padding: 6px 12px;
+                font-size: 12px;
+                font-family: var(--font-mono);
+                color: var(--muted-foreground);
+                cursor: pointer;
+            }
+
+            .context-menu-item:hover {
+                background: var(--muted);
+                color: var(--foreground);
+            }
+
+            .context-menu-item.danger:hover {
+                color: var(--primary);
+            }
+
             /* ── CTX-3: NODE PROPERTY ── */
             #ctx-node-property {
                 width: var(--pane-property-width);
@@ -517,7 +553,6 @@
                 text-transform: uppercase;
             }
 
-            /* [CTX-4] 編集可能フィールド */
             .property-input {
                 font-size: 12px;
                 color: var(--foreground);
@@ -554,7 +589,6 @@
                 box-shadow: 0 0 0 2px var(--primary-glow);
             }
 
-            /* [CTX-4] バリデーションエラー */
             .property-error {
                 font-size: 10px;
                 color: var(--primary);
@@ -659,7 +693,7 @@
             </nav>
 
             <!-- ============================================================
-                 CTX-2: GRAPH EDITOR [✓ + CTX-4]
+                 CTX-2: GRAPH EDITOR [✓]
                  責務: ノードの手動配置・接続・選択・インライン編集を管理するグラフエディタ
                  注意: React Flow を使用する
                        nodes[], edges[] は Zustand で管理する
@@ -685,7 +719,7 @@
                         <button class="btn-tool">＋ ノード追加</button>
                     </div>
 
-                    <!-- 通常ノード（選択済み） -->
+                    <!-- 通常ノード（単一選択済み） -->
                     <div class="mock-node selected" style="top:100px;left:120px;">
                         <div class="handle left"></div>
                         <div class="node-label">ProjectGrid.tsx</div>
@@ -693,55 +727,70 @@
                         <div class="handle right"></div>
                     </div>
 
-                    <!-- [CTX-4] インライン編集中ノード（ダブルクリック後） -->
-                    <div class="mock-node editing" style="top:240px;left:320px;">
+                    <!-- [CTX-5] 複数選択中ノード -->
+                    <div class="mock-node multi-selected" style="top:240px;left:320px;">
                         <div class="handle left"></div>
-                        <input class="node-inline-input" value="useProjectStore" />
+                        <div class="node-label">useProjectStore</div>
                         <div class="handle right"></div>
                     </div>
 
-                    <!-- エッジ（SVG） -->
+                    <!-- [CTX-6] エッジ（接続済み） -->
                     <svg class="graph-svg" style="position:absolute;inset:0;pointer-events:none;">
-                        <line x1="268" y1="130" x2="320" y2="270" stroke="#30343a" stroke-width="1.5" />
+                        <line x1="268" y1="130" x2="320" y2="270" stroke="#c0392b" stroke-width="1.5" opacity="0.4" />
                     </svg>
+
+                    <!-- [CTX-7] コンテキストメニュー（ノード右クリック後） -->
+                    <div class="context-menu" style="top:150px;left:280px;">
+                        <div class="context-menu-item">Edit Label</div>
+                        <div class="context-menu-item danger">Delete Node</div>
+                    </div>
                 </div>
 
                 <!--
                     [✓][Feature] Add Node          — 「＋ ノード追加」クリックでノードを追加する
                     [✓][Feature] Select Node       — ノードをクリックで選択 → selectedNodeId を更新
+                    [✓][Feature] Delete Node       — 選択中ノードを Delete キーで削除する
                     [✓][Logic]   onNodesChange     — remove / position 変更を store に反映する
                     [✓][Logic]   Persist           — nodes[], edges[] の変化を subscribe で自動保存する
+                    [✓][Feature] Inline Edit       — ノードのダブルクリックで label をインライン <input> に切り替える
+                    [✓][Logic]   Inline Commit     — Blur / Enter で store.updateNodeData() に label を commit する
+                    [✓][Logic]   Inline Cancel     — Escape でキャンセルし元の label に戻す
+                    [✓][Logic]   EditingNodeId     — editingNodeId を useState で管理（Zustand には持たない）
 
-                    [✓][Feature] Inline Edit   — ノードのダブルクリックで label をインライン <input> に切り替える
-                    [✓][Logic]   Inline Commit — Blur / Enter で store.updateNodeData() に label を commit する
-                    [✓][Logic]   Inline Cancel — Escape でキャンセルし元の label に戻す
-                    [✓][Logic]   EditingNodeId — editingNodeId を useState で管理（Zustand には持たない）
+                    [ ][Feature] Multi Select      — Shift+クリック / ドラッグで複数ノードを選択できる
+                    [ ][Feature] Multi Move        — 複数選択中のノードをまとめてドラッグ移動できる
+                    [ ][Feature] Multi Delete      — 複数選択中に Delete キーで一括削除できる
+                    [ ][Feature] Selection Highlight — 選択中ノードを視覚的に強調する（単一・複数共通）
+                    [ ][Logic]   selectedNodeIds   — ReactFlow の onSelectionChange で selectedNodeIds[] を更新する
+                    [ ][Logic]   Single Guard      — selectedNodeIds.length === 1 のときのみ selectedNodeId を更新する
+
+                    [ ][Feature] Edge Connect      — ノードのハンドルをドラッグして別ノードに繋ぐとエッジが作成される
+                    [ ][Feature] Edge Delete       — エッジを選択して Delete キーで削除できる
+                    [ ][Logic]   onConnect         — ReactFlow の onConnect で addEdge() を呼び store に反映する
+                    [ ][Logic]   onEdgesChange     — remove イベントを store に反映する
+                    [ ][Logic]   Edge Persist      — edges[] の変化を既存の subscribe で自動保存する（追加実装不要）
+
+                    [ ][Feature] Node Context Menu — ノード右クリックでコンテキストメニューを表示する
+                    [ ][Feature] Menu: Delete Node — メニューから選択中ノードを削除できる
+                    [ ][Feature] Menu: Edit Label  — メニューからインライン編集を起動できる
+                    [ ][Feature] Edge Context Menu — エッジ右クリックでコンテキストメニューを表示する
+                    [ ][Feature] Menu: Delete Edge — メニューからエッジを削除できる
+                    [ ][Logic]   Context Menu State — contextMenu: { type, id, x, y } | null を useState で管理する
+                    [ ][Logic]   Close on Pane Click — キャンバスクリックでメニューを閉じる
                 -->
             </main>
 
             <!-- ============================================================
-                 CTX-3: NODE PROPERTY [✓ + CTX-4]
+                 CTX-3: NODE PROPERTY [✓]
                  責務: 選択中ノードの label・description を編集するフォームを提供する
-
-                 [CTX-4] 読み取り専用 → 編集フォームに変更。
-                       label:       <input type="text"> で編集
-                       description: <textarea> で編集
-                       確定タイミング: blur（フォーカスが外れた瞬間）
-                       確定動作: store.updateNodeData() で該当ノードの data を部分更新
-                       フォームの初期値: selectedNodeId が変わるたびに store の値で reset
-                       label の空文字: Zod バリデーション（min(1)）でエラー表示、commit しない
-
-                 [CTX-4][Note] 同期競合:
-                       NodeProperty 編集中に inline 編集を開いた場合も後勝ちで commit される。
-                       NodeProperty の blur は ダブルクリック前に走るため自然に排他となる。
-                       仕様として許容する。
+                 注意: selectedNodeIds.length !== 1 のとき（未選択・複数選択）は非表示にする
             ============================================================ -->
             <aside id="ctx-node-property">
                 <div class="pane-header">
                     <span class="pane-title">Properties</span>
                 </div>
 
-                <!-- ノード選択中: 編集フォーム [CTX-4 変更] -->
+                <!-- ノード単一選択中: 編集フォーム -->
                 <div class="property-body">
                     <div class="property-field">
                         <span class="property-label">name</span>
@@ -755,19 +804,21 @@
                     </div>
                 </div>
 
-                <!-- 空状態（selectedNodeId が null のとき）: 何も表示しない -->
+                <!-- 空状態（未選択・複数選択）: 何も表示しない -->
 
                 <!--
                     [✓][Feature] Property Display  — 選択中ノードの name・description を表示する
                     [✓][Feature] Empty State       — selectedNodeId が null のとき何も表示しない
+                    [✓][Feature] Label Edit        — name フィールドを <input> で編集できる
+                    [✓][Feature] Desc Edit         — description フィールドを <textarea> で編集できる
+                    [✓][Logic]   Blur Commit       — blur で store.updateNodeData() に commit する
+                    [✓][Logic]   Form Reset        — selectedNodeId 変化時にフォームを store の値で reset する
+                    [✓][Logic]   Validation        — label が空のとき commit せずエラーを表示する（Zod min(1)）
+                    [✓][Logic]   onUpdateNode      — 確定時に呼ぶコールバック prop（props DI）
+                                                     省略時は store.updateNodeData() に直接 commit する
 
-                    [✓][Feature] Label Edit    — name フィールドを <input> で編集できる
-                    [✓][Feature] Desc Edit     — description フィールドを <textarea> で編集できる
-                    [✓][Logic]   Blur Commit   — blur で store.updateNodeData() に commit する
-                    [✓][Logic]   Form Reset    — selectedNodeId 変化時にフォームを store の値で reset する
-                    [✓][Logic]   Validation    — label が空のとき commit せずエラーを表示する（Zod min(1)）
-                    [✓][Logic]   onUpdateNode  — 確定時に呼ぶコールバック prop（props DI）
-                                                省略時は store.updateNodeData() に直接 commit する
+                    [ ][Feature] Hide on Multi Select — 複数ノード選択中は NodeProperty を非表示にする
+                    [ ][Logic]   Visibility Guard     — selectedNodeIds.length !== 1 のとき null を返す
                 -->
             </aside>
 
