@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect } from 'react'
 import {
     ReactFlow,
     Background,
@@ -20,6 +20,11 @@ import { useGraphFile } from '@/hooks/useGraphFile'
 import { useGraphInit } from '@/hooks/useGraphInit'
 import { EditableNode } from '@/components/nodes/EditableNode'
 import type { GraphNodeData, GraphFile, InitStatus } from '@/bom/graph'
+
+// nodeTypes: コンポーネント外で定義し参照を固定する。
+// コンポーネント内で定義すると re-render のたびに新しい参照が生まれ
+// ReactFlow が内部状態をリセットして visibility: hidden のままになる。
+const NODE_TYPES = { editableNode: EditableNode }
 
 // ============================================================
 // Types
@@ -103,10 +108,6 @@ export function GraphEditor({
     const addNode = onAddNode ?? storeAddNode
     const setSelectedNodeId = onSetSelectedNodeId ?? storeSetSelectedNodeId
 
-    // --- [CTX-4] nodeTypes: EditableNode を登録する ---
-    // コンポーネント外で定義すると re-render のたびに新しい参照が生まれ
-    // React Flow が無限ループに入るため useMemo で固定する
-    const nodeTypes = useMemo(() => ({ editableNode: EditableNode }), [])
 
     // --- 初期化・ロードロジックを useGraphInit に委譲 ---
     useGraphInit({
@@ -149,7 +150,7 @@ export function GraphEditor({
     return (
         <div
             data-testid="graph-editor"
-            style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
+            style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0, height: '100%' }}
         >
             {initStatus === 'ready' && (
                 <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10 }}>
@@ -178,7 +179,7 @@ export function GraphEditor({
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
                         onNodeClick={handleNodeClick}
-                        nodeTypes={nodeTypes}
+                        nodeTypes={NODE_TYPES}
                         deleteKeyCode="Delete"
                     >
                         <Background />
