@@ -35,11 +35,13 @@ type Story = StoryObj<typeof GraphEditor>
 const mockNodes: Node<GraphNodeData>[] = [
     {
         id: 'node-001',
+        type: 'editableNode',
         position: { x: 100, y: 100 },
         data: { label: 'ProjectGrid.tsx', description: 'カードグリッド表示' },
     },
     {
         id: 'node-002',
+        type: 'editableNode',
         position: { x: 350, y: 200 },
         data: { label: 'useProjectStore' },
     },
