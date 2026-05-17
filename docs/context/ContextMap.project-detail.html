@@ -694,6 +694,8 @@
 
             <!-- ============================================================
                  CTX-2: GRAPH EDITOR [✓]
+                 ※ [CTX-7] ContextMenu: contextMenu / editingNodeId を GraphEditor の useState で管理する
+                            EditableNode の isEditing は prop で外部制御する（GraphEditor → editingNodeId 経由）
                  責務: ノードの手動配置・接続・選択・インライン編集を管理するグラフエディタ
                  注意: React Flow を使用する
                        nodes[], edges[] は Zustand で管理する
@@ -770,13 +772,13 @@
                     [✓][Logic]   onEdgesChange     — remove イベントを store に反映する
                     [✓][Logic]   Edge Persist      — edges[] の変化を既存の subscribe で自動保存する（追加実装不要）
 
-                    [ ][Feature] Node Context Menu — ノード右クリックでコンテキストメニューを表示する
-                    [ ][Feature] Menu: Delete Node — メニューから選択中ノードを削除できる
-                    [ ][Feature] Menu: Edit Label  — メニューからインライン編集を起動できる
-                    [ ][Feature] Edge Context Menu — エッジ右クリックでコンテキストメニューを表示する
-                    [ ][Feature] Menu: Delete Edge — メニューからエッジを削除できる
-                    [ ][Logic]   Context Menu State — contextMenu: { type, id, x, y } | null を useState で管理する
-                    [ ][Logic]   Close on Pane Click — キャンバスクリックでメニューを閉じる
+                    [✓][Feature] Node Context Menu — ノード右クリックでコンテキストメニューを表示する
+                    [✓][Feature] Menu: Delete Node — メニューから選択中ノードを削除できる
+                    [✓][Feature] Menu: Edit Label  — メニューからインライン編集を起動できる
+                    [✓][Feature] Edge Context Menu — エッジ右クリックでコンテキストメニューを表示する
+                    [✓][Feature] Menu: Delete Edge — メニューからエッジを削除できる
+                    [✓][Logic]   Context Menu State — contextMenu: { type, id, x, y } | null を useState で管理する
+                    [✓][Logic]   Close on Pane Click — キャンバスクリックでメニューを閉じる
                 -->
             </main>
 
