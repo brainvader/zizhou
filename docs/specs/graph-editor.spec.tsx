@@ -1,5 +1,5 @@
 /**
- * @context CTX-2/5/6: GraphEditor — ロジック検証
+ * @context CTX-2/5/6/7: GraphEditor — ロジック検証
  * @bom docs/bom/graph.ts
  * @story
  * 1. onNodesChange に remove タイプの変更が渡されると store からノードが削除される
@@ -8,6 +8,12 @@
  * 4. [CTX-5] onSelectionChange で複数ノードが選択されると setSelectedNodeIds が呼ばれる
  * 5. [CTX-5] onSelectionChange で単一ノードが選択されると setSelectedNodeIds が呼ばれる
  * 6. [CTX-6] onConnect が呼ばれると addEdge が呼ばれる
+ * 7. [CTX-7] ノード右クリックで contextMenu state が node タイプでセットされる
+ * 8. [CTX-7] エッジ右クリックで contextMenu state が edge タイプでセットされる
+ * 9. [CTX-7] Delete Node が実行されると onNodesChange(remove) 経由で setNodes が呼ばれる
+ * 10. [CTX-7] Delete Edge が実行されると onEdgesChange(remove) 経由で setEdges が呼ばれる
+ * 11. [CTX-7] Edit Label が実行されると context-menu が閉じる
+ * 12. [CTX-7] pane クリックで contextMenu state が null になる
  * @output src/components/GraphEditor.tsx
  */
 
@@ -90,8 +96,17 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@xyflow/react')>()
     return {
         ...actual,
-        ReactFlow: ({ onNodesChange, onEdgesChange, onSelectionChange, onConnect }: any) => (
+        ReactFlow: ({
+            onNodesChange,
+            onEdgesChange,
+            onSelectionChange,
+            onConnect,
+            onNodeContextMenu,
+            onEdgeContextMenu,
+            onPaneClick,
+        }: any) => (
             <div data-testid="mock-react-flow">
+                {/* CTX-2: nodes/edges change */}
                 <button
                     data-testid="trigger-remove-node"
                     onClick={() => onNodesChange?.([{ type: 'remove', id: 'node-001' } as NodeChange])}
@@ -114,6 +129,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
                 >
                     move node
                 </button>
+                {/* CTX-5: selection */}
                 <button
                     data-testid="trigger-multi-select"
                     onClick={() => onSelectionChange?.({
@@ -135,6 +151,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
                 >
                     single select
                 </button>
+                {/* CTX-6: connect */}
                 <button
                     data-testid="trigger-connect"
                     onClick={() => onConnect?.({
@@ -145,6 +162,33 @@ vi.mock('@xyflow/react', async (importOriginal) => {
                     })}
                 >
                     connect
+                </button>
+                {/* CTX-7: context menu */}
+                <button
+                    data-testid="trigger-node-context-menu"
+                    onClick={(e) => onNodeContextMenu?.(e, {
+                        id: 'node-001',
+                        position: { x: 100, y: 100 },
+                        data: { label: 'Node A' },
+                    })}
+                >
+                    node context menu
+                </button>
+                <button
+                    data-testid="trigger-edge-context-menu"
+                    onClick={(e) => onEdgeContextMenu?.(e, {
+                        id: 'edge-001',
+                        source: 'node-001',
+                        target: 'node-002',
+                    })}
+                >
+                    edge context menu
+                </button>
+                <button
+                    data-testid="trigger-pane-click"
+                    onClick={(e) => onPaneClick?.(e)}
+                >
+                    pane click
                 </button>
             </div>
         ),
@@ -160,6 +204,8 @@ import { GraphEditor } from '@/components/GraphEditor'
 beforeEach(() => {
     vi.clearAllMocks()
 })
+
+// ─── CTX-2: onNodesChange / onEdgesChange ────────────────────────────────────
 
 describe('GraphEditor: onNodesChange / onEdgesChange', () => {
 
@@ -190,6 +236,8 @@ describe('GraphEditor: onNodesChange / onEdgesChange', () => {
 
 })
 
+// ─── CTX-5: onSelectionChange ─────────────────────────────────────────────────
+
 describe('GraphEditor: [CTX-5] onSelectionChange', () => {
 
     test('logic: 複数ノード選択時に setSelectedNodeIds が ids 配列で呼ばれる', async () => {
@@ -208,6 +256,8 @@ describe('GraphEditor: [CTX-5] onSelectionChange', () => {
 
 })
 
+// ─── CTX-6: onConnect ────────────────────────────────────────────────────────
+
 describe('GraphEditor: [CTX-6] onConnect', () => {
 
     test('logic: onConnect が呼ばれると addEdge が connection オブジェクトで呼ばれる', async () => {
@@ -220,6 +270,71 @@ describe('GraphEditor: [CTX-6] onConnect', () => {
             sourceHandle: null,
             targetHandle: null,
         })
+    })
+
+})
+
+// ─── CTX-7: Context Menu ─────────────────────────────────────────────────────
+
+describe('GraphEditor: [CTX-7] Context Menu', () => {
+
+    test('logic: ノード右クリックで context-menu が node タイプで表示される', async () => {
+        render(<GraphEditor initStatus="ready" />)
+        await act(async () => { screen.getByTestId('trigger-node-context-menu').click() })
+        expect(screen.getByTestId('context-menu')).toBeInTheDocument()
+        expect(screen.getByTestId('menu-item-edit-label')).toBeInTheDocument()
+        expect(screen.getByTestId('menu-item-delete')).toBeInTheDocument()
+    })
+
+    test('logic: エッジ右クリックで context-menu が edge タイプで表示される', async () => {
+        render(<GraphEditor initStatus="ready" />)
+        await act(async () => { screen.getByTestId('trigger-edge-context-menu').click() })
+        expect(screen.getByTestId('context-menu')).toBeInTheDocument()
+        expect(screen.queryByTestId('menu-item-edit-label')).not.toBeInTheDocument()
+        expect(screen.getByTestId('menu-item-delete')).toBeInTheDocument()
+    })
+
+    test('logic: pane クリックで context-menu が閉じる', async () => {
+        render(<GraphEditor initStatus="ready" />)
+        // まずメニューを開く
+        await act(async () => { screen.getByTestId('trigger-node-context-menu').click() })
+        expect(screen.getByTestId('context-menu')).toBeInTheDocument()
+        // pane クリックで閉じる
+        await act(async () => { screen.getByTestId('trigger-pane-click').click() })
+        expect(screen.queryByTestId('context-menu')).not.toBeInTheDocument()
+    })
+
+    test('logic: Delete Node が実行されると onNodesChange(remove) 経由で setNodes が呼ばれる', async () => {
+        render(<GraphEditor initStatus="ready" />)
+        // ノード右クリックでメニューを開く
+        await act(async () => { screen.getByTestId('trigger-node-context-menu').click() })
+        // Delete Node をクリック
+        await act(async () => { screen.getByTestId('menu-item-delete').click() })
+        expect(mockSetNodes).toHaveBeenCalledTimes(1)
+        const updatedNodes = mockSetNodes.mock.calls[0][0] as Node<GraphNodeData>[]
+        expect(updatedNodes.find((n) => n.id === 'node-001')).toBeUndefined()
+    })
+
+    test('logic: Delete Edge が実行されると onEdgesChange(remove) 経由で setEdges が呼ばれる', async () => {
+        render(<GraphEditor initStatus="ready" />)
+        // エッジ右クリックでメニューを開く
+        await act(async () => { screen.getByTestId('trigger-edge-context-menu').click() })
+        // Delete Edge をクリック
+        await act(async () => { screen.getByTestId('menu-item-delete').click() })
+        expect(mockSetEdges).toHaveBeenCalledTimes(1)
+        const updatedEdges = mockSetEdges.mock.calls[0][0] as Edge[]
+        expect(updatedEdges.find((e) => e.id === 'edge-001')).toBeUndefined()
+    })
+
+    test('logic: Edit Label が実行されると context-menu が閉じる', async () => {
+        render(<GraphEditor initStatus="ready" />)
+        // ノード右クリックでメニューを開く
+        await act(async () => { screen.getByTestId('trigger-node-context-menu').click() })
+        expect(screen.getByTestId('context-menu')).toBeInTheDocument()
+        // Edit Label をクリック
+        await act(async () => { screen.getByTestId('menu-item-edit-label').click() })
+        // メニューが閉じる（editingNodeId がセットされ contextMenu が null になった証拠）
+        expect(screen.queryByTestId('context-menu')).not.toBeInTheDocument()
     })
 
 })
