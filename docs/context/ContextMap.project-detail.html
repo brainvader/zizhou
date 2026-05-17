@@ -712,10 +712,10 @@
                     [✓][Logic]   onNodesChange     — remove / position 変更を store に反映する
                     [✓][Logic]   Persist           — nodes[], edges[] の変化を subscribe で自動保存する
 
-                    [CTX-4][Feature] Inline Edit   — ノードのダブルクリックで label をインライン <input> に切り替える
-                    [CTX-4][Logic]   Inline Commit — Blur / Enter で store.updateNodeData() に label を commit する
-                    [CTX-4][Logic]   Inline Cancel — Escape でキャンセルし元の label に戻す
-                    [CTX-4][Logic]   EditingNodeId — editingNodeId を useState で管理（Zustand には持たない）
+                    [✓][Feature] Inline Edit   — ノードのダブルクリックで label をインライン <input> に切り替える
+                    [✓][Logic]   Inline Commit — Blur / Enter で store.updateNodeData() に label を commit する
+                    [✓][Logic]   Inline Cancel — Escape でキャンセルし元の label に戻す
+                    [✓][Logic]   EditingNodeId — editingNodeId を useState で管理（Zustand には持たない）
                 -->
             </main>
 
@@ -761,13 +761,13 @@
                     [✓][Feature] Property Display  — 選択中ノードの name・description を表示する
                     [✓][Feature] Empty State       — selectedNodeId が null のとき何も表示しない
 
-                    [CTX-4][Feature] Label Edit    — name フィールドを <input> で編集できる
-                    [CTX-4][Feature] Desc Edit     — description フィールドを <textarea> で編集できる
-                    [CTX-4][Logic]   Blur Commit   — blur で store.updateNodeData() に commit する
-                    [CTX-4][Logic]   Form Reset    — selectedNodeId 変化時にフォームを store の値で reset する
-                    [CTX-4][Logic]   Validation    — label が空のとき commit せずエラーを表示する（Zod min(1)）
-                    [CTX-4][Logic]   onUpdateNode  — 確定時に呼ぶコールバック prop（props DI）
-                                                    省略時は store.updateNodeData() に直接 commit する
+                    [✓][Feature] Label Edit    — name フィールドを <input> で編集できる
+                    [✓][Feature] Desc Edit     — description フィールドを <textarea> で編集できる
+                    [✓][Logic]   Blur Commit   — blur で store.updateNodeData() に commit する
+                    [✓][Logic]   Form Reset    — selectedNodeId 変化時にフォームを store の値で reset する
+                    [✓][Logic]   Validation    — label が空のとき commit せずエラーを表示する（Zod min(1)）
+                    [✓][Logic]   onUpdateNode  — 確定時に呼ぶコールバック prop（props DI）
+                                                省略時は store.updateNodeData() に直接 commit する
                 -->
             </aside>
 
