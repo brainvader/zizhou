@@ -9,7 +9,6 @@ import {
     type Edge,
     type NodeChange,
     type EdgeChange,
-    type NodeMouseHandler,
     type OnSelectionChangeParams,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -103,7 +102,6 @@ export function GraphEditor({
     const nodes = storeNodes
     const edges = storeEdges
     const addNode = onAddNode ?? storeAddNode
-    const setSelectedNodeId = onSetSelectedNodeId ?? storeSetSelectedNodeId
     const setSelectedNodeIds = onSetSelectedNodeIds ?? storeSetSelectedNodeIds
 
     useGraphInit({
