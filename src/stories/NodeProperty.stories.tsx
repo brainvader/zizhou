@@ -1,14 +1,16 @@
 /**
- * @context NodeProperty
- * @bom docs/bom/graph.ts
+ * @context CTX-4: NodeProperty — フォーム編集
+ * @bom docs/bom/graph.ts (GraphNodeData, GraphStore.updateNodeData)
  * @story
- * 1. ノードが選択されている状態でパネルを開く
- * 2. 選択ノードの name・description が表示される
- * 3. description がないノードは name のみ表示される
- * 4. selectedNodeId が null のとき何も表示されない（空白）
+ * 1. ノード選択時: label・description が input/textarea に表示される
+ * 2. label を変更して blur → onUpdateNode が呼ばれる
+ * 3. label を空にして blur → commit されずエラーが表示される
+ * 4. description を変更して blur → onUpdateNode が呼ばれる
+ * 5. 未選択状態（Empty）: 何も表示されない
+ * 6. description なしのノード: description フィールドは空 textarea で表示される
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect } from 'storybook/test'
+import { expect, fn, userEvent } from 'storybook/test'
 import type { Node } from '@xyflow/react'
 import type { GraphNodeData } from '@/bom/graph'
 import { NodeProperty } from '@/components/NodeProperty'
@@ -34,38 +36,96 @@ const mockNodes: Node<GraphNodeData>[] = [
     },
 ]
 
-// @story 状態 4: 未選択（空白）
+// @story 状態 5: 未選択（空白）
 export const Empty: Story = {
     args: {
         selectedNodeId: null,
         nodes: mockNodes,
+        onUpdateNode: fn(),
     },
     play: async ({ canvas }) => {
-        await expect(canvas.queryByText('name')).not.toBeInTheDocument()
-        await expect(canvas.queryByText('description')).not.toBeInTheDocument()
+        await expect(canvas.queryByTestId('input-label')).not.toBeInTheDocument()
+        await expect(canvas.queryByTestId('input-description')).not.toBeInTheDocument()
     },
 }
 
-// @story 状態 3: ノード選択済み（description なし）
+// @story 状態 6: ノード選択済み（description なし）
 export const WithoutDescription: Story = {
     args: {
         selectedNodeId: 'node-002',
         nodes: mockNodes,
+        onUpdateNode: fn(),
     },
     play: async ({ canvas }) => {
-        await expect(canvas.getByText('useProjectStore')).toBeVisible()
-        await expect(canvas.queryByText('description')).not.toBeInTheDocument()
+        const input = canvas.getByTestId('input-label') as HTMLInputElement
+        await expect(input.value).toBe('useProjectStore')
+        const textarea = canvas.getByTestId('input-description') as HTMLTextAreaElement
+        await expect(textarea.value).toBe('')
     },
 }
 
-// @story 状態 1-2: ノード選択済み（description あり）
+// @story 状態 1: ノード選択済み（description あり）— 初期値確認
 export const WithDescription: Story = {
     args: {
         selectedNodeId: 'node-001',
         nodes: mockNodes,
+        onUpdateNode: fn(),
     },
     play: async ({ canvas }) => {
-        await expect(canvas.getByText('ProjectGrid.tsx')).toBeVisible()
-        await expect(canvas.getByText('カードグリッド表示。projects[] を一覧表示する。')).toBeVisible()
+        const input = canvas.getByTestId('input-label') as HTMLInputElement
+        await expect(input.value).toBe('ProjectGrid.tsx')
+        const textarea = canvas.getByTestId('input-description') as HTMLTextAreaElement
+        await expect(textarea.value).toBe('カードグリッド表示。projects[] を一覧表示する。')
+    },
+}
+
+// @story 状態 2: label 変更して blur → onUpdateNode が呼ばれる
+export const LabelEdit: Story = {
+    args: {
+        selectedNodeId: 'node-001',
+        nodes: mockNodes,
+        onUpdateNode: fn(),
+    },
+    play: async ({ canvas, args }) => {
+        const input = canvas.getByTestId('input-label')
+        await userEvent.clear(input)
+        await userEvent.type(input, 'NewComponent.tsx')
+        await userEvent.tab() // blur
+        await expect(args.onUpdateNode).toHaveBeenCalledOnce()
+        await expect(args.onUpdateNode).toHaveBeenCalledWith('node-001', { label: 'NewComponent.tsx' })
+    },
+}
+
+// @story 状態 3: label を空にして blur → commit されずエラー表示
+export const LabelEmptyValidation: Story = {
+    args: {
+        selectedNodeId: 'node-001',
+        nodes: mockNodes,
+        onUpdateNode: fn(),
+    },
+    play: async ({ canvas, args }) => {
+        const input = canvas.getByTestId('input-label')
+        await userEvent.clear(input)
+        await userEvent.tab() // blur
+        await expect(args.onUpdateNode).not.toHaveBeenCalled()
+        const error = canvas.getByTestId('error-label')
+        await expect(error).toBeVisible()
+    },
+}
+
+// @story 状態 4: description 変更して blur → onUpdateNode が呼ばれる
+export const DescriptionEdit: Story = {
+    args: {
+        selectedNodeId: 'node-001',
+        nodes: mockNodes,
+        onUpdateNode: fn(),
+    },
+    play: async ({ canvas, args }) => {
+        const textarea = canvas.getByTestId('input-description')
+        await userEvent.clear(textarea)
+        await userEvent.type(textarea, '更新した説明文')
+        await userEvent.tab() // blur
+        await expect(args.onUpdateNode).toHaveBeenCalledOnce()
+        await expect(args.onUpdateNode).toHaveBeenCalledWith('node-001', { description: '更新した説明文' })
     },
 }

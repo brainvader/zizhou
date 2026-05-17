@@ -236,7 +236,7 @@ test.describe('GraphEditor — ラベル編集 [CTX-4]', () => {
      * シナリオ 6: NodeProperty フォーム — blur で確定
      * @note NodeProperty の編集フォームは CTX-4 NodeProperty 実装後に有効化する
      */
-    test.skip('NodeProperty フォーム → blur でラベルが更新される', async ({ page }) => {
+    test('NodeProperty フォーム → blur でラベルが更新される', async ({ page }) => {
         await createNewGraph(page)
         await page.getByRole('button', { name: /ノード追加/ }).click()
         const node = page.locator('.react-flow__node').first()
