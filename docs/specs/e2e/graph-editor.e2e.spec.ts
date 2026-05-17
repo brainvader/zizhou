@@ -365,3 +365,82 @@ test.describe('GraphEditor — 複数選択 [CTX-5]', () => {
     })
 
 })
+
+// =============================================================================
+// [CTX-6] Edge Connect / Delete シナリオ
+// =============================================================================
+
+test.describe('GraphEditor — Edge Connect / Delete [CTX-6]', () => {
+
+    test.beforeEach(async ({ page }) => {
+        await page.goto('/')
+        await page.evaluate(() => localStorage.clear())
+    })
+
+    /**
+     * シナリオ 12: Edge Connect
+     * ノードのハンドルをドラッグして別ノードに接続するとエッジが作成される
+     */
+    test('2ノード間をハンドルでドラッグ接続するとエッジが作成される', async ({ page }) => {
+        await createNewGraph(page)
+
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await expect(page.locator('.react-flow__node')).toHaveCount(1, { timeout: 10000 })
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
+
+        const nodeA = page.locator('.react-flow__node').nth(0)
+        const nodeB = page.locator('.react-flow__node').nth(1)
+        const sourceHandle = nodeA.locator('.react-flow__handle-right, .react-flow__handle-bottom').first()
+        const targetHandle = nodeB.locator('.react-flow__handle-left, .react-flow__handle-top').first()
+
+        const sourceBox = await sourceHandle.boundingBox()
+        const targetBox = await targetHandle.boundingBox()
+
+        if (sourceBox && targetBox) {
+            await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2)
+            await page.mouse.down()
+            await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 10 })
+            await page.mouse.up()
+        }
+
+        await expect(page.locator('.react-flow__edge')).toHaveCount(1, { timeout: 5000 })
+        await page.screenshot({ path: 'evidence/GraphEditor_ctx6_edge-connected.png' })
+    })
+
+    /**
+     * シナリオ 13: Edge Delete
+     * エッジを選択して Delete キーで削除できる
+     */
+    test('エッジを選択して Delete キーで削除できる', async ({ page }) => {
+        await createNewGraph(page)
+
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await expect(page.locator('.react-flow__node')).toHaveCount(1, { timeout: 10000 })
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
+
+        const nodeA = page.locator('.react-flow__node').nth(0)
+        const nodeB = page.locator('.react-flow__node').nth(1)
+        const sourceHandle = nodeA.locator('.react-flow__handle-right, .react-flow__handle-bottom').first()
+        const targetHandle = nodeB.locator('.react-flow__handle-left, .react-flow__handle-top').first()
+
+        const sourceBox = await sourceHandle.boundingBox()
+        const targetBox = await targetHandle.boundingBox()
+
+        if (sourceBox && targetBox) {
+            await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2)
+            await page.mouse.down()
+            await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 10 })
+            await page.mouse.up()
+        }
+
+        await expect(page.locator('.react-flow__edge')).toHaveCount(1, { timeout: 5000 })
+
+        await page.locator('.react-flow__edge').first().click()
+        await page.keyboard.press('Delete')
+        await expect(page.locator('.react-flow__edge')).toHaveCount(0, { timeout: 5000 })
+        await page.screenshot({ path: 'evidence/GraphEditor_ctx6_edge-deleted.png' })
+    })
+
+})
