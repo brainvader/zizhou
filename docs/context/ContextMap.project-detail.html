@@ -504,6 +504,44 @@
                 color: var(--primary);
             }
 
+            /* ── CTX-8: NODE TYPE ── */
+            .node-type-badge {
+                font-size: 9px;
+                font-family: var(--font-mono);
+                color: var(--muted-foreground);
+                margin-bottom: 2px;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+
+            .mock-node.node-type-git {
+                border-color: #27ae60;
+            }
+
+            .mock-node.node-type-llm {
+                border-color: #8e44ad;
+            }
+
+            .mock-node.node-type-validate {
+                border-color: #2980b9;
+            }
+
+            .mock-node.node-type-analyze {
+                border-color: #f39c12;
+            }
+
+            .mock-node.node-type-custom {
+                border-color: var(--border);
+            }
+
+            .mock-node.node-status-doing {
+                box-shadow: 0 0 8px var(--primary);
+            }
+
+            .mock-node.node-status-done {
+                opacity: 0.4;
+            }
+
             /* ── CTX-3: NODE PROPERTY ── */
             #ctx-node-property {
                 width: var(--pane-property-width);
@@ -694,25 +732,39 @@
 
             <!-- ============================================================
                  CTX-2: GRAPH EDITOR [✓]
-                 ※ [CTX-7] ContextMenu: contextMenu / editingNodeId を GraphEditor の useState で管理する
-                            EditableNode の isEditing は prop で外部制御する（GraphEditor → editingNodeId 経由）
                  責務: ノードの手動配置・接続・選択・インライン編集を管理するグラフエディタ
                  注意: React Flow を使用する
                        nodes[], edges[] は Zustand で管理する
                        ノード追加はダイアログなし（インライン操作）
                        initStatus が 'checking' の場合はエディタ領域にローディングスピナーを表示する
                        initStatus が 'ready' の場合はエディタを表示する
-
+ 
                  [CTX-4] インライン編集:
                        editingNodeId を useState で管理する（GraphEditor ローカル状態。Zustand には持たない）
                        ダブルクリックで label を inline <input> に切り替える
                        Blur / Enter で store.updateNodeData() に commit する
                        Escape でキャンセルし元の label に戻す
-
+ 
                  [CTX-4][Note] 同期競合:
                        inline 編集中に NodeProperty を操作した場合、後から blur した方が
                        store に上書き commit される。意図的な排他制御は行わない。
                        データ破損はなく上書きのみ。仕様として許容する。
+ 
+                 [CTX-7] ContextMenu:
+                       contextMenu / editingNodeId を GraphEditor の useState で管理する
+                       EditableNode の isEditing は prop で外部制御する（GraphEditor → editingNodeId 経由）
+ 
+                 [CTX-8] Node Type:
+                       nodeType / status を GraphNodeData に追加する
+                       タイプは node_catalog の category に対応する（git / validate / analyze / llm / custom）
+ 
+                 [CTX-9] Node Catalog:
+                       node_catalog は SurrealDB で管理する（SSOT）
+                       UI / LLMエクスポート / 実行エンジンが参照する
+ 
+                 [CTX-10] Graph Export/Import:
+                       グラフ + カタログを JSON でエクスポートする
+                       エクスポートJSONはLLMへのナレッジ兼TODOリストとして機能する
             ============================================================ -->
             <main id="ctx-graph-editor">
                 <div class="graph-canvas">
@@ -745,6 +797,26 @@
                     <div class="context-menu" style="top:150px;left:280px;">
                         <div class="context-menu-item">Edit Label</div>
                         <div class="context-menu-item danger">Delete Node</div>
+                    </div>
+
+                    <!-- [CTX-8] ノードタイプ（色分け）・ステータス表現 -->
+                    <div class="mock-node node-type-git" style="top:100px;left:500px;">
+                        <div class="handle left"></div>
+                        <div class="node-type-badge">git</div>
+                        <div class="node-label">ブランチ作成</div>
+                        <div class="handle right"></div>
+                    </div>
+                    <div class="mock-node node-type-llm node-status-doing" style="top:200px;left:500px;">
+                        <div class="handle left"></div>
+                        <div class="node-type-badge">llm</div>
+                        <div class="node-label">実装</div>
+                        <div class="handle right"></div>
+                    </div>
+                    <div class="mock-node node-type-validate node-status-done" style="top:300px;left:500px;">
+                        <div class="handle left"></div>
+                        <div class="node-type-badge">validate</div>
+                        <div class="node-label">テスト実行</div>
+                        <div class="handle right"></div>
                     </div>
                 </div>
 
@@ -779,6 +851,24 @@
                     [✓][Feature] Menu: Delete Edge — メニューからエッジを削除できる
                     [✓][Logic]   Context Menu State — contextMenu: { type, id, x, y } | null を useState で管理する
                     [✓][Logic]   Close on Pane Click — キャンバスクリックでメニューを閉じる
+
+                    [ ][Feature] Node Type Select   — 右クリックメニューからノードのタイプを選択できる
+                    [ ][Feature] Node Type Color    — タイプに応じてノードの色が変わる（git=緑 / validate=青 / analyze=黄 / llm=紫 / custom=グレー）
+                    [ ][Feature] Node Status        — ノードにステータスを持つ（todo / doing / done）
+                    [ ][Feature] Node Status Visual — ステータスに応じてノードの見た目が変わる（done=薄くなる / doing=ハイライト）
+                    [ ][Logic]   GraphNodeData Update — nodeType / status を GraphNodeData に追加する
+
+                    [ ][Feature] Catalog Panel      — グラフエディタ内にカタログパネルを表示する
+                    [ ][Feature] Catalog Node Add   — カタログからノードをグラフに追加できる
+                    [ ][Feature] Catalog List       — カテゴリ別にカタログ一覧を表示する（git / validate / analyze / llm / custom）
+                    [ ][Logic]   Catalog Load       — 起動時にSurrealDBからnode_catalogを取得する
+                    [ ][Logic]   SurrealDB Setup    — TauriにSurrealDBを組み込み node_catalogテーブルを定義・初期データ投入する
+
+                    [ ][Feature] Graph Export       — グラフ+カタログをJSONでエクスポートする（クリップボード / ファイル保存）
+                    [ ][Feature] Graph Import       — LLMが返したJSONをグラフに反映する
+                    [ ][Logic]   TODO Integration   — status=doing が現在タスク / status=done が完了タスク
+                    [ ][Logic]   LLM Knowledge Format — { graph: { nodes, edges }, catalog: [...] } 形式でエクスポートする
+                    [ ][Logic]   Import Validation  — インポート時にZodでJSONを検証する
                 -->
             </main>
 
