@@ -25,12 +25,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ReactFlowProvider } from '@xyflow/react'
 import { expect, fn, userEvent } from 'storybook/test'
-import type { Node } from '@xyflow/react'
 import type { EditableNodeProps } from '@/components/nodes/EditableNode'
-import type { GraphNodeData } from '@/bom/graph'
 import { EditableNode } from '@/components/nodes/EditableNode'
-import { ContextMenu } from '@/components/ContextMenu'
-import { NodeProperty } from '@/components/NodeProperty'
 
 // =============================================================================
 // EditableNode Stories
