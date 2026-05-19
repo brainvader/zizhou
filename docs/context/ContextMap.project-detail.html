@@ -780,23 +780,23 @@
                     [✓][Logic]   Context Menu State — contextMenu: { type, id, x, y } | null を useState で管理する
                     [✓][Logic]   Close on Pane Click — キャンバスクリックでメニューを閉じる
 
-                    [ ][Feature] Node Type Select     — 右クリックメニューからノードのタイプを選択できる
-                    [ ][Feature] Node Type Color      — タイプに応じてノードの色が変わる（git=緑 / validate=青 / analyze=黄 / llm=紫 / custom=グレー）
-                    [ ][Feature] Node Status          — ノードにステータスを持つ（todo / doing / done）
-                    [ ][Feature] Node Status Visual   — ステータスに応じてノードの見た目が変わる（done=薄くなる / doing=ハイライト）
+                    [ ][Feature] Node Type Select   — 右クリックメニューからノードのタイプを選択できる
+                    [ ][Feature] Node Type Color    — タイプに応じてノードの色が変わる（git=緑 / validate=青 / analyze=黄 / llm=紫 / custom=グレー）
+                    [ ][Feature] Node Status        — ノードにステータスを持つ（todo / doing / done）
+                    [ ][Feature] Node Status Visual — ステータスに応じてノードの見た目が変わる（done=薄くなる / doing=ハイライト）
                     [ ][Logic]   GraphNodeData Update — nodeType / status を GraphNodeData に追加する
 
-                    [ ][Feature] Catalog Panel        — グラフエディタ内にカタログパネルを表示する
-                    [ ][Feature] Catalog Node Add     — カタログからノードをグラフに追加できる
-                    [ ][Feature] Catalog List         — カテゴリ別にカタログ一覧を表示する（git / validate / analyze / llm / custom）
-                    [ ][Logic]   Catalog Load         — 起動時にSurrealDBからnode_catalogを取得する
-                    [ ][Logic]   SurrealDB Setup      — TauriにSurrealDBを組み込み node_catalogテーブルを定義・初期データ投入する
+                    [ ][Feature] Catalog Panel      — グラフエディタ内にカタログパネルを表示する
+                    [ ][Feature] Catalog Node Add   — カタログからノードをグラフに追加できる
+                    [ ][Feature] Catalog List       — カテゴリ別にカタログ一覧を表示する（git / validate / analyze / llm / custom）
+                    [ ][Logic]   Catalog Load       — 起動時にSurrealDBからnode_catalogを取得する
+                    [ ][Logic]   SurrealDB Setup    — TauriにSurrealDBを組み込み node_catalogテーブルを定義・初期データ投入する
 
-                    [ ][Feature] Graph Export         — グラフ+カタログをJSONでエクスポートする（クリップボード / ファイル保存）
-                    [ ][Feature] Graph Import         — LLMが返したJSONをグラフに反映する
-                    [ ][Logic]   TODO Integration     — status=doing が現在タスク / status=done が完了タスク
+                    [ ][Feature] Graph Export       — グラフ+カタログをJSONでエクスポートする（クリップボード / ファイル保存）
+                    [ ][Feature] Graph Import       — LLMが返したJSONをグラフに反映する
+                    [ ][Logic]   TODO Integration   — status=doing が現在タスク / status=done が完了タスク
                     [ ][Logic]   LLM Knowledge Format — { graph: { nodes, edges }, catalog: [...] } 形式でエクスポートする
-                    [ ][Logic]   Import Validation    — インポート時にZodでJSONを検証する
+                    [ ][Logic]   Import Validation  — インポート時にZodでJSONを検証する
                 -->
             </main>
 
