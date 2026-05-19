@@ -24,7 +24,7 @@
 
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import type { GraphNodeData, NodeType } from '@/bom/graph'
+import type { GraphNodeData } from '@/bom/graph'
 import { NODE_TYPE_COLOR } from '@/bom/graph'
 
 // =============================================================================

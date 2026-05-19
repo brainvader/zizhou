@@ -16,6 +16,8 @@
  * @see src/stories/context-menu.stories.tsx
  */
 
+import { NodeType } from "@/bom/graph"
+
 export type ContextMenuProps = {
     type: 'node' | 'edge'
     x: number
@@ -23,6 +25,7 @@ export type ContextMenuProps = {
     onDelete: () => void
     onClose: () => void
     onEditLabel?: () => void
+    onSetNodeType?: (type: NodeType) => void
 }
 
 export function ContextMenu({ type, x, y, onDelete, onClose, onEditLabel }: ContextMenuProps) {
