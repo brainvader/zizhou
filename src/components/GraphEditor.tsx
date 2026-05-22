@@ -20,6 +20,11 @@
  * - editingNodeId を useState で管理する（ローカル状態。Zustand には持たない）
  * - NODE_TYPES を useMemo 化し editingNodeId を EditableNode に prop で注入する
  * - Delete Node/Edge は onNodesChange/onEdgesChange(remove) 経由で処理する（ReactFlow の想定フロー）
+ * 
+ * [CTX-8] Set Node Type:
+ * - onSetNodeType は store.updateNodeData() に直結している
+ * - TODO: props DI 化（onUpdateNodeData prop を追加）すれば Storybook で検証可能になる
+ * - 現状は E2E（Playwright）で結合確認する
  *
  * @context CTX-2/5/6/7
  * @see docs/bom/graph.ts
@@ -54,7 +59,7 @@ import { useGraphFile } from '@/hooks/useGraphFile'
 import { useGraphInit } from '@/hooks/useGraphInit'
 import { EditableNode } from '@/components/nodes/EditableNode'
 import { ContextMenu } from '@/components/ContextMenu'
-import type { GraphNodeData, GraphFile, InitStatus } from '@/bom/graph'
+import type { GraphNodeData, GraphFile, InitStatus, NodeType } from '@/bom/graph'
 
 type ExistsFn = (path: string) => Promise<boolean>
 type ReadTextFileFn = (path: string) => Promise<string>
@@ -114,6 +119,7 @@ export function GraphEditor({
 
     const storeSetNodes = useGraphStore((s) => s.setNodes)
     const storeSetEdges = useGraphStore((s) => s.setEdges)
+    const storeUpdateNodeData = useGraphStore((s) => s.updateNodeData)
 
     useEffect(() => {
         if (nodesProp !== undefined) storeSetNodes(nodesProp)
@@ -238,6 +244,12 @@ export function GraphEditor({
         setContextMenu(null)
     }, [contextMenu])
 
+    // --- [CTX-8] Set Node Type ---
+    const handleSetNodeType = useCallback((type: NodeType) => {
+        if (!contextMenu) return
+        storeUpdateNodeData(contextMenu.id, { nodeType: type })
+    }, [contextMenu, storeUpdateNodeData])
+
     return (
         <div
             data-testid="graph-editor"
@@ -300,6 +312,7 @@ export function GraphEditor({
                             onDelete={handleDeleteFromMenu}
                             onEditLabel={handleEditLabelFromMenu}
                             onClose={() => setContextMenu(null)}
+                            onSetNodeType={handleSetNodeType}
                         />
                     )}
                 </>
