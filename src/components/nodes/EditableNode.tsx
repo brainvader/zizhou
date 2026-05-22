@@ -20,6 +20,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react'
 import { useGraphStore } from '@/store/useGraphStore'
 import type { GraphNodeData } from '@/bom/graph'
+import { NODE_TYPE_COLOR } from '@/bom/graph'
 
 export type EditableNodeType = Node<GraphNodeData, 'editableNode'>
 
@@ -81,16 +82,31 @@ export function EditableNode({
 
     // [CTX-5] selected に応じてボーダー・グローを切り替える
     const selectedStyle = selected
-        ? 'border-(--primary) shadow-[0_0_12px_var(--primary-glow)]'
-        : 'border-(--border)'
+        ? 'shadow-[0_0_12px_var(--primary-glow)]'
+        : ''
+
+    const borderColor = selected
+        ? 'var(--primary)'
+        : NODE_TYPE_COLOR[data.nodeType ?? 'custom']
 
     return (
         <div
-            data-testid={`editable-node-${id}`}
+            data-testid="editable-node"
+            data-status={data.status ?? 'todo'}
             className={`bg-[--card] border rounded-[--radius] px-3 py-2 min-w-35 cursor-grab ${selectedStyle}`}
+            style={{ borderColor }}
             onDoubleClick={handleDoubleClick}
         >
             <Handle type="target" position={Position.Left} />
+
+            {data.nodeType && (
+                <div
+                    data-testid="node-type-badge"
+                    className="text-[9px] font-mono text-[--muted-foreground] pl-2 mb-0.5"
+                >
+                    {data.nodeType}
+                </div>
+            )}
 
             {isEditing ? (
                 <input
@@ -107,6 +123,17 @@ export function EditableNode({
                     {data.label}
                 </div>
             )}
+
+            <input
+                data-testid="node-status-checkbox"
+                type="checkbox"
+                className="nodrag"
+                checked={data.status === 'done'}
+                onChange={() => {
+                    const next = data.status === 'done' ? 'todo' : 'done'
+                    updateNodeData(id, { status: next })
+                }}
+            />
 
             {!isEditing && data.description && (
                 <div className="text-[11px] text-[--muted-foreground] pl-2 mt-0.5">

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { Node } from '@xyflow/react'
 import { z } from 'zod'
-import type { GraphNodeData } from '@/bom/graph'
+import type { GraphNodeData, NodeStatus } from '@/bom/graph'
 import { useGraphStore } from '@/store/useGraphStore'
 
 const LabelSchema = z.string().min(1)
@@ -112,6 +112,23 @@ export const NodeProperty = ({
                     rows={4}
                     className="text-xs text-[--foreground] bg-[--muted] border border-[--border] rounded-[--radius] px-2 py-1.5 font-sans w-full outline-none focus:border-[--primary] focus:shadow-[0_0_0_2px_var(--primary-glow)] resize-none"
                 />
+            </div>
+
+            {/* status フィールド [CTX-8] */}
+            <div className="flex flex-col gap-1">
+                <label className="font-mono text-[9px] text-[--muted-foreground] tracking-[0.15em] uppercase">
+                    status
+                </label>
+                <select
+                    data-testid="select-status"
+                    value={node.data.status ?? 'todo'}
+                    onChange={(e) => commitUpdate(node.id, { status: e.target.value as NodeStatus })}
+                    className="text-xs text-[--foreground] bg-[--muted] border border-[--border] rounded-[--radius] px-2 py-1.5 font-sans w-full outline-none focus:border-[--primary]"
+                >
+                    <option value="todo">todo</option>
+                    <option value="doing">doing</option>
+                    <option value="done">done</option>
+                </select>
             </div>
         </div>
     )

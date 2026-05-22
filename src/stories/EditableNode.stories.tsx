@@ -1,16 +1,28 @@
 /**
- * @context CTX-4/5/7: EditableNode — インライン編集の視覚・インタラクション検証
+ * @context CTX-4/5/7/8: EditableNode — インライン編集・タイプ・ステータスの視覚・インタラクション検証
  * @bom docs/bom/graph.ts (GraphNodeData)
  * @story
- * 1. 通常状態: label と description が表示される
- * 2. description なし: label のみ表示される
- * 3. [CTX-7] ダブルクリックで onStartEditing が呼ばれる
- * 4. [CTX-7] isEditing=true: inline input が表示され label の初期値が入る
- * 5. inline input に新しい値を入力して Enter で確定すると updateNodeData が呼ばれる
- * 6. inline input に新しい値を入力して blur で確定すると updateNodeData が呼ばれる
- * 7. Escape でキャンセルすると onStopEditing が呼ばれ updateNodeData は呼ばれない
- * 8. label を空にして Enter で確定しても updateNodeData は呼ばれない
- * 9. [CTX-5] 選択中: border が vermillion になる
+ * === CTX-4/5/7 ===
+ * 1.  通常状態: label と description が表示される
+ * 2.  description なし: label のみ表示される
+ * 3.  [CTX-7] ダブルクリックで onStartEditing が呼ばれる
+ * 4.  [CTX-7] isEditing=true: inline input が表示され label の初期値が入る
+ * 5.  inline input に新しい値を入力して Enter で確定すると updateNodeData が呼ばれる
+ * 6.  inline input に新しい値を入力して blur で確定すると updateNodeData が呼ばれる
+ * 7.  Escape でキャンセルすると onStopEditing が呼ばれ updateNodeData は呼ばれない
+ * 8.  label を空にして Enter で確定しても updateNodeData は呼ばれない
+ * 9.  [CTX-5] 選択中: border が vermillion になる
+ * === CTX-8 ===
+ * 10. nodeType="git"      — 緑ボーダー + "git" バッジ
+ * 11. nodeType="validate" — 青ボーダー + "validate" バッジ
+ * 12. nodeType="analyze"  — 黄ボーダー + "analyze" バッジ
+ * 13. nodeType="llm"      — 紫ボーダー + "llm" バッジ
+ * 14. nodeType="custom"   — グレーボーダー + "custom" バッジ
+ * 15. nodeType 未設定     — custom 扱い
+ * 16. status="todo"       — 通常表示・チェックボックス未チェック
+ * 17. status="doing"      — ハイライト表示・チェックボックス未チェック
+ * 18. status="done"       — 薄表示・チェックボックスチェック済み
+ * 19. チェックボックスをクリックすると onUpdateNode({ status }) が呼ばれる
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ReactFlowProvider } from '@xyflow/react'
@@ -25,7 +37,7 @@ const meta: Meta<EditableNodeProps> = {
     decorators: [
         (Story) => (
             <ReactFlowProvider>
-                <div style={{ width: 200, padding: 24 }}>
+                <div style={{ width: 220, padding: 24 }}>
                     <Story />
                 </div>
             </ReactFlowProvider>
@@ -52,6 +64,10 @@ const meta: Meta<EditableNodeProps> = {
 }
 export default meta
 type Story = StoryObj<EditableNodeProps>
+
+// =============================================================================
+// CTX-4/5/7
+// =============================================================================
 
 // @story 状態 1: 通常状態（label + description）
 export const Default: Story = {
@@ -81,7 +97,7 @@ export const DoubleClickToEdit: Story = {
         isEditing: false,
     },
     play: async ({ canvas, args }) => {
-        await userEvent.dblClick(canvas.getByTestId('editable-node-node-001'))
+        await userEvent.dblClick(canvas.getByTestId('editable-node'))
         await expect(args.onStartEditing).toHaveBeenCalledOnce()
     },
 }
@@ -168,6 +184,106 @@ export const Selected: Story = {
         selected: true,
     },
     play: async ({ canvas }) => {
-        await expect(canvas.getByTestId('editable-node-node-001')).toBeVisible()
+        await expect(canvas.getByTestId('editable-node')).toBeVisible()
+    },
+}
+
+// =============================================================================
+// CTX-8: Node Type
+// =============================================================================
+
+// @story 10: nodeType="git"
+export const TypeGit: Story = {
+    args: { data: { label: 'ブランチ作成', nodeType: 'git', status: 'todo' } },
+    play: async ({ canvas }) => {
+        await expect(canvas.getByTestId('node-type-badge')).toHaveTextContent('git')
+        await expect(canvas.getByTestId('editable-node').style.borderColor).toBeTruthy()
+    },
+}
+
+// @story 11: nodeType="validate"
+export const TypeValidate: Story = {
+    args: { data: { label: 'テスト実行', nodeType: 'validate', status: 'todo' } },
+    play: async ({ canvas }) => {
+        await expect(canvas.getByTestId('node-type-badge')).toHaveTextContent('validate')
+    },
+}
+
+// @story 12: nodeType="analyze"
+export const TypeAnalyze: Story = {
+    args: { data: { label: '依存分析', nodeType: 'analyze', status: 'todo' } },
+    play: async ({ canvas }) => {
+        await expect(canvas.getByTestId('node-type-badge')).toHaveTextContent('analyze')
+    },
+}
+
+// @story 13: nodeType="llm"
+export const TypeLlm: Story = {
+    args: { data: { label: '実装', nodeType: 'llm', status: 'todo' } },
+    play: async ({ canvas }) => {
+        await expect(canvas.getByTestId('node-type-badge')).toHaveTextContent('llm')
+    },
+}
+
+// @story 14: nodeType="custom"
+export const TypeCustom: Story = {
+    args: { data: { label: 'カスタム', nodeType: 'custom', status: 'todo' } },
+    play: async ({ canvas }) => {
+        await expect(canvas.getByTestId('node-type-badge')).toHaveTextContent('custom')
+    },
+}
+
+// @story 15: nodeType 未設定 → custom 扱い
+export const TypeUnset: Story = {
+    args: { data: { label: '未分類ノード' } },
+    play: async ({ canvas }) => {
+        await expect(canvas.getByTestId('editable-node')).toBeInTheDocument()
+    },
+}
+
+// =============================================================================
+// CTX-8: Node Status
+// =============================================================================
+
+// @story 16: status="todo"
+export const StatusTodo: Story = {
+    args: { data: { label: 'タスク', nodeType: 'git', status: 'todo' } },
+    play: async ({ canvas }) => {
+        const checkbox = canvas.getByTestId('node-status-checkbox') as HTMLInputElement
+        await expect(checkbox.checked).toBe(false)
+        await expect(canvas.getByTestId('editable-node')).toHaveAttribute('data-status', 'todo')
+    },
+}
+
+// @story 17: status="doing"
+export const StatusDoing: Story = {
+    args: { data: { label: '進行中', nodeType: 'llm', status: 'doing' } },
+    play: async ({ canvas }) => {
+        await expect(canvas.getByTestId('editable-node')).toHaveAttribute('data-status', 'doing')
+        const checkbox = canvas.getByTestId('node-status-checkbox') as HTMLInputElement
+        await expect(checkbox.checked).toBe(false)
+    },
+}
+
+// @story 18: status="done"
+export const StatusDone: Story = {
+    args: { data: { label: '完了タスク', nodeType: 'validate', status: 'done' } },
+    play: async ({ canvas }) => {
+        await expect(canvas.getByTestId('editable-node')).toHaveAttribute('data-status', 'done')
+        const checkbox = canvas.getByTestId('node-status-checkbox') as HTMLInputElement
+        await expect(checkbox.checked).toBe(true)
+    },
+}
+
+// @story 19: チェックボックス toggle
+export const CheckboxToggle: Story = {
+    args: {
+        data: { label: 'トグル確認', nodeType: 'git', status: 'todo' },
+        onUpdateNode: fn(),
+    },
+    play: async ({ canvas, args }) => {
+        const checkbox = canvas.getByTestId('node-status-checkbox')
+        await userEvent.click(checkbox)
+        await expect(args.onUpdateNode).toHaveBeenCalledWith('node-001', { status: 'done' })
     },
 }

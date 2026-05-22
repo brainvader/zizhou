@@ -19,6 +19,33 @@ export const graphsDir = (projectRootPath: string): string =>
 export const graphFilePath = (projectRootPath: string, graphId: string): string =>
     `${graphsDir(projectRootPath)}/${graphId}.json`
 
+
+// ============================================================
+// NodeType
+// ノードのカテゴリ。将来 SurrealDB の node_catalog.category に対応（CTX-9）。
+// 当面フロントエンドに固定値で保持する。
+// ============================================================
+export const NODE_TYPES = ['git', 'validate', 'analyze', 'llm', 'custom'] as const
+export const NodeTypeSchema = z.enum(NODE_TYPES)
+export type NodeType = z.infer<typeof NodeTypeSchema>
+
+// カラーマップ。GraphNode のスタイリングに使用する。
+export const NODE_TYPE_COLOR: Record<NodeType, string> = {
+    git: '#27ae60', // 緑
+    validate: '#2980b9', // 青
+    analyze: '#f39c12', // 黄
+    llm: '#8e44ad', // 紫
+    custom: '#555e6b', // グレー
+}
+
+// ============================================================
+// NodeStatus
+// ノードの進行状態。人間が LLM チャットと進捗を共有するためのフラグ。
+// ============================================================
+export const NODE_STATUSES = ['todo', 'doing', 'done'] as const
+export const NodeStatusSchema = z.enum(NODE_STATUSES)
+export type NodeStatus = z.infer<typeof NodeStatusSchema>
+
 // ============================================================
 // GraphNodeData
 // React Flow カスタムノードのデータペイロード。
@@ -28,6 +55,10 @@ export const graphFilePath = (projectRootPath: string, graphId: string): string 
 export const GraphNodeDataSchema = z.object({
     label: z.string().min(1, 'label は必須です').max(100),
     description: z.string().max(500).optional(),
+    // [CTX-8] 未設定時は 'custom' 扱いとする。後方互換のため optional。
+    nodeType: NodeTypeSchema.optional(),
+    // [CTX-8] 未設定時は 'todo' 扱いとする。後方互換のため optional。
+    status: NodeStatusSchema.optional(),
 })
 
 export type GraphNodeData = z.infer<typeof GraphNodeDataSchema>
