@@ -22,8 +22,7 @@ test.describe('ResizableLayout: Integration', () => {
     test('should render 3 panes on /projects/:id', async ({ page }) => {
         await expect(page.getByTestId('file-tree')).toBeVisible()
         await expect(page.getByTestId('graph-editor')).toBeVisible()
-        await expect(page.getByTestId('node-property')).toBeVisible()
-
+        await expect(page.getByTestId('node-property-pane')).toBeVisible()
         await page.screenshot({ path: 'evidence/resizable-layout_initial.png' })
     })
 
