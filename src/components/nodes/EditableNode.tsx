@@ -99,6 +99,15 @@ export function EditableNode({
         >
             <Handle type="target" position={Position.Left} />
 
+            {data.nodeType && (
+                <div
+                    data-testid="node-type-badge"
+                    className="text-[9px] font-mono text-[--muted-foreground] pl-2 mb-0.5"
+                >
+                    {data.nodeType}
+                </div>
+            )}
+
             {isEditing ? (
                 <input
                     data-testid="inline-input"

@@ -1,5 +1,5 @@
 /**
- * @context CTX-4/5: NodeProperty — フォーム編集
+ * @context CTX-4/5/8: NodeProperty — フォーム編集
  * @bom docs/bom/graph.ts (GraphNodeData, GraphStore.updateNodeData)
  * @story
  * 1. ノード選択時: label・description が input/textarea に表示される
@@ -9,6 +9,8 @@
  * 5. 未選択状態（Empty）: 何も表示されない
  * 6. description なしのノード: description フィールドは空 textarea で表示される
  * 7. [CTX-5] 複数選択中: 何も表示されない（Visibility Guard）
+ * 8. [CTX-8] status セレクトが表示され、現在値が反映される
+ * 9. [CTX-8] status セレクト変更で onUpdateNode が呼ばれる
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, userEvent } from 'storybook/test'
@@ -148,5 +150,43 @@ export const MultiSelectHidden: Story = {
     play: async ({ canvas }) => {
         await expect(canvas.queryByTestId('input-label')).not.toBeInTheDocument()
         await expect(canvas.queryByTestId('input-description')).not.toBeInTheDocument()
+    },
+}
+
+// @story 状態 8: [CTX-8] status セレクトが表示され、現在値が反映される
+export const WithStatus: Story = {
+    args: {
+        selectedNodeId: 'node-001',
+        selectedNodeIds: ['node-001'],
+        nodes: [{
+            id: 'node-001',
+            position: { x: 0, y: 0 },
+            data: { label: 'ProjectGrid.tsx', status: 'doing' },
+        }],
+        onUpdateNode: fn(),
+    },
+    play: async ({ canvas }) => {
+        const select = canvas.getByTestId('select-status') as HTMLSelectElement
+        await expect(select).toBeVisible()
+        await expect(select).toHaveValue('doing')
+    },
+}
+
+// @story 状態 9: [CTX-8] status セレクト変更で onUpdateNode が呼ばれる
+export const StatusEdit: Story = {
+    args: {
+        selectedNodeId: 'node-001',
+        selectedNodeIds: ['node-001'],
+        nodes: [{
+            id: 'node-001',
+            position: { x: 0, y: 0 },
+            data: { label: 'ProjectGrid.tsx', status: 'todo' },
+        }],
+        onUpdateNode: fn(),
+    },
+    play: async ({ canvas, args }) => {
+        const select = canvas.getByTestId('select-status')
+        await userEvent.selectOptions(select, 'done')
+        await expect(args.onUpdateNode).toHaveBeenCalledWith('node-001', { status: 'done' })
     },
 }

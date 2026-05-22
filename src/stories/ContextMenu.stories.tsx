@@ -1,5 +1,5 @@
 /**
- * @context CTX-7: ContextMenu — 視覚・インタラクション検証
+ * @context CTX-7/8: ContextMenu — 視覚・インタラクション検証
  * @bom docs/bom/graph.ts
  * @story
  * 1. type='node': "Edit Label" と "Delete Node" が表示される
@@ -7,6 +7,9 @@
  * 3. "Delete Node" クリックで onDelete が呼ばれる
  * 4. "Edit Label" クリックで onEditLabel が呼ばれる
  * 5. "Delete Edge" クリックで onDelete が呼ばれる
+ * 6. [CTX-8] type='node': SET TYPE セクションと5項目が表示される
+ * 7. [CTX-8] type='edge': SET TYPE セクションが表示されない
+ * 8. [CTX-8] SET TYPE の git クリックで onSetNodeType("git") が呼ばれる
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, userEvent, within } from 'storybook/test'
@@ -29,6 +32,7 @@ const meta: Meta<typeof ContextMenu> = {
         onDelete: fn(),
         onClose: fn(),
         onEditLabel: fn(),
+        onSetNodeType: fn(),
     },
 }
 export default meta
@@ -41,10 +45,8 @@ export const NodeMenu: Story = {
     },
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
-        // "Edit Label" と "Delete Node" が表示される
         await expect(canvas.getByTestId('menu-item-edit-label')).toBeVisible()
         await expect(canvas.getByTestId('menu-item-delete')).toBeVisible()
-        // "Delete Node" のラベル確認
         await expect(canvas.getByTestId('menu-item-delete')).toHaveTextContent('Delete Node')
     },
 }
@@ -56,9 +58,7 @@ export const EdgeMenu: Story = {
     },
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement)
-        // "Edit Label" は表示されない
         await expect(canvas.queryByTestId('menu-item-edit-label')).not.toBeInTheDocument()
-        // "Delete Edge" が表示される
         await expect(canvas.getByTestId('menu-item-delete')).toBeVisible()
         await expect(canvas.getByTestId('menu-item-delete')).toHaveTextContent('Delete Edge')
     },
@@ -97,5 +97,44 @@ export const DeleteEdgeClick: Story = {
         const canvas = within(canvasElement)
         await userEvent.click(canvas.getByTestId('menu-item-delete'))
         await expect(args.onDelete).toHaveBeenCalledOnce()
+    },
+}
+
+// @story 状態 6: [CTX-8] type='node' — SET TYPE セクションと5項目が表示される
+export const NodeMenuWithSetType: Story = {
+    args: {
+        type: 'node',
+    },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await expect(canvas.getByTestId('menu-section-set-type')).toBeVisible()
+        await expect(canvas.getByTestId('menu-item-type-git')).toBeVisible()
+        await expect(canvas.getByTestId('menu-item-type-validate')).toBeVisible()
+        await expect(canvas.getByTestId('menu-item-type-analyze')).toBeVisible()
+        await expect(canvas.getByTestId('menu-item-type-llm')).toBeVisible()
+        await expect(canvas.getByTestId('menu-item-type-custom')).toBeVisible()
+    },
+}
+
+// @story 状態 7: [CTX-8] type='edge' — SET TYPE セクションが表示されない
+export const EdgeMenuNoSetType: Story = {
+    args: {
+        type: 'edge',
+    },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement)
+        await expect(canvas.queryByTestId('menu-section-set-type')).not.toBeInTheDocument()
+    },
+}
+
+// @story 状態 8: [CTX-8] git クリックで onSetNodeType("git") が呼ばれる
+export const SetTypeGitClick: Story = {
+    args: {
+        type: 'node',
+    },
+    play: async ({ canvasElement, args }) => {
+        const canvas = within(canvasElement)
+        await userEvent.click(canvas.getByTestId('menu-item-type-git'))
+        await expect(args.onSetNodeType).toHaveBeenCalledWith('git')
     },
 }
