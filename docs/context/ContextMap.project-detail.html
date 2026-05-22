@@ -765,6 +765,13 @@
                  [CTX-10] Graph Export/Import:
                        グラフ + カタログを JSON でエクスポートする
                        エクスポートJSONはLLMへのナレッジ兼TODOリストとして機能する
+
+                 [CTX-11] Root Layout:
+                       __root.tsx を作成し loadProjects() をルートレイアウトに移動する
+                       どのルートに直接アクセスしても hydration が走るようにする
+                       index.tsx から loadProjects() / isHydrated を削除する
+                       ProjectGrid の isHydrated prop を削除する
+                       CTX-8 でスキップした Persistence E2E テストが通るようになる
             ============================================================ -->
             <main id="ctx-graph-editor">
                 <div class="graph-canvas">
