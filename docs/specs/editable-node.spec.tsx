@@ -85,7 +85,7 @@ describe('EditableNode: [CTX-7] isEditing prop 制御', () => {
 
     test('logic: ダブルクリックで onStartEditing が呼ばれる', () => {
         render(<EditableNode {...makeProps({ isEditing: false })} />)
-        fireEvent.dblClick(screen.getByTestId('editable-node-node-001'))
+        fireEvent.dblClick(screen.getByTestId('editable-node'))
         expect(mockOnStartEditing).toHaveBeenCalledOnce()
     })
 
