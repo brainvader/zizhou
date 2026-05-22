@@ -172,19 +172,22 @@ describe('EditableNode: [CTX-8] nodeType ボーダー色', () => {
     test('logic: nodeType="git" のとき git カラーのボーダーが適用される', () => {
         render(<EditableNode {...makeNodeProps({ data: { label: 'A', nodeType: 'git' } })} />)
         const node = screen.getByTestId('editable-node')
-        expect(node.style.borderColor).toBe(NODE_TYPE_COLOR['git'])
+        expect(node.style.borderColor).toBeTruthy()
+        expect(node).toHaveStyle({ borderColor: NODE_TYPE_COLOR['git'] })
     })
 
     test('logic: nodeType 未設定のとき custom カラーのボーダーが適用される', () => {
         render(<EditableNode {...makeNodeProps({ data: { label: 'A' } })} />)
         const node = screen.getByTestId('editable-node')
-        expect(node.style.borderColor).toBe(NODE_TYPE_COLOR['custom'])
+        expect(node.style.borderColor).toBeTruthy()
+        expect(node).toHaveStyle({ borderColor: NODE_TYPE_COLOR['custom'] })
     })
 
     test('logic: nodeType="llm" のとき llm カラーのボーダーが適用される', () => {
         render(<EditableNode {...makeNodeProps({ data: { label: 'A', nodeType: 'llm' } })} />)
         const node = screen.getByTestId('editable-node')
-        expect(node.style.borderColor).toBe(NODE_TYPE_COLOR['llm'])
+        expect(node.style.borderColor).toBeTruthy()
+        expect(node).toHaveStyle({ borderColor: NODE_TYPE_COLOR['llm'] })
     })
 
 })
