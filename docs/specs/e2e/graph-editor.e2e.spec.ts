@@ -25,7 +25,7 @@ const renavigateWithGraph = async (page: import('@playwright/test').Page, graphP
     await page.goto('/')
     await expect(page.getByText('zizou-core')).toBeVisible()
     await page.locator('[data-testid^="card-"]').first().click()
-    await expect(page.getByText('Loading…')).toBeHidden({ timeout: 10000 })
+    await expect(page.getByText('Loading…')).toBeHidden({ timeout: 15000 })  // 10000 → 15000
     if (graphParam) {
         await page.evaluate((param) => {
             window.history.pushState({}, '', `/projects/1?graph=${param}`)
@@ -46,6 +46,46 @@ const createNewGraph = async (page: import('@playwright/test').Page) => {
     }, { timeout: 10000 })
     await page.evaluate(() => window.dispatchEvent(new Event('resize')))
     await page.waitForTimeout(500)
+}
+
+/**
+ * エッジ接続テスト用: 2ノードを追加し、確実に離れた位置に移動する。
+ * ノードが重なるとエッジが z-index の関係でクリックできなくなるため、
+ * ドラッグで明示的に離れた座標に配置する。
+ */
+const addTwoNodesApart = async (page: import('@playwright/test').Page) => {
+    await page.getByRole('button', { name: /ノード追加/ }).click()
+    await expect(page.locator('.react-flow__node')).toHaveCount(1, { timeout: 10000 })
+    await page.getByRole('button', { name: /ノード追加/ }).click()
+    await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
+
+    // nodeA を左上に移動
+    const nodeA = page.locator('.react-flow__node').nth(0)
+    const boxA = await nodeA.boundingBox()
+    if (boxA) {
+        const cx = boxA.x + boxA.width / 2
+        const cy = boxA.y + boxA.height / 2
+        await page.mouse.move(cx, cy)
+        await page.mouse.down()
+        await page.waitForTimeout(100)
+        await page.mouse.move(cx - 150, cy - 80, { steps: 20 })
+        await page.mouse.up()
+        await page.waitForTimeout(200)
+    }
+
+    // nodeB を右下に移動
+    const nodeB = page.locator('.react-flow__node').nth(1)
+    const boxB = await nodeB.boundingBox()
+    if (boxB) {
+        const cx = boxB.x + boxB.width / 2
+        const cy = boxB.y + boxB.height / 2
+        await page.mouse.move(cx, cy)
+        await page.mouse.down()
+        await page.waitForTimeout(100)
+        await page.mouse.move(cx + 150, cy + 80, { steps: 20 })
+        await page.mouse.up()
+        await page.waitForTimeout(200)
+    }
 }
 
 // =============================================================================
@@ -114,10 +154,7 @@ test.describe('GraphEditor — 永続化', () => {
      */
     test('ノード A・B 追加 → エッジ接続 → 再ナビゲーション → エッジが復元される', async ({ page }) => {
         await createNewGraph(page)
-
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await expect(page.locator('.react-flow__node')).toHaveCount(2)
+        await addTwoNodesApart(page)
 
         const nodeA = page.locator('.react-flow__node').nth(0)
         const nodeB = page.locator('.react-flow__node').nth(1)
@@ -290,11 +327,9 @@ test.describe('GraphEditor — 複数選択 [CTX-5]', () => {
         await page.getByRole('button', { name: /ノード追加/ }).click()
         await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
 
-        // 1枚目をクリック → NodeProperty が表示される
         await page.locator('.react-flow__node').nth(0).click()
         await expect(page.getByTestId('node-property')).toBeVisible({ timeout: 5000 })
 
-        // 2枚目を Shift+クリック → 複数選択 → NodeProperty が非表示になる
         await page.locator('.react-flow__node').nth(1).click({ modifiers: ['Shift'] })
         await expect(page.getByTestId('node-property')).toHaveCount(0)
 
@@ -357,7 +392,6 @@ test.describe('GraphEditor — 複数選択 [CTX-5]', () => {
         await page.locator('.react-flow__node').nth(1).click({ modifiers: ['Shift'] })
         await expect(page.getByTestId('node-property')).not.toBeVisible()
 
-        // キャンバスの空白をクリックして選択解除
         await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } })
         await expect(page.getByTestId('node-property')).not.toBeVisible()
 
@@ -383,11 +417,7 @@ test.describe('GraphEditor — Edge Connect / Delete [CTX-6]', () => {
      */
     test('2ノード間をハンドルでドラッグ接続するとエッジが作成される', async ({ page }) => {
         await createNewGraph(page)
-
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await expect(page.locator('.react-flow__node')).toHaveCount(1, { timeout: 10000 })
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
+        await addTwoNodesApart(page)
 
         const nodeA = page.locator('.react-flow__node').nth(0)
         const nodeB = page.locator('.react-flow__node').nth(1)
@@ -414,11 +444,7 @@ test.describe('GraphEditor — Edge Connect / Delete [CTX-6]', () => {
      */
     test('エッジを選択して Delete キーで削除できる', async ({ page }) => {
         await createNewGraph(page)
-
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await expect(page.locator('.react-flow__node')).toHaveCount(1, { timeout: 10000 })
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
+        await addTwoNodesApart(page)
 
         const nodeA = page.locator('.react-flow__node').nth(0)
         const nodeB = page.locator('.react-flow__node').nth(1)

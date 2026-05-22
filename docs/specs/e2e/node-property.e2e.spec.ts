@@ -63,7 +63,7 @@ test.describe('NodeProperty — フォーム編集', () => {
         const labelInput = page.getByTestId('input-label')
         await expect(labelInput).toBeVisible()
         await labelInput.fill('')
-        await page.getByTestId('graph-editor').click({ position: { x: 10, y: 10 } })
+        await page.keyboard.press('Tab')
 
         await expect(page.getByTestId('error-label')).toBeVisible()
         await expect(node.getByText('New Node')).toBeVisible()
