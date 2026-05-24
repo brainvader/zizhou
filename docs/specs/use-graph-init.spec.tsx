@@ -32,14 +32,16 @@ const {
     mockReadTextFile,
     mockUseProjectDetailStore,
     mockUseGraphStore,
-    mockSetHydrated,
 } = vi.hoisted(() => ({
     mockExists: vi.fn(),
     mockReadTextFile: vi.fn(),
     mockUseProjectDetailStore: vi.fn(),
     mockUseGraphStore: vi.fn(),
-    mockSetHydrated: vi.fn(),
 }))
+
+// useGraphFile は GraphEditor 側でインスタンス化する設計のため
+// useGraphInit 内では呼ばない。setHydrated は props DI で渡す。
+const mockSetHydrated = vi.fn()
 
 type ExistsFn = NonNullable<UseGraphInitOptions['onExists']>
 type ReadTextFileFn = NonNullable<UseGraphInitOptions['onReadTextFile']>
@@ -58,10 +60,6 @@ vi.mock('@/store/useProjectDetailStore', () => ({
 
 vi.mock('@/store/useGraphStore', () => ({
     useGraphStore: mockUseGraphStore,
-}))
-
-vi.mock('@/hooks/useGraphFile', () => ({
-    useGraphFile: () => ({ setHydrated: mockSetHydrated }),
 }))
 
 const makeDetailStoreState = (overrides: Partial<{
@@ -88,6 +86,7 @@ const makeGraphStoreState = (overrides: Partial<{
 
 beforeEach(() => {
     vi.clearAllMocks()
+    mockSetHydrated.mockReset()
     mockExists.mockResolvedValue(true)
     mockReadTextFile.mockResolvedValue(mockGraphJson)
 
