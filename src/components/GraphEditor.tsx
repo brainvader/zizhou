@@ -153,16 +153,20 @@ export function GraphEditor({
     const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
 
     // --- [CTX-7] NODE_TYPES: editingNodeId を EditableNode に注入するため useMemo 化 ---
-    const nodeTypes = useMemo(() => ({
-        editableNode: (props: React.ComponentProps<typeof EditableNode>) => (
+    const nodeTypes = useMemo(() => {
+        const node = (props: React.ComponentProps<typeof EditableNode>) => (
             <EditableNode
                 {...props}
                 isEditing={editingNodeId === props.id}
                 onStartEditing={() => setEditingNodeId(props.id)}
                 onStopEditing={() => setEditingNodeId(null)}
             />
-        ),
-    }), [editingNodeId])
+        )
+        return {
+            editableNode: node,
+            default: node,  // type 未指定ノードも EditableNode で描画する
+        }
+    }, [editingNodeId])
 
     // --- Add Node ---
     const handleAddNode = useCallback(() => {

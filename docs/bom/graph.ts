@@ -66,6 +66,7 @@ export const GraphFileSchema = z.object({
     nodes: z.array(
         z.object({
             id: z.string(),
+            type: z.string().optional(),  // 'editableNode' 等。未設定時は loadGraph で補完する
             position: z.object({ x: z.number(), y: z.number() }),
             data: GraphNodeDataSchema,
         })

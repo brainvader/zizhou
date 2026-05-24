@@ -39,7 +39,11 @@ export const useGraphStore = create<GraphStore>((set) => ({
 
     loadGraph: (graph) =>
         set({
-            nodes: graph.nodes as Node<GraphNodeData>[],
+            // type が未設定のノードは 'editableNode' に補完する（後方互換）
+            nodes: graph.nodes.map((n) => ({
+                ...n,
+                type: n.type ?? 'editableNode',
+            })) as Node<GraphNodeData>[],
             edges: graph.edges as Edge[],
             selectedNodeId: null,
             selectedNodeIds: [],
