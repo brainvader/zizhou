@@ -1,8 +1,7 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect } from 'react'
 import { readTextFile } from '@tauri-apps/plugin-fs'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import { useGraphStore } from '@/store/useGraphStore'
-import { useGraphFile } from '@/hooks/useGraphFile'
 import { graphFilePath, GraphFileSchema } from '@/bom/graph'
 import type { InitStatus, GraphFile } from '@/bom/graph'
 
@@ -40,7 +39,6 @@ export function useGraphInit({
     const storeSetInitStatus = useProjectDetailStore((s) => s.setInitStatus)
     const storeLoadGraph = useGraphStore((s) => s.loadGraph)
     const storeResetGraph = useGraphStore((s) => s.resetGraph)
-    const { setHydrated: storeSetHydrated } = useGraphFile()
 
     const projectRootPath = projectRootPathProp ?? storeProjectRootPath
     const activeGraphId = activeGraphIdProp ?? storeActiveGraphId
@@ -48,7 +46,11 @@ export function useGraphInit({
     const setInitStatus = onSetInitStatus ?? storeSetInitStatus
     const loadGraph = onLoadGraph ?? storeLoadGraph
     const resetGraph = onResetGraph ?? storeResetGraph
-    const setHydrated = setHydratedProp ?? storeSetHydrated
+
+    // useGraphFile は GraphEditor 側でインスタンス化する。
+    // useGraphInit 内で呼ぶと subscribe が2重登録されるため、
+    // setHydrated は必ず外から渡す。渡されない場合は no-op。
+    const setHydrated = setHydratedProp ?? (() => { })
 
     // --- 1. Init Check: projectRootPath が設定されたら即 'ready' ---
     useEffect(() => {

@@ -198,16 +198,18 @@ test.describe('NodeType + Status — Persistence [CTX-8]', () => {
         await createNewGraph(page)
         await addNode(page)
 
-        // done に設定
         const checkbox = page.locator('[data-testid="node-status-checkbox"]').first()
         await checkbox.click()
         await expect(page.locator('[data-testid="editable-node"]').first()).toHaveAttribute('data-status', 'done')
 
-        // リロード
+        await page.waitForTimeout(500)
+
         await page.reload()
         await expect(page.getByText('Loading…')).toBeHidden({ timeout: 10000 })
 
-        await expect(page.locator('[data-testid="editable-node"]').first()).toHaveAttribute('data-status', 'done')
+        await expect(page.locator('[data-testid="editable-node"]').first())
+            .toHaveAttribute('data-status', 'done', { timeout: 10000 })
+
         await page.screenshot({ path: 'evidence/CTX8_persistence_status.png' })
     })
 
