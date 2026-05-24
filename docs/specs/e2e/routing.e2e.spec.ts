@@ -1,7 +1,7 @@
 /**
  * Slot 1: 発注用ヘッダー (JSDoc Metadata)
  *
- * @context CTX-5: ROUTING
+ * @context CTX-5: ROUTING / CTX-11: Root Layout
  * @bom     docs/bom/project.ts
  *
  * @story
@@ -9,9 +9,12 @@
  * 2. ユーザーがプロジェクトカードをクリックすると `/projects/:id` へ遷移する
  * 3. `/projects/:id` ページに FileTree が表示される
  * 4. ブラウザの「戻る」操作で ProjectGrid に戻れる
+ * 5. `/projects/:id` に直接アクセスしても __root.tsx 経由で loadProjects が走り
+ *    戻った後の ProjectGrid でプロジェクトが表示される（CTX-11）
  *
  * @output
  *   src/router.tsx
+ *   src/routes/__root.tsx
  *   src/routes/index.tsx
  *   src/routes/projects.$id.tsx
  */
@@ -81,22 +84,26 @@ test.describe('CTX-5 ROUTING — Visual Story (Playwright)', () => {
         });
     });
 
-    test('direct navigation to /projects/:id renders project detail', async ({ page }) => {
+    test('direct navigation to /projects/:id renders project detail (CTX-11)', async ({ page }) => {
         const firstCard = page.locator('[data-testid^="card-"]').first()
         const testId = await firstCard.getAttribute('data-testid') ?? ''
         const projectId = testId.replace('card-', '')
 
+        // /projects/:id に直接アクセスしても __root.tsx 経由で loadProjects が走る
         await page.goto(`/projects/${projectId}`)
         await expect(page).toHaveURL(`/projects/${projectId}`)
         await expect(page.getByTestId('file-tree')).toBeVisible()
+
+        // 戻った後も ProjectGrid でプロジェクトが表示される（hydration 確認）
+        await page.goBack()
+        await expect(page).toHaveURL('/')
+        await expect(page.getByTestId('project-grid')).toBeVisible()
+        await expect(page.locator('[data-testid^="card-"]').first()).toBeVisible()
+        await expect(page.locator('button').filter({ hasText: '＋ new project' })).toBeEnabled()
 
         await page.screenshot({
             path: `${EVIDENCE}/routing_direct_nav.png`,
             fullPage: true,
         })
-    });
-
-    test.skip('tauri: native window title and hardware-back navigation', async () => {
-        // Tauri WebDriver セットアップ後に実装する
     });
 });
