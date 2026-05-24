@@ -119,9 +119,9 @@ test.describe('CTX-1 FileTree — グラフ切り替え', () => {
 test.describe('CTX-1 FileTree — URL 直打ち復元', () => {
 
     test.skip('step 10: ?graph=graph-02 で直アクセスすると graph-02 が読み込まれる', async () => {
-        // SKIP REASON: モック環境では page.goto() で Zustand store がリセットされるため
+        // SKIP REASON: page.goto() で Zustand store がリセットされるため
         // projectRootPath が空になり FileTree が Loading… のまま。
-        // URL SSOT の検証は pnpm tauri dev での手動確認で代替する。
+        // useProjectDetailStore の永続化（CTX-12 等）で対応予定。
     })
 
 })
