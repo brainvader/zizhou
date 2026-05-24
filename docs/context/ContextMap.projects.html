@@ -598,18 +598,22 @@
         </div>
 
         <!-- ============================================================
-            CTX-5: ROUTING [ ]
+            CTX-5: ROUTING [✓]
             責務: TanStack Router のルート定義・ページコンポーネントの配線
             注意: routing の SSOT は TanStack Router。Zustand に currentPath は持たない。
         ============================================================ -->
         <!--
-            src/router.tsx          — createRouter() + RouterProvider のエクスポート
-            src/routes/index.tsx    — "/" ルート（ProjectGrid をレンダリング）
-            src/routes/projects.$id.tsx — "/projects/$id" ルート（id 表示プレースホルダー）
+            src/routes/__root.tsx       — Root Layout。useProjectLoad を呼び出し、
+                                          どのルートに直接アクセスしても hydration を保証する。[✓] CTX-11
+            src/router.tsx              — createRouter() + RouterProvider のエクスポート
+            src/routes/index.tsx        — "/" ルート（ProjectGrid をレンダリング）
+            src/routes/projects.$id.tsx — "/projects/$id" ルート
 
-            [✓][Feature] Project Detail Route — /projects/$id を開くと useParams で id を取得して表示する（プレースホルダー）
-            [✓][Logic]   Router Setup         — createRouter() でルートツリーを構築し App.tsx で RouterProvider をラップする    
+            [✓][Feature] Project Detail Route — /projects/$id を開くと useParams で id を取得して表示する
+            [✓][Logic]   Router Setup         — createRouter() でルートツリーを構築し App.tsx で RouterProvider をラップする
             [✓][Logic]   Link Wrap            — ProjectGrid の各カードを <Link to="/projects/$id"> でラップする（CTX-2 Open Project の実装）
+            [✓][Logic]   Root Layout          — __root.tsx で useProjectLoad を呼び出し全ルートで hydration を保証する（CTX-11）
+            [✓][Logic]   Direct Navigation    — /projects/:id に直接アクセスしても ProjectGrid に戻った後プロジェクトが表示される
         -->
 
     </body>

@@ -766,12 +766,19 @@
                        グラフ + カタログを JSON でエクスポートする
                        エクスポートJSONはLLMへのナレッジ兼TODOリストとして機能する
 
-                 [CTX-11] Root Layout:
-                       __root.tsx を作成し loadProjects() をルートレイアウトに移動する
-                       どのルートに直接アクセスしても hydration が走るようにする
-                       index.tsx から loadProjects() / isHydrated を削除する
-                       ProjectGrid の isHydrated prop を削除する
-                       CTX-8 でスキップした Persistence E2E テストが通るようになる
+                 [CTX-11] Root Layout: [✓]
+                       __root.tsx を作成し loadProjects() をルートレイアウトに移動した
+                       useProjectFile を useProjectLoad / useProjectSave に分割した
+                       index.tsx から loadProjects() / isHydrated を削除した
+                       ProjectGrid の isHydrated prop を削除した
+                       node-type.e2e.spec.ts の Persistence skip 2件を解除した
+                       useGraphFile の hydration race condition を修正した（module スコープ変数 + pending パターン）
+
+                 [CTX-12] ProjectDetail Store の永続化: [ ]
+                       useProjectDetailStore の projectRootPath / activeGraphId を永続化する
+                       /projects/:id に直接アクセスしたとき projectRootPath が復元され
+                       FileTree が Loading… のまま止まらないようにする
+                       file-tree.e2e.spec.ts の step 10 skip を解除できるようになる
             ============================================================ -->
             <main id="ctx-graph-editor">
                 <div class="graph-canvas">
