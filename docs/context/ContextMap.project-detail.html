@@ -774,11 +774,14 @@
                        node-type.e2e.spec.ts の Persistence skip 2件を解除した
                        useGraphFile の hydration race condition を修正した（module スコープ変数 + pending パターン）
 
-                 [CTX-12] ProjectDetail Store の永続化: [ ]
-                       useProjectDetailStore の projectRootPath / activeGraphId を永続化する
-                       /projects/:id に直接アクセスしたとき projectRootPath が復元され
-                       FileTree が Loading… のまま止まらないようにする
-                       file-tree.e2e.spec.ts の step 10 skip を解除できるようになる
+                 [CTX-12] ProjectDetail Store の永続化: [✓]
+                       useProjectDetailStore の projectRootPath / activeGraphId を永続化した
+                       AppData/project-detail-{projectId}.json に保存・復元する
+                       useProjectDetailLoad: projects.$id.tsx マウント時に json を読み込み store に hydrate する
+                       useProjectDetailSave: subscribe ベースで projectRootPath / activeGraphId の変化を自動保存する
+                       isDetailHydrated を ProjectDetailStore に追加し save-before-load を防止する
+                       src/__mocks__/plugin-fs.ts に project-detail-*.json の localStorage バックエンドを追加した
+                       file-tree.e2e.spec.ts の step 10 skip を解除した
             ============================================================ -->
             <main id="ctx-graph-editor">
                 <div class="graph-canvas">
