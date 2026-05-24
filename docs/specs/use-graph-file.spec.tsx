@@ -189,7 +189,7 @@ describe('useGraphFile: logic', () => {
         mockWriteTextFile.mockResolvedValue(undefined)
 
         const { result } = renderHook(() => useGraphFile())
-
+        act(() => result.current.setHydrated(true))  // ← 追加
         await act(() => result.current.saveGraph(fixtureNodes, fixtureEdges))
 
         expect(mockWriteTextFile).toHaveBeenCalledWith(
@@ -198,24 +198,38 @@ describe('useGraphFile: logic', () => {
         )
     })
 
-    test('logic: saving.current が true のとき重複保存をスキップする', async () => {
-        // 最初の saveGraph が pending 中に2回目が呼ばれた場合
+    test('logic: saving.current が true のとき最新状態を pending に記憶して再実行する', async () => {
         let resolve: () => void
         mockWriteTextFile.mockImplementation(
             () => new Promise<void>((r) => { resolve = r })
         )
 
+        const nodesV1: Node<GraphNodeData>[] = [
+            { id: 'node-1', type: 'editableNode', position: { x: 0, y: 0 }, data: { label: 'v1' } },
+        ]
+        const nodesV2: Node<GraphNodeData>[] = [
+            { id: 'node-1', type: 'editableNode', position: { x: 0, y: 0 }, data: { label: 'v1', status: 'done' } },
+        ]
+
         const { result } = renderHook(() => useGraphFile())
+        act(() => result.current.setHydrated(true))
 
         // 1回目（pending のまま）
-        const first = act(() => result.current.saveGraph(fixtureNodes, fixtureEdges))
-        // 2回目（saving.current === true なのでスキップ）
-        await act(() => result.current.saveGraph(fixtureNodes, fixtureEdges))
+        const first = act(() => result.current.saveGraph(nodesV1, fixtureEdges))
+        // 2回目（saving.current === true なので pending に記憶）
+        await act(() => result.current.saveGraph(nodesV2, fixtureEdges))
 
         resolve!()
         await first
 
-        expect(mockWriteTextFile).toHaveBeenCalledTimes(1)
+        // pending の v2 が再実行されるため writeTextFile は2回呼ばれる
+        await vi.waitFor(() => expect(mockWriteTextFile).toHaveBeenCalledTimes(2))
+
+        // 2回目の呼び出しに status: done が含まれる
+        expect(mockWriteTextFile).toHaveBeenLastCalledWith(
+            `${MOCK_ROOT}/graphs/${MOCK_GRAPH}.json`,
+            expect.stringContaining('"status"'),
+        )
     })
 
     test('logic: activeGraphId が null の場合 saveGraph は writeTextFile を呼ばない', async () => {
@@ -234,6 +248,50 @@ describe('useGraphFile: logic', () => {
         await act(() => result.current.saveGraph(fixtureNodes, fixtureEdges))
 
         expect(mockWriteTextFile).not.toHaveBeenCalled()
+    })
+
+    test('logic: status を含むノードを saveGraph すると status が JSON に含まれる', async () => {
+        mockWriteTextFile.mockResolvedValue(undefined)
+
+        const nodesWithStatus: Node<GraphNodeData>[] = [
+            {
+                id: 'node-1',
+                type: 'editableNode',
+                position: { x: 100, y: 100 },
+                data: { label: 'Test', status: 'done' },
+            },
+        ]
+
+        const { result } = renderHook(() => useGraphFile())
+        act(() => result.current.setHydrated(true))
+        await act(() => result.current.saveGraph(nodesWithStatus, []))
+
+        expect(mockWriteTextFile).toHaveBeenCalledWith(
+            `${MOCK_ROOT}/graphs/${MOCK_GRAPH}.json`,
+            expect.stringContaining('"status": "done"'),
+        )
+    })
+
+    test('logic: nodeType を含むノードを saveGraph すると nodeType が JSON に含まれる', async () => {
+        mockWriteTextFile.mockResolvedValue(undefined)
+
+        const nodesWithType: Node<GraphNodeData>[] = [
+            {
+                id: 'node-1',
+                type: 'editableNode',
+                position: { x: 100, y: 100 },
+                data: { label: 'Test', nodeType: 'llm' },
+            },
+        ]
+
+        const { result } = renderHook(() => useGraphFile())
+        act(() => result.current.setHydrated(true))
+        await act(() => result.current.saveGraph(nodesWithType, []))
+
+        expect(mockWriteTextFile).toHaveBeenCalledWith(
+            `${MOCK_ROOT}/graphs/${MOCK_GRAPH}.json`,
+            expect.stringContaining('"nodeType": "llm"'),
+        )
     })
 
 })

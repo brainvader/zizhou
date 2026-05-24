@@ -25,8 +25,6 @@ const INITIAL_ERRORS = { name: null as string | null, description: null as strin
 type MkdirFn = (path: string, options?: { recursive: boolean }) => Promise<void>
 
 type ProjectGridProps = {
-    /** loadProjects 完了後に true になる。false の間は「＋ new project」を disabled にする */
-    isHydrated: boolean
     /** フォルダ選択ダイアログを開く関数（省略時は RootPathInput が Tauri plugin-dialog にフォールバック） */
     onOpenDirectory?: () => Promise<string | null>
     /** graphs/ ディレクトリ作成関数（省略時は Tauri plugin-fs にフォールバック） */
@@ -43,8 +41,8 @@ type ProjectGridProps = {
  * @see docs/bom/project.ts
  * @see docs/specs/project-list.spec.tsx
  */
-export const ProjectGrid = ({ isHydrated, onOpenDirectory, onMkdir = mkdir }: ProjectGridProps) => {
-    const { projects, addProject } = useProjectStore()
+export const ProjectGrid = ({ onOpenDirectory, onMkdir = mkdir }: ProjectGridProps) => {
+    const { projects, addProject, isHydrated } = useProjectStore()
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [form, setForm] = useState<NewProjectForm>(INITIAL_FORM)
     const [errors, setErrors] = useState(INITIAL_ERRORS)
@@ -75,9 +73,7 @@ export const ProjectGrid = ({ isHydrated, onOpenDirectory, onMkdir = mkdir }: Pr
             })
             return
         }
-        // graphs/ ディレクトリを作成
         await onMkdir(graphsDir(result.data.rootPath), { recursive: true })
-        // [C] ID生成: nanoid() で id を生成して Project に合成
         addProject({ id: nanoid(), ...result.data })
         setIsDialogOpen(false)
         setForm(INITIAL_FORM)
@@ -86,7 +82,6 @@ export const ProjectGrid = ({ isHydrated, onOpenDirectory, onMkdir = mkdir }: Pr
 
     return (
         <main data-testid="project-grid" className="p-6">
-            {/* プロジェクトカードグリッド */}
             <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
                 {projects.map((project) => (
                     <Link
@@ -114,7 +109,6 @@ export const ProjectGrid = ({ isHydrated, onOpenDirectory, onMkdir = mkdir }: Pr
                 </button>
             </div>
 
-            {/* [B] New Project ダイアログ */}
             {isDialogOpen && (
                 <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleCancel()}>
                     <DialogContent>
@@ -126,7 +120,6 @@ export const ProjectGrid = ({ isHydrated, onOpenDirectory, onMkdir = mkdir }: Pr
                         </DialogHeader>
 
                         <div className="flex flex-col gap-4">
-                            {/* name フィールド */}
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="project-name" className="font-mono text-xs tracking-wide">
                                     name *
@@ -143,7 +136,6 @@ export const ProjectGrid = ({ isHydrated, onOpenDirectory, onMkdir = mkdir }: Pr
                                 )}
                             </div>
 
-                            {/* description フィールド */}
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="project-description" className="font-mono text-xs tracking-wide">
                                     description
@@ -160,7 +152,6 @@ export const ProjectGrid = ({ isHydrated, onOpenDirectory, onMkdir = mkdir }: Pr
                                 )}
                             </div>
 
-                            {/* rootPath フィールド — RootPathInput に委譲 */}
                             <RootPathInput
                                 value={form.rootPath}
                                 onChange={(v) => setForm((f) => ({ ...f, rootPath: v }))}

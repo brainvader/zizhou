@@ -34,14 +34,16 @@ export type NewProjectForm = z.infer<typeof NewProjectFormSchema>
 // ProjectStore
 // Zustand global-store の型定義。
 // routing は TanStack Router に委譲するため持たない。
-// 永続化は useProjectFile hook に委譲する（subscribe ベース）。
-// isHydrated: Tauri fs からの初回ロード完了フラグ。
+// 永続化は useProjectLoad / useProjectSave hook に委譲する。
+// isHydrated: useProjectLoad 完了後に true になる。
+//             useProjectSave が hydration 前の保存スキップ判断に使用する。
 // ============================================================
 
 export type ProjectStore = {
     // State
     projects: Project[]
     isHydrated: boolean
+
     // Actions
     addProject: (project: Project) => void
     setProjects: (projects: Project[]) => void
@@ -49,12 +51,22 @@ export type ProjectStore = {
 }
 
 // ============================================================
-// UseProjectFileReturn
-// useProjectFile hook の戻り値型。
+// UseProjectLoadReturn
+// useProjectLoad hook の戻り値型。
+// __root.tsx で呼び出す。起動時の一度きりの読み込みに特化。
 // ============================================================
 
-export type UseProjectFileReturn = {
-    isHydrated: boolean
+export type UseProjectLoadReturn = {
     loadProjects: () => Promise<void>
+}
+
+// ============================================================
+// UseProjectSaveReturn
+// useProjectSave hook の戻り値型。
+// IndexRoute で呼び出す。subscribe ベースの自動保存に特化。
+// saveProjects は E2E・手動テスト用に公開する。
+// ============================================================
+
+export type UseProjectSaveReturn = {
     saveProjects: (projects: Project[]) => Promise<void>
 }

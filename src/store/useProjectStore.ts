@@ -5,7 +5,7 @@ import type { ProjectStore } from '@/bom/project'
  * useProjectStore
  * Zustand global-store。projects[] の SSOT。
  * routing は TanStack Router に委譲するため持たない。
- * 永続化は useProjectFile hook に委譲する。
+ * 永続化は useProjectLoad / useProjectSave hook に委譲する。
  * @see docs/bom/project.ts ProjectStore
  */
 export const useProjectStore = create<ProjectStore>((set) => ({
