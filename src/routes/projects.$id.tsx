@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/resizable'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
+import { useProjectDetailLoad } from '@/hooks/useProjectDetailLoad'
+import { useProjectDetailSave } from '@/hooks/useProjectDetailSave'
 import { FILE_TREE_PANEL, GRAPH_EDITOR_PANEL, NODE_PROPERTY_PANEL } from '@/bom/layout'
 
 /**
@@ -25,13 +27,17 @@ import { FILE_TREE_PANEL, GRAPH_EDITOR_PANEL, NODE_PROPERTY_PANEL } from '@/bom/
  * activeGraphId の SSOT は URL の ?graph= クエリパラメータ。
  * useSearch() で取得し、GraphEditor に props として渡すとともに
  * useProjectDetailStore にも同期する（useGraphFile が getState() で参照するため）。
- * リロード時も URL から復元されるため Zustand のみへの依存はない。
+ *
+ * CTX-12 永続化:
+ *   - useProjectDetailLoad: マウント時に AppData/project-detail-{id}.json を読み込む。
+ *     直アクセス時に projectRootPath が即座に復元されるため FileTree が Loading… で止まらない。
+ *   - useProjectDetailSave: subscribe ベースで projectRootPath / activeGraphId の変化を自動保存する。
  *
  * @see src/router.tsx
  * @see src/components/ProjectDetailTopbar.tsx
  * @see docs/bom/layout.ts
- * @see docs/specs/file-tree.spec.tsx
- * @see docs/specs/graph-editor.spec.tsx
+ * @see src/hooks/useProjectDetailLoad.ts
+ * @see src/hooks/useProjectDetailSave.ts
  */
 export const ProjectDetailRoute = () => {
     const { id } = useParams({ from: '/projects/$id' })
@@ -41,7 +47,16 @@ export const ProjectDetailRoute = () => {
     const setActiveGraphId = useProjectDetailStore((s) => s.setActiveGraphId)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
-    // projectRootPath を store に注入する
+    // CTX-12: 直アクセス時に project-detail-{id}.json から projectRootPath を復元する
+    const { loadProjectDetail } = useProjectDetailLoad()
+    useEffect(() => {
+        loadProjectDetail(id)
+    }, [id, loadProjectDetail])
+
+    // CTX-12: projectRootPath / activeGraphId の変化を自動保存する
+    useProjectDetailSave(id)
+
+    // 通常遷移時: project?.rootPath が解決されたら store に注入する（loadProjectDetail より後に走るが上書きは問題なし）
     useEffect(() => {
         if (project?.rootPath) {
             setProjectRootPath(project.rootPath)
@@ -55,21 +70,18 @@ export const ProjectDetailRoute = () => {
 
     return (
         <div
-            style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}
+            style={{
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100vh',
+                background: 'var(--background)',
+                color: 'var(--foreground)',
+            }}
         >
-            {/* CTX-Topbar: Breadcrumb + New Graph + Settings */}
-            <ProjectDetailTopbar
-                projectId={id}
-                project={project}
-                onSettingsClick={() => setIsSettingsOpen(true)}
-            />
+            <ProjectDetailTopbar projectId={id} onSettingsClick={() => setIsSettingsOpen(true)} />
 
-            {/* 3ペイン水平リサイズレイアウト
-                flex-1 + h-0 でトップバー分を除いた残高を確実に占有させる。
-                flex: 1 + minHeight: 0 で Topbar 分を除いた残高を占有する。 */}
             <ResizablePanelGroup
-                orientation="horizontal"
-                style={{ flex: 1, minHeight: 0 }}
+                style={{ flex: 1, overflow: 'hidden' }}
             >
                 {/* CTX-1: FileTree */}
                 <ResizablePanel
@@ -80,7 +92,7 @@ export const ProjectDetailRoute = () => {
                     <FileTree projectId={id} />
                 </ResizablePanel>
 
-                <ResizableHandle withHandle />
+                <ResizableHandle />
 
                 {/* CTX-2: GraphEditor */}
                 <ResizablePanel
@@ -90,7 +102,7 @@ export const ProjectDetailRoute = () => {
                     <GraphEditor activeGraphId={activeGraphId ?? null} />
                 </ResizablePanel>
 
-                <ResizableHandle withHandle />
+                <ResizableHandle />
 
                 {/* CTX-3: NodeProperty */}
                 <ResizablePanel
@@ -98,16 +110,7 @@ export const ProjectDetailRoute = () => {
                     minSize={NODE_PROPERTY_PANEL.minSize}
                     maxSize={NODE_PROPERTY_PANEL.maxSize}
                 >
-                    <aside
-                        data-testid="node-property-pane"
-                        style={{
-                            height: '100%',
-                            borderLeft: '1px solid var(--border)',
-                            overflowY: 'auto',
-                        }}
-                    >
-                        <NodeProperty />
-                    </aside>
+                    <NodeProperty />
                 </ResizablePanel>
             </ResizablePanelGroup>
 

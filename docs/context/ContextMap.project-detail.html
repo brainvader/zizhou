@@ -21,6 +21,37 @@
         ============================================================ -->
 
         <!-- ============================================================
+             PHILOSOPHY — Zizou の運用思想
+
+             Zizou は人間とエージェントの合意形成プラットフォームである。
+             エージェント主導でも人間主導でもなく、両者が同じグラフを共有し
+             作業の定義・分担・実行について合意する場を提供する。
+
+             基本運用思想は Palantir Foundry に準拠する:
+               - グラフが人間とエージェントの合意の SSOT（信頼できる唯一の情報源）
+               - 誰が何をするかをグラフが定義する
+               - 実行はグラフの定義に従う
+
+             ノード = 単一スキル（変換処理の最小単位）
+               スキルとは「入力を受け取り、何らかの変換を行い、出力を返す処理単位」である。
+               変換の種類は問わない（データ変換 / ファイル変換 / 状態変換 / 知識変換 / 人間の判断）。
+               実行主体も問わない（CLI / API / LLM エージェント / 人間）。
+               確定的な作業はソフトウェア（CLI/API）が担い、
+               不確定な作業は LLM エージェントが担う。
+
+             グラフ = 複合スキル（スキルの入れ子構造）
+               複数のノード（単一スキル）を繋いだワークフロー全体が1つのスキルを構成する。
+               グラフ自体も1つのスキルとして別グラフから参照できる（入れ子）。
+               Palantir のデータパイプラインと異なり、
+               変換対象はデータに限定されない（ファイル・状態・知識・判断も含む）。
+
+             3者の役割:
+               人間        — グラフを設計・承認することで意図とルールを定義する
+               エージェント — グラフを読んで自分の担当ノードを把握し実行する
+               ソフトウェア — ノードの定義に従い CLI/API を実行する
+        ============================================================ -->
+
+        <!-- ============================================================
              GLOBAL STORE
              routing は TanStack Router に委譲するため持たない。
              グラフデータは Tauri fs プラグインで {projectRootPath}/graphs/{graphId}.json に保存する。
@@ -766,12 +797,22 @@
                        グラフ + カタログを JSON でエクスポートする
                        エクスポートJSONはLLMへのナレッジ兼TODOリストとして機能する
 
-                 [CTX-11] Root Layout:
-                       __root.tsx を作成し loadProjects() をルートレイアウトに移動する
-                       どのルートに直接アクセスしても hydration が走るようにする
-                       index.tsx から loadProjects() / isHydrated を削除する
-                       ProjectGrid の isHydrated prop を削除する
-                       CTX-8 でスキップした Persistence E2E テストが通るようになる
+                 [CTX-11] Root Layout: [✓]
+                       __root.tsx を作成し loadProjects() をルートレイアウトに移動した
+                       useProjectFile を useProjectLoad / useProjectSave に分割した
+                       index.tsx から loadProjects() / isHydrated を削除した
+                       ProjectGrid の isHydrated prop を削除した
+                       node-type.e2e.spec.ts の Persistence skip 2件を解除した
+                       useGraphFile の hydration race condition を修正した（module スコープ変数 + pending パターン）
+
+                 [CTX-12] ProjectDetail Store の永続化: [✓]
+                       useProjectDetailStore の projectRootPath / activeGraphId を永続化した
+                       AppData/project-detail-{projectId}.json に保存・復元する
+                       useProjectDetailLoad: projects.$id.tsx マウント時に json を読み込み store に hydrate する
+                       useProjectDetailSave: subscribe ベースで projectRootPath / activeGraphId の変化を自動保存する
+                       isDetailHydrated を ProjectDetailStore に追加し save-before-load を防止する
+                       src/__mocks__/plugin-fs.ts に project-detail-*.json の localStorage バックエンドを追加した
+                       file-tree.e2e.spec.ts の step 10 skip を解除した
             ============================================================ -->
             <main id="ctx-graph-editor">
                 <div class="graph-canvas">

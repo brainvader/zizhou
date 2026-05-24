@@ -94,7 +94,7 @@ const TreeItem = ({
                     tabIndex={0}
                     className={[
                         'flex items-center gap-1.5 px-2 py-0.75 rounded-sm cursor-pointer select-none',
-                        'text-[--muted-foreground] hover:text-[--foreground] hover:bg-[--muted]',
+                        'text-[11px] font-light text-[--foreground] hover:bg-[--muted]',
                         'transition-colors duration-100',
                     ].join(' ')}
                     style={{ paddingLeft: `${8 + indentPx}px` }}
@@ -134,9 +134,9 @@ const TreeItem = ({
             tabIndex={0}
             className={[
                 'flex items-center gap-1.5 px-2 py-0.75 rounded-sm cursor-pointer select-none',
-                'transition-colors duration-100',
+                'text-[11px] font-light transition-colors duration-100',
                 isSelected
-                    ? 'bg-[--primary-glow] text-[--primary-foreground]'
+                    ? 'bg-[--muted] text-[--foreground]'
                     : 'text-[--muted-foreground] hover:text-[--foreground] hover:bg-[--muted]',
             ].join(' ')}
             style={{ paddingLeft: `${8 + indentPx}px` }}
@@ -145,7 +145,7 @@ const TreeItem = ({
         >
             <span className="shrink-0 w-3 h-3" />
             <span className="shrink-0 w-3.5 h-3.5">
-                <FileText size={14} className={isSelected ? 'text-[--primary]' : 'text-[--muted-foreground]'} />
+                <FileText size={14} className={isSelected ? 'text-[--foreground]' : 'text-[--muted-foreground]'} />
             </span>
             <span className="truncate">{node.name}</span>
         </div>
