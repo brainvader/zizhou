@@ -118,10 +118,32 @@ test.describe('CTX-1 FileTree — グラフ切り替え', () => {
 
 test.describe('CTX-1 FileTree — URL 直打ち復元', () => {
 
-    test.skip('step 10: ?graph=graph-02 で直アクセスすると graph-02 が読み込まれる', async () => {
-        // SKIP REASON: page.goto() で Zustand store がリセットされるため
-        // projectRootPath が空になり FileTree が Loading… のまま。
-        // useProjectDetailStore の永続化（CTX-12 等）で対応予定。
+    test('step 10: ?graph=graph-02 で直アクセスすると graph-02 が読み込まれる', async ({ page }) => {
+        // CTX-12: useProjectDetailLoad により project-detail-{id}.json から
+        // projectRootPath が復元されるため、直アクセスでも FileTree が Loading… を抜ける。
+
+        // Step 1: 通常遷移で project-detail の URL を確立し、project-detail.json を書き込む
+        await page.goto('/')
+        await expect(page.getByText('zizou-core')).toBeVisible()
+        await page.locator('[data-testid^="card-"]').first().click()
+        await expect(page.getByTestId('new-graph-btn')).toBeEnabled({ timeout: 15000 })
+        await page.getByTestId('new-graph-btn').click()
+        await page.waitForURL(/\?graph=/, { timeout: 10000 })
+        const currentUrl = page.url()
+
+        // project-detail.json が書き込まれるまで待つ（subscribe ベースの保存）
+        await page.waitForTimeout(500)
+
+        // Step 2: 直アクセス（リロード相当）
+        await page.goto(currentUrl)
+
+        // Step 3: FileTree が Loading… を抜けることを確認
+        await expect(page.getByText('Loading…')).toBeHidden({ timeout: 15000 })
+
+        // Step 4: FileTree が表示されていることを確認
+        await expect(page.getByTestId('file-tree')).toBeVisible()
+
+        await page.screenshot({ path: 'evidence/CTX12_step10_direct_access.png' })
     })
 
 })
