@@ -789,13 +789,23 @@
                        nodeType / status を GraphNodeData に追加する
                        タイプは node_catalog の category に対応する（git / validate / analyze / llm / custom）
  
-                 [CTX-9] Node Catalog:
-                       node_catalog は SurrealDB で管理する（SSOT）
-                       UI / LLMエクスポート / 実行エンジンが参照する
- 
-                 [CTX-10] Graph Export/Import:
+                 [CTX-9] Node Catalog UI: [ ]
+                       Node Catalog をフロントエンドのみで実装する（固定データ・SurrealDB 不使用）
+                       カタログパネルをグラフエディタ内に表示する
+                       カテゴリ別一覧（git / validate / analyze / llm / custom）を表示する
+                       カタログからノードをグラフに追加できる
+                       カタログデータは BOM の定数（NODE_CATALOG）としてハードコードする
+                       PHILOSOPHY: ノード = 単一スキル。カタログはスキルの定義リスト。
+
+                 [CTX-10] Graph Export/Import: [ ]
                        グラフ + カタログを JSON でエクスポートする
-                       エクスポートJSONはLLMへのナレッジ兼TODOリストとして機能する
+                       エクスポート JSON は LLM へのナレッジ兼 TODO リストとして機能する
+                       PHILOSOPHY: エクスポート JSON が人間とエージェントの合意の SSOT としてエージェントに渡る
+
+                 [CTX-13] Node Catalog + SurrealDB 連携: [ ]
+                       node_catalog の SSOT を SurrealDB に移行する（CTX-9 の固定データを置き換える）
+                       Tauri に SurrealDB を組み込み node_catalog テーブルを定義・初期データ投入する
+                       起動時に SurrealDB から node_catalog を取得し UI / LLM エクスポート / 実行エンジンが参照する
 
                  [CTX-11] Root Layout: [✓]
                        __root.tsx を作成し loadProjects() をルートレイアウトに移動した
@@ -906,17 +916,19 @@
                     [✓][Feature] Node Status Visual — ステータスに応じてノードの見た目が変わる（done=薄くなる / doing=ハイライト）
                     [✓][Logic]   GraphNodeData Update — nodeType / status を GraphNodeData に追加する
 
-                    [ ][Feature] Catalog Panel      — グラフエディタ内にカタログパネルを表示する
-                    [ ][Feature] Catalog Node Add   — カタログからノードをグラフに追加できる
-                    [ ][Feature] Catalog List       — カテゴリ別にカタログ一覧を表示する（git / validate / analyze / llm / custom）
-                    [ ][Logic]   Catalog Load       — 起動時にSurrealDBからnode_catalogを取得する
-                    [ ][Logic]   SurrealDB Setup    — TauriにSurrealDBを組み込み node_catalogテーブルを定義・初期データ投入する
+                    [ ][CTX-9][Feature] Catalog Panel      — グラフエディタ内にカタログパネルを表示する
+                    [ ][CTX-9][Feature] Catalog Node Add   — カタログからノードをグラフに追加できる
+                    [ ][CTX-9][Feature] Catalog List       — カテゴリ別にカタログ一覧を表示する（git / validate / analyze / llm / custom）
+                    [ ][CTX-9][Logic]   Catalog Data       — NODE_CATALOG 定数として BOM にハードコードする（SurrealDB は CTX-13）
 
-                    [ ][Feature] Graph Export       — グラフ+カタログをJSONでエクスポートする（クリップボード / ファイル保存）
-                    [ ][Feature] Graph Import       — LLMが返したJSONをグラフに反映する
-                    [ ][Logic]   TODO Integration   — status=doing が現在タスク / status=done が完了タスク
-                    [ ][Logic]   LLM Knowledge Format — { graph: { nodes, edges }, catalog: [...] } 形式でエクスポートする
-                    [ ][Logic]   Import Validation  — インポート時にZodでJSONを検証する
+                    [ ][CTX-10][Feature] Graph Export      — グラフ+カタログをJSONでエクスポートする（クリップボード / ファイル保存）
+                    [ ][CTX-10][Feature] Graph Import      — LLMが返したJSONをグラフに反映する
+                    [ ][CTX-10][Logic]   TODO Integration  — status=doing が現在タスク / status=done が完了タスク
+                    [ ][CTX-10][Logic]   LLM Knowledge Format — { graph: { nodes, edges }, catalog: [...] } 形式でエクスポートする
+                    [ ][CTX-10][Logic]   Import Validation — インポート時にZodでJSONを検証する
+
+                    [ ][CTX-13][Logic]   Catalog Load      — 起動時にSurrealDBからnode_catalogを取得する
+                    [ ][CTX-13][Logic]   SurrealDB Setup   — TauriにSurrealDBを組み込み node_catalogテーブルを定義・初期データ投入する
                 -->
             </main>
 
