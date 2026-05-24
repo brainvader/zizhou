@@ -176,15 +176,39 @@ test.describe('NodeType + Status — Persistence [CTX-8]', () => {
         await page.evaluate(() => localStorage.clear())
     })
 
-    test.skip('nodeType を設定してリロードすると復元される', async ({ page }) => {
-        // SKIP: loadProjects() が IndexRoute にしかないため、
-        // projects/$id に直接アクセスした場合に hydration が走らず
-        // FileTree の Loading… が消えない。
-        // __root.tsx 作成（Root Layout リファクタ）で解決予定。
+    test('nodeType を設定してリロードすると復元される', async ({ page }) => {
+        await createNewGraph(page)
+        await addNode(page)
+
+        // llm に設定
+        const node = page.locator('.react-flow__node').first()
+        await node.click({ button: 'right' })
+        await page.getByTestId('menu-item-type-llm').click()
+        await expect(page.locator('[data-testid="node-type-badge"]').first()).toHaveText('llm')
+
+        // リロード
+        await page.reload()
+        await expect(page.getByText('Loading…')).toBeHidden({ timeout: 10000 })
+
+        await expect(page.locator('[data-testid="node-type-badge"]').first()).toHaveText('llm')
+        await page.screenshot({ path: 'evidence/CTX8_persistence_nodetype.png' })
     })
 
-    test.skip('status=done にしてリロードすると復元される', async ({ page }) => {
-        // SKIP: 同上
+    test('status=done にしてリロードすると復元される', async ({ page }) => {
+        await createNewGraph(page)
+        await addNode(page)
+
+        // done に設定
+        const checkbox = page.locator('[data-testid="node-status-checkbox"]').first()
+        await checkbox.click()
+        await expect(page.locator('[data-testid="editable-node"]').first()).toHaveAttribute('data-status', 'done')
+
+        // リロード
+        await page.reload()
+        await expect(page.getByText('Loading…')).toBeHidden({ timeout: 10000 })
+
+        await expect(page.locator('[data-testid="editable-node"]').first()).toHaveAttribute('data-status', 'done')
+        await page.screenshot({ path: 'evidence/CTX8_persistence_status.png' })
     })
 
 })
