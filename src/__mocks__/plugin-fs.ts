@@ -20,6 +20,9 @@
 const isGraphFile = (path: string): boolean =>
     /[\\/]graphs[\\/][^/\\/]+\.json$/.test(path)
 
+const isProjectDetailFile = (path: string): boolean =>
+    /^project-detail-.+\.json$/.test(path)
+
 // ============================================================
 // exists
 // ============================================================
@@ -27,6 +30,7 @@ const isGraphFile = (path: string): boolean =>
 export const exists = async (path: string): Promise<boolean> => {
     if (path === 'projects.json') return true
     if (isGraphFile(path)) return localStorage.getItem(path) !== null
+    if (isProjectDetailFile(path)) return localStorage.getItem(path) !== null
     return true
 }
 
@@ -37,6 +41,12 @@ export const exists = async (path: string): Promise<boolean> => {
 export const readTextFile = async (path: string): Promise<string> => {
     // グラフファイルは localStorage から読む
     if (isGraphFile(path)) {
+        const value = localStorage.getItem(path)
+        if (value === null) throw new Error(`[mock] file not found: ${path}`)
+        return value
+    }
+    // project-detail-{id}.json は localStorage から読む
+    if (isProjectDetailFile(path)) {
         const value = localStorage.getItem(path)
         if (value === null) throw new Error(`[mock] file not found: ${path}`)
         return value
@@ -58,6 +68,11 @@ export const readTextFile = async (path: string): Promise<string> => {
 export const writeTextFile = async (path: string, contents: string): Promise<void> => {
     // グラフファイルは localStorage に書く
     if (isGraphFile(path)) {
+        localStorage.setItem(path, contents)
+        return
+    }
+    // project-detail-{id}.json は localStorage に書く
+    if (isProjectDetailFile(path)) {
         localStorage.setItem(path, contents)
         return
     }
