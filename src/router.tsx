@@ -1,4 +1,5 @@
-import { createRouter, createRootRoute, createRoute } from '@tanstack/react-router'
+import { createRouter, createRoute } from '@tanstack/react-router'
+import { rootRoute } from '@/routes/__root'
 import { IndexRoute } from '@/routes/index'
 import { ProjectDetailRoute } from '@/routes/projects.$id'
 
@@ -17,8 +18,6 @@ import { ProjectDetailRoute } from '@/routes/projects.$id'
  * @see docs/bom/project.ts — routing は TanStack Router に委譲
  * @see docs/specs/routing.spec.tsx
  */
-const rootRoute = createRootRoute()
-
 const indexRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/',
