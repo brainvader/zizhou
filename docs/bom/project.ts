@@ -41,20 +41,21 @@ export type NewProjectForm = z.infer<typeof NewProjectFormSchema>
 export type ProjectStore = {
     // State
     projects: Project[]
-    isHydrated: boolean
+
     // Actions
     addProject: (project: Project) => void
     setProjects: (projects: Project[]) => void
-    setHydrated: (value: boolean) => void
 }
 
-// ============================================================
-// UseProjectFileReturn
-// useProjectFile hook の戻り値型。
-// ============================================================
-
-export type UseProjectFileReturn = {
-    isHydrated: boolean
+// 新規: useProjectLoad の戻り値
+// __root.tsx で呼び出す。起動時の一度きりの読み込みに特化。
+export type UseProjectLoadReturn = {
     loadProjects: () => Promise<void>
+}
+
+// 新規: useProjectSave の戻り値
+// IndexRoute で呼び出す。subscribe ベースの自動保存に特化。
+// saveProjects は E2E・手動テスト用に公開する。
+export type UseProjectSaveReturn = {
     saveProjects: (projects: Project[]) => Promise<void>
 }
