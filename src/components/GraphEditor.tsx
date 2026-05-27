@@ -43,6 +43,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
     ReactFlow,
+    ReactFlowProvider,
     Background,
     Controls,
     applyNodeChanges,
@@ -384,9 +385,13 @@ function GraphEditorInner({
     )
 }
 
-// ReactFlow の useReactFlow は ReactFlowProvider 内でしか使えないため
-// GraphEditorInner を ReactFlow の外側でラップする必要はない。
-// GraphEditor は ReactFlow コンポーネント自体が Provider を兼ねる。
+// useReactFlow() は ReactFlowProvider の子孫でしか使えない。
+// GraphEditorInner が ReactFlow の外側で useReactFlow() を呼ぶため
+// ReactFlowProvider で明示的にラップする。
 export function GraphEditor(props: GraphEditorProps = {}) {
-    return <GraphEditorInner {...props} />
+    return (
+        <ReactFlowProvider>
+            <GraphEditorInner {...props} />
+        </ReactFlowProvider>
+    )
 }
