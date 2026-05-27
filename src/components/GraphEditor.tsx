@@ -20,16 +20,22 @@
  * - editingNodeId を useState で管理する（ローカル状態。Zustand には持たない）
  * - NODE_TYPES を useMemo 化し editingNodeId を EditableNode に prop で注入する
  * - Delete Node/Edge は onNodesChange/onEdgesChange(remove) 経由で処理する（ReactFlow の想定フロー）
- * 
+ *
  * [CTX-8] Set Node Type:
  * - onSetNodeType は store.updateNodeData() に直結している
- * - TODO: props DI 化（onUpdateNodeData prop を追加）すれば Storybook で検証可能になる
  * - 現状は E2E（Playwright）で結合確認する
  *
- * @context CTX-2/5/6/7
+ * [CTX-9] Catalog Menu:
+ * - キャンバス空白右クリックで CatalogMenu を表示する
+ * - onPaneContextMenu で catalogMenu state をセットする
+ * - CatalogMenu でエントリ選択 → addNodeFromCatalog() でノードを追加する
+ * - 追加位置は右クリック座標を ReactFlow の flowToScreenPosition で変換する
+ *
+ * @context CTX-2/5/6/7/8/9
  * @see docs/bom/graph.ts
  * @see src/components/nodes/EditableNode.tsx
  * @see src/components/ContextMenu.tsx
+ * @see src/components/CatalogMenu.tsx
  * @see src/hooks/useGraphInit.ts
  * @see src/hooks/useGraphFile.ts
  */
@@ -41,6 +47,7 @@ import {
     Controls,
     applyNodeChanges,
     applyEdgeChanges,
+    useReactFlow,
     type Node,
     type Edge,
     type Connection,
@@ -59,17 +66,26 @@ import { useGraphFile } from '@/hooks/useGraphFile'
 import { useGraphInit } from '@/hooks/useGraphInit'
 import { EditableNode } from '@/components/nodes/EditableNode'
 import { ContextMenu } from '@/components/ContextMenu'
-import type { GraphNodeData, GraphFile, InitStatus, NodeType } from '@/bom/graph'
+import { CatalogMenu } from '@/components/CatalogMenu'
+import type { GraphNodeData, GraphFile, InitStatus, NodeType, CatalogEntry } from '@/bom/graph'
 
 type ExistsFn = (path: string) => Promise<boolean>
 type ReadTextFileFn = (path: string) => Promise<string>
 
-// [CTX-7] コンテキストメニューのローカル状態型
+// [CTX-7] ノード・エッジ用コンテキストメニューのローカル状態型
 type ContextMenuState = {
     type: 'node' | 'edge'
     id: string
     x: number
     y: number
+} | null
+
+// [CTX-9] カタログメニューのローカル状態型
+type CatalogMenuState = {
+    x: number
+    y: number
+    flowX: number  // ReactFlow座標系でのX（ノード配置に使う）
+    flowY: number  // ReactFlow座標系でのY
 } | null
 
 export type GraphEditorProps = {
@@ -92,7 +108,8 @@ export type GraphEditorProps = {
     setHydrated?: (hydrated: boolean) => void
 }
 
-export function GraphEditor({
+// [CTX-9] ReactFlow の useReactFlow を使うため内部コンポーネントに分離する
+function GraphEditorInner({
     initStatus: initStatusProp,
     projectRootPath: projectRootPathProp,
     activeGraphId: activeGraphIdProp,
@@ -107,12 +124,15 @@ export function GraphEditor({
     onExists = exists,
     onReadTextFile = readTextFile,
     setHydrated: setHydratedProp,
-}: GraphEditorProps = {}) {
+}: GraphEditorProps) {
+    const { screenToFlowPosition } = useReactFlow()
+
     // --- store フォールバック ---
     const storeNodes = useGraphStore((s) => s.nodes)
     const storeEdges = useGraphStore((s) => s.edges)
     const storeAddNode = useGraphStore((s) => s.addNode)
     const storeAddEdge = useGraphStore((s) => s.addEdge)
+    const storeAddNodeFromCatalog = useGraphStore((s) => s.addNodeFromCatalog)
     const storeSetSelectedNodeIds = useGraphStore((s) => s.setSelectedNodeIds)
     const storeInitStatus = useProjectDetailStore((s) => s.initStatus)
     const { setHydrated: storeSetHydrated } = useGraphFile()
@@ -152,6 +172,9 @@ export function GraphEditor({
     const [contextMenu, setContextMenu] = useState<ContextMenuState>(null)
     const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
 
+    // --- [CTX-9] カタログメニュー状態 ---
+    const [catalogMenu, setCatalogMenu] = useState<CatalogMenuState>(null)
+
     // --- [CTX-7] NODE_TYPES: editingNodeId を EditableNode に注入するため useMemo 化 ---
     const nodeTypes = useMemo(() => {
         const node = (props: React.ComponentProps<typeof EditableNode>) => (
@@ -168,7 +191,7 @@ export function GraphEditor({
         }
     }, [editingNodeId])
 
-    // --- Add Node ---
+    // --- Add Node（手動ボタン） ---
     const handleAddNode = useCallback(() => {
         const node: Node<GraphNodeData> = {
             id: nanoid(),
@@ -219,16 +242,34 @@ export function GraphEditor({
     // --- [CTX-7] Context Menu ハンドラ ---
     const handleNodeContextMenu: NodeMouseHandler = useCallback((e, node) => {
         e.preventDefault()
+        setCatalogMenu(null)
         setContextMenu({ type: 'node', id: node.id, x: e.clientX, y: e.clientY })
     }, [])
 
     const handleEdgeContextMenu: EdgeMouseHandler = useCallback((e, edge) => {
         e.preventDefault()
+        setCatalogMenu(null)
         setContextMenu({ type: 'edge', id: edge.id, x: e.clientX, y: e.clientY })
     }, [])
 
+    // --- [CTX-9] Pane 右クリック → カタログメニュー ---
+    const handlePaneContextMenu = useCallback((e: MouseEvent | React.MouseEvent) => {
+        // onPaneContextMenu は MouseEvent | React.MouseEvent のユニオン型
+        e.preventDefault()
+        setContextMenu(null)
+        const flowPos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+        setCatalogMenu({
+            x: e.clientX,
+            y: e.clientY,
+            flowX: flowPos.x,
+            flowY: flowPos.y,
+        })
+    }, [screenToFlowPosition])
+
+    // --- Pane クリック（左クリック）: 両メニューを閉じる ---
     const handlePaneClick = useCallback(() => {
         setContextMenu(null)
+        setCatalogMenu(null)
     }, [])
 
     // --- [CTX-7] メニューアクション ---
@@ -253,6 +294,13 @@ export function GraphEditor({
         if (!contextMenu) return
         storeUpdateNodeData(contextMenu.id, { nodeType: type })
     }, [contextMenu, storeUpdateNodeData])
+
+    // --- [CTX-9] カタログからノード追加 ---
+    const handleSelectCatalogEntry = useCallback((entry: CatalogEntry) => {
+        if (!catalogMenu) return
+        storeAddNodeFromCatalog(entry, { x: catalogMenu.flowX, y: catalogMenu.flowY })
+        setCatalogMenu(null)
+    }, [catalogMenu, storeAddNodeFromCatalog])
 
     return (
         <div
@@ -298,6 +346,7 @@ export function GraphEditor({
                         onConnect={handleConnect}
                         onNodeContextMenu={handleNodeContextMenu}
                         onEdgeContextMenu={handleEdgeContextMenu}
+                        onPaneContextMenu={handlePaneContextMenu}
                         onPaneClick={handlePaneClick}
                         nodeTypes={nodeTypes}
                         deleteKeyCode="Delete"
@@ -307,7 +356,7 @@ export function GraphEditor({
                         <Controls />
                     </ReactFlow>
 
-                    {/* [CTX-7] Context Menu */}
+                    {/* [CTX-7] Node / Edge Context Menu */}
                     {contextMenu && (
                         <ContextMenu
                             type={contextMenu.type}
@@ -319,8 +368,25 @@ export function GraphEditor({
                             onSetNodeType={handleSetNodeType}
                         />
                     )}
+
+                    {/* [CTX-9] Catalog Menu */}
+                    {catalogMenu && (
+                        <CatalogMenu
+                            x={catalogMenu.x}
+                            y={catalogMenu.y}
+                            onClose={() => setCatalogMenu(null)}
+                            onSelectEntry={handleSelectCatalogEntry}
+                        />
+                    )}
                 </>
             )}
         </div>
     )
+}
+
+// ReactFlow の useReactFlow は ReactFlowProvider 内でしか使えないため
+// GraphEditorInner を ReactFlow の外側でラップする必要はない。
+// GraphEditor は ReactFlow コンポーネント自体が Provider を兼ねる。
+export function GraphEditor(props: GraphEditorProps = {}) {
+    return <GraphEditorInner {...props} />
 }

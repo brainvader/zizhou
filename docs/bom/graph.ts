@@ -14,8 +14,7 @@ export type InitStatus = z.infer<typeof InitStatusSchema>
 
 // ============================================================
 // NodeType
-// ノードのカテゴリ。将来 SurrealDB の node_catalog.category に対応（CTX-9）。
-// 当面フロントエンドに固定値で保持する。
+// ノードのカテゴリ。SurrealDB の node_catalog.category に対応（CTX-13）。
 // ============================================================
 
 export const NODE_TYPES = ['git', 'validate', 'analyze', 'llm', 'custom'] as const
@@ -52,9 +51,151 @@ export const GraphNodeDataSchema = z.object({
     nodeType: NodeTypeSchema.optional(),
     // [CTX-8] 未設定時は 'todo' 扱いとする。後方互換のため optional。
     status: NodeStatusSchema.optional(),
+    // [CTX-9] カタログ紐付き情報。非紐付きノードは null。後方互換のため optional。
+    service: z.string().nullable().optional(),
+    provider: z.string().nullable().optional(),
+    // [CTX-9] ノード実行時の入力値。{ subcommand: '...' } を含む。
+    input: z.record(z.string(), z.unknown()).optional(),
 })
 
 export type GraphNodeData = z.infer<typeof GraphNodeDataSchema>
+
+// ============================================================
+// CatalogField / CatalogProfile / CatalogEntry       [CTX-9]
+// Node Catalog のエントリ型定義。
+// CTX-13 で SurrealDB の node_catalog レコードに対応する。
+// 1エントリ = 1スキル = 1profile（CTX-9設計決定）。
+// ============================================================
+
+export const CatalogFieldSchema = z.object({
+    type: z.enum(['string', 'number', 'boolean', 'enum']),
+    label: z.string(),
+    required: z.boolean().optional(),
+    default: z.unknown().optional(),
+    values: z.array(z.string()).optional(),  // type='enum' の場合のみ
+})
+export type CatalogField = z.infer<typeof CatalogFieldSchema>
+
+export const CatalogProfileSchema = z.object({
+    subcommand: z.string(),
+    args: z.array(z.string()),
+    fields: z.record(z.string(), CatalogFieldSchema),
+})
+export type CatalogProfile = z.infer<typeof CatalogProfileSchema>
+
+export const CatalogEntrySchema = z.object({
+    service: z.string(),
+    provider: z.string(),
+    label: z.string(),
+    nodeType: NodeTypeSchema,
+    profile: CatalogProfileSchema,
+})
+export type CatalogEntry = z.infer<typeof CatalogEntrySchema>
+
+// ============================================================
+// NODE_CATALOG                                        [CTX-9]
+// フロントエンドにハードコードされたカタログ定数。
+// CTX-13 で useCatalogSearch の内部実装を SurrealDB クエリに差し替える。
+// ============================================================
+
+export const NODE_CATALOG: CatalogEntry[] = [
+    // ── git ──────────────────────────────────────────────────
+    {
+        service: 'git', provider: 'local', label: 'Git Status',
+        nodeType: 'git',
+        profile: { subcommand: 'status', args: ['status'], fields: {} },
+    },
+    {
+        service: 'git', provider: 'local', label: 'Git Commit',
+        nodeType: 'git',
+        profile: {
+            subcommand: 'commit',
+            args: ['commit', '-m', '{input.message}'],
+            fields: {
+                message: { type: 'string', label: 'Commit Message', required: true },
+            },
+        },
+    },
+    {
+        service: 'git', provider: 'local', label: 'Git Log',
+        nodeType: 'git',
+        profile: {
+            subcommand: 'log',
+            args: ['log', '--oneline', '-{input.count}'],
+            fields: {
+                count: { type: 'number', label: 'Lines', default: 10 },
+            },
+        },
+    },
+    {
+        service: 'git', provider: 'local', label: 'Git Diff',
+        nodeType: 'git',
+        profile: { subcommand: 'diff', args: ['diff'], fields: {} },
+    },
+    // ── validate ─────────────────────────────────────────────
+    {
+        service: 'validate', provider: 'local', label: 'TypeScript Check',
+        nodeType: 'validate',
+        profile: { subcommand: 'tsc', args: ['tsc', '--noEmit'], fields: {} },
+    },
+    {
+        service: 'validate', provider: 'local', label: 'ESLint',
+        nodeType: 'validate',
+        profile: {
+            subcommand: 'eslint',
+            args: ['eslint', '{input.target}'],
+            fields: {
+                target: { type: 'string', label: 'Target Path', default: 'src' },
+            },
+        },
+    },
+    // ── analyze ──────────────────────────────────────────────
+    {
+        service: 'analyze', provider: 'local', label: 'Test Run',
+        nodeType: 'analyze',
+        profile: { subcommand: 'vitest', args: ['vitest', 'run'], fields: {} },
+    },
+    {
+        service: 'analyze', provider: 'local', label: 'Build',
+        nodeType: 'analyze',
+        profile: { subcommand: 'build', args: ['vite', 'build'], fields: {} },
+    },
+    // ── llm ──────────────────────────────────────────────────
+    {
+        service: 'llm', provider: 'claude', label: 'Claude: Summarize',
+        nodeType: 'llm',
+        profile: {
+            subcommand: 'summarize',
+            args: [],
+            fields: {
+                prompt: { type: 'string', label: 'Prompt', required: true },
+            },
+        },
+    },
+    {
+        service: 'llm', provider: 'claude', label: 'Claude: Review',
+        nodeType: 'llm',
+        profile: {
+            subcommand: 'review',
+            args: [],
+            fields: {
+                prompt: { type: 'string', label: 'Review Prompt', required: true },
+            },
+        },
+    },
+    // ── custom ───────────────────────────────────────────────
+    {
+        service: 'custom', provider: 'local', label: 'Shell Command',
+        nodeType: 'custom',
+        profile: {
+            subcommand: 'shell',
+            args: ['{input.command}'],
+            fields: {
+                command: { type: 'string', label: 'Command', required: true },
+            },
+        },
+    },
+]
 
 // ============================================================
 // GraphFile
@@ -101,10 +242,12 @@ export type GraphStore = {
     setNodes: (nodes: Node<GraphNodeData>[]) => void
     setEdges: (edges: Edge[]) => void
     setSelectedNodeId: (id: string | null) => void
-    // [CTX-5] selectedNodeIds を更新する。Single Guard も同時に適用する。
-    // Single Guard: ids.length === 1 のときのみ selectedNodeId も更新する。
+    // [CTX-5] selectedNodeIds を更新する。
+    // Single Guard: ids.length === 1 のときのみ selectedNodeId も同時に適用する。
     setSelectedNodeIds: (ids: string[]) => void
     addNode: (node: Node<GraphNodeData>) => void
+    // [CTX-9] CatalogEntry からノードを生成して nodes[] に追加する。
+    addNodeFromCatalog: (entry: CatalogEntry, position: { x: number; y: number }) => void
     loadGraph: (graph: GraphFile) => void
     resetGraph: () => void
     // [CTX-4] 指定 id のノードの data のみを部分更新する。
@@ -130,16 +273,14 @@ export const ProjectDetailStoreSchema = z.object({
     activeGraphId: z.string().nullable(),
     initStatus: InitStatusSchema,
     projectRootPath: z.string(),
-    // [CTX-12]
-    isDetailHydrated: z.boolean(),
+    isDetailHydrated: z.boolean(), // [CTX-12]
 })
 
 export type ProjectDetailStore = z.infer<typeof ProjectDetailStoreSchema> & {
     setActiveGraphId: (id: string | null) => void
     setInitStatus: (status: InitStatus) => void
     setProjectRootPath: (path: string) => void
-    // [CTX-12]
-    setDetailHydrated: (value: boolean) => void
+    setDetailHydrated: (value: boolean) => void // [CTX-12]
 }
 
 // ============================================================
@@ -158,31 +299,23 @@ export type ProjectDetailSnapshot = z.infer<typeof ProjectDetailSnapshotSchema>
 
 // ============================================================
 // UseProjectDetailLoadReturn                         [CTX-12]
-// useProjectDetailLoad hook の戻り値型。
-// projects.$id.tsx の useEffect で loadProjectDetail(projectId) を呼ぶ。
 // ============================================================
 
 export type UseProjectDetailLoadReturn = {
-    /** AppData/project-detail-{projectId}.json を読み込み store に hydrate する */
     loadProjectDetail: (projectId: string) => Promise<void>
 }
 
 // ============================================================
 // UseProjectDetailSaveReturn                         [CTX-12]
-// useProjectDetailSave hook の戻り値型。
-// projects.$id.tsx（ProjectDetailRoute）でマウント時に呼ぶ。
-// subscribe ベースで自動保存する。
 // ============================================================
 
 export type UseProjectDetailSaveReturn = {
-    /** 手動保存用（E2E・テスト用途）。通常は subscribe で自動呼び出し */
     saveProjectDetail: (snapshot: ProjectDetailSnapshot) => Promise<void>
 }
 
 // ============================================================
 // FileTreeNode
 // ctx-file-tree で表示するツリーノードの型。
-// Tauri fs の readDir 結果をこの型にマッピングする。
 // ============================================================
 
 export const FileTreeNodeSchema: z.ZodType<FileTreeNode> = z.lazy(() =>
@@ -202,17 +335,11 @@ export type FileTreeNode = {
 }
 
 // ============================================================
-// graphFilePath
-// {projectRootPath}/graphs/{graphId}.json のフルパスを生成するユーティリティ。
+// graphFilePath / graphsDir
 // ============================================================
 
 export const graphFilePath = (projectRootPath: string, graphId: string): string =>
     `${projectRootPath}/graphs/${graphId}.json`
-
-// ============================================================
-// graphsDir
-// {projectRootPath}/graphs/ ディレクトリパスを生成するユーティリティ。
-// ============================================================
 
 export const graphsDir = (projectRootPath: string): string =>
     `${projectRootPath}/graphs`

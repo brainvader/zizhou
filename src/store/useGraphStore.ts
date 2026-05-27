@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { addEdge as rfAddEdge } from '@xyflow/react'
+import { nanoid } from 'nanoid'
 import type { Node, Edge } from '@xyflow/react'
-import type { GraphNodeData, GraphStore } from '@/bom/graph'
+import type { GraphNodeData, GraphStore, CatalogEntry } from '@/bom/graph'
 
 export const useGraphStore = create<GraphStore>((set) => ({
     // State
@@ -32,6 +33,31 @@ export const useGraphStore = create<GraphStore>((set) => ({
 
     addNode: (node: Node<GraphNodeData>) =>
         set((state) => ({ nodes: [...state.nodes, node] })),
+
+    // [CTX-9] CatalogEntry からノードを生成して nodes[] に追加する。
+    // - label:    entry.label
+    // - nodeType: entry.nodeType
+    // - service:  entry.service
+    // - provider: entry.provider
+    // - input:    { subcommand: entry.profile.subcommand }
+    addNodeFromCatalog: (entry: CatalogEntry, position: { x: number; y: number }) =>
+        set((state) => ({
+            nodes: [
+                ...state.nodes,
+                {
+                    id: nanoid(),
+                    type: 'editableNode',
+                    position,
+                    data: {
+                        label: entry.label,
+                        nodeType: entry.nodeType,
+                        service: entry.service,
+                        provider: entry.provider,
+                        input: { subcommand: entry.profile.subcommand },
+                    },
+                } satisfies Node<GraphNodeData>,
+            ],
+        })),
 
     // [CTX-6] rfAddEdge は重複エッジを自動排除して新しい Edge[] を返す。
     addEdge: (connection) =>
