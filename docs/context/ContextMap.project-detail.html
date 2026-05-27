@@ -54,7 +54,7 @@
 
                Thin Orchestrator（薄い本体）
                  Zizou はグラフの設計・管理・合意形成に100%集中する。
-                 ノードの実行は単一の常駐サイドカー（service-manager）に完全委譲し、
+                 ノードの実行は Tauri コマンドが SurrealDB のノード定義を参照して直接実行する。
                  本体の責務を最小限に保つ。
 
                Data-Driven Extensibility（宣言的な拡張）
@@ -65,8 +65,8 @@
 
                Ephemerality of Execution（実行の刹那性）
                  サービスは実行時のみ起動・終了し、常駐しない。
-                 service-manager だけが常駐する唯一のサイドカーである。
-                 これによりローカルリソースを最適化し、プロセスのゾンビ化を防ぐ。
+                 外部サイドカー・常駐プロセスは不要。Tauri プロセス内で全てが完結する。
+                 実行時のみ CLI / HTTP を起動し終了する。
                  高コストな処理（LLM等）は入力ハッシュをキーにキャッシュで最適化する。
         ============================================================ -->
 
@@ -969,7 +969,7 @@
                     [ ][CTX-13][Logic]   SurrealDB Schema    — node_catalog テーブル + HNSW インデックスを定義する
                     [ ][CTX-13][Logic]   Node INSERT         — ノード定義を SurrealDB に直接 INSERT する（TOML 不要）
                     [ ][CTX-13][Logic]   useCatalogSearch    — 内部実装を SurrealDB クエリに差し替える（UI 変更不要）
-                    [ ][CTX-13][Logic]   service-manager     — GET /catalog を SurrealDB から取得するよう更新する
+                    [ ][CTX-13][Logic]   Tauri コマンド      — catalog_get_all / catalog_search / execute_node を実装する
                     [ ][Logic]   Import Validation  — インポート時にZodでJSONを検証する
                 -->
             </main>
