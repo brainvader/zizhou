@@ -51,14 +51,9 @@ pub async fn init_db() -> Result<Db, surrealdb::Error> {
     let db = Surreal::new::<Mem>(()).await?;
     db.use_ns("zizhou").use_db("catalog").await?;
 
-    // スキーマ定義
+    // スキーマ定義（SCHEMALESS でネストオブジェクトを自由に保存する）
     db.query(
-        "DEFINE TABLE node_catalog SCHEMAFULL;
-         DEFINE FIELD service   ON node_catalog TYPE string;
-         DEFINE FIELD provider  ON node_catalog TYPE string;
-         DEFINE FIELD label     ON node_catalog TYPE string;
-         DEFINE FIELD node_type ON node_catalog TYPE string;
-         DEFINE FIELD profile   ON node_catalog TYPE object;
+        "DEFINE TABLE node_catalog SCHEMALESS;
          DEFINE INDEX idx_label   ON node_catalog FIELDS label;
          DEFINE INDEX idx_service ON node_catalog FIELDS service;",
     )
