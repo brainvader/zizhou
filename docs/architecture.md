@@ -70,13 +70,13 @@ pub async fn setup() -> Surreal<SurrealKV> {
 ```sql
 -- Node Catalog
 DEFINE TABLE node_catalog SCHEMAFULL;
-DEFINE FIELD service      ON node_catalog TYPE string;
-DEFINE FIELD provider     ON node_catalog TYPE string;
-DEFINE FIELD label        ON node_catalog TYPE string;
-DEFINE FIELD executor     ON node_catalog TYPE object;
-DEFINE FIELD profiles     ON node_catalog TYPE array;
-DEFINE FIELD input_schema ON node_catalog TYPE object;
-DEFINE FIELD embedding    ON node_catalog TYPE array<float>;  -- CTX-13
+DEFINE FIELD service   ON node_catalog TYPE string;
+DEFINE FIELD provider  ON node_catalog TYPE string;
+DEFINE FIELD label     ON node_catalog TYPE string;
+DEFINE FIELD node_type ON node_catalog TYPE string;  -- CTX-9
+DEFINE FIELD executor  ON node_catalog TYPE object;
+DEFINE FIELD profile   ON node_catalog TYPE object;  -- 単数（CTX-9設計決定）
+DEFINE FIELD embedding ON node_catalog TYPE array<float>;  -- CTX-13
 
 -- ベクトル類似検索（CTX-13）
 DEFINE INDEX node_hnsw ON node_catalog
@@ -96,13 +96,13 @@ DEFINE INDEX node_search ON node_catalog
 ```rust
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NodeCatalog {
-    pub service:      String,
-    pub provider:     String,
-    pub label:        String,
-    pub executor:     Executor,
-    pub profiles:     Vec<Profile>,
-    pub input_schema: Option<serde_json::Value>,
-    pub embedding:    Option<Vec<f32>>,            // CTX-13
+    pub service:   String,
+    pub provider:  String,
+    pub label:     String,
+    pub node_type: String,   // フロントの CatalogEntry.nodeType に対応（CTX-9）
+    pub executor:  Executor,
+    pub profile:   Profile,  // 1エントリ = 1プロファイル（CTX-9設計決定）
+    pub embedding: Option<Vec<f32>>,  // CTX-13
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -120,7 +120,6 @@ pub enum Executor {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Profile {
     pub subcommand: String,
-    pub label:      String,
     pub args:       Vec<String>,
     pub fields:     HashMap<String, FieldSchema>,
 }
@@ -141,34 +140,44 @@ pub struct FieldSchema {
 
 ```rust
 // SurrealDB に INSERT するだけで Node Catalog に追加される
+// Git Status
 db.create::<Option<NodeCatalog>>("node_catalog")
     .content(NodeCatalog {
-        service:  "git".into(),
-        provider: "local".into(),
-        label:    "Git".into(),
-        executor: Executor::Cli { command: "git".into() },
-        profiles: vec![
-            Profile {
-                subcommand: "status".into(),
-                label:      "Status".into(),
-                args:       vec!["status".into()],
-                fields:     HashMap::new(),
-            },
-            Profile {
-                subcommand: "commit".into(),
-                label:      "Commit".into(),
-                args:       vec!["commit".into(), "-m".into(), "{input.message}".into()],
-                fields:     HashMap::from([
-                    ("message".into(), FieldSchema {
-                        r#type:   "string".into(),
-                        label:    "Commit Message".into(),
-                        required: Some(true),
-                        ..Default::default()
-                    }),
-                ]),
-            },
-        ],
-        ..Default::default()
+        service:   "git".into(),
+        provider:  "local".into(),
+        label:     "Git Status".into(),
+        node_type: "git".into(),
+        executor:  Executor::Cli { command: "git".into() },
+        profile:   Profile {
+            subcommand: "status".into(),
+            args:       vec!["status".into()],
+            fields:     HashMap::new(),
+        },
+        embedding: None,
+    })
+    .await?;
+
+// Git Commit（別レコードとして INSERT）
+db.create::<Option<NodeCatalog>>("node_catalog")
+    .content(NodeCatalog {
+        service:   "git".into(),
+        provider:  "local".into(),
+        label:     "Git Commit".into(),
+        node_type: "git".into(),
+        executor:  Executor::Cli { command: "git".into() },
+        profile:   Profile {
+            subcommand: "commit".into(),
+            args:       vec!["commit".into(), "-m".into(), "{input.message}".into()],
+            fields:     HashMap::from([
+                ("message".into(), FieldSchema {
+                    r#type:   "string".into(),
+                    label:    "Commit Message".into(),
+                    required: Some(true),
+                    ..Default::default()
+                }),
+            ]),
+        },
+        embedding: None,
     })
     .await?;
 ```
@@ -230,9 +239,14 @@ async fn execute_node(
                 .and_then(|v| v.as_str())
                 .ok_or("Missing subcommand")?;
 
-            let profile = node.profiles.iter()
-                .find(|p| p.subcommand == subcommand)
-                .ok_or("PROFILE_NOT_FOUND")?;
+            // 1エントリ = 1プロファイルなので検索不要
+            // subcommand はノード追加時に input.subcommand として確定済み
+            let profile = &node.profile;
+
+            // subcommand の一致確認（防御的チェック）
+            if profile.subcommand != subcommand {
+                return Err("PROFILE_NOT_FOUND".to_string());
+            }
 
             // テンプレート展開
             let resolved = resolve_args(&profile.args, &input)?;
@@ -424,19 +438,18 @@ CTX-13 での差し替えはフックの内部実装のみの変更で完結す�
 
 ---
 
-## フロントエンド統合メモ（CTX-9/10 設計時に正式化する）
+## フロントエンド統合メモ
 
-> **注意:** 以下は設計議論の記録。BOM への正式反映は CTX-9 の設計フェーズで行う。
+### GraphNodeData への追加（CTX-9 確定済み）
 
-### GraphNodeData への追加候補（CTX-9 で検討）
+> `docs/bom/graph.ts` を参照。`catalog` ネストは不採用。
+> エクスポートJSONとの一貫性を優先し `service / provider / input` をフラットに持つ。
 
 ```typescript
 {
-  catalog: {
-    service:  string
-    provider: string
-  } | null
-  input: Record<string, unknown>
+  service: string | null;
+  provider: string | null;
+  input: Record;
 }
 ```
 

@@ -15,5 +15,6 @@ export default defineConfig({
         url: 'http://localhost:1420',
         reuseExistingServer: !process.env.CI,
         env: { VITE_PLAYWRIGHT: 'true' },
+        timeout: 60_000,
     },
 });

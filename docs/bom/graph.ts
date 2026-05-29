@@ -343,3 +343,25 @@ export const graphFilePath = (projectRootPath: string, graphId: string): string 
 
 export const graphsDir = (projectRootPath: string): string =>
     `${projectRootPath}/graphs`
+
+// ============================================================
+// UseCatalogSearchOptions                            [CTX-13]
+// useCatalogSearch の props DI オプション。
+// デフォルト値は invoke() の実装。テストでは差し替える。
+// ============================================================
+export type UseCatalogSearchOptions = {
+    onGetAll?: () => Promise<CatalogEntry[]>
+    onSearch?: (query: string) => Promise<CatalogEntry[]>
+}
+
+// ============================================================
+// UseCatalogSearchReturn                             [CTX-13]
+// useCatalogSearch の戻り値型。
+// CTX-9 の CatalogEntry[] から変更（破壊的変更）。
+// CatalogMenu.tsx の呼び出し箇所1箇所を合わせて修正すること。
+// ============================================================
+export type UseCatalogSearchReturn = {
+    results: CatalogEntry[]
+    loading: boolean
+    error: string | null
+}

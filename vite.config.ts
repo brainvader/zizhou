@@ -22,10 +22,15 @@ export default defineConfig({
       ignored: ["**/src-tauri/**"],
     },
   },
+  // Playwright 環境で 504 Outdated Optimize Dep を防ぐため強制プリバンドル
+  optimizeDeps: {
+    force: isPlaywright,
+  },
   resolve: {
     alias: [
       ...(isPlaywright ? [
         { find: '@tauri-apps/plugin-fs', replacement: path.resolve(__dirname, './src/__mocks__/plugin-fs.ts') },
+        { find: '@tauri-apps/api/core', replacement: path.resolve(__dirname, './src/__mocks__/api-core.ts') },
         { find: '@tauri-apps/api/path', replacement: path.resolve(__dirname, './src/__mocks__/api-path.ts') },
       ] : []),
       { find: '@/bom', replacement: path.resolve(__dirname, './docs/bom') },

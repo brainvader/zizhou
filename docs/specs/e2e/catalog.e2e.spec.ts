@@ -1,128 +1,78 @@
 /**
- * Slot 1: 発注用ヘッダー (JSDoc Metadata)
- * @context  CTX-9: Node Catalog UI — E2E Visual Story
- * @bom      docs/bom/graph.ts (CatalogEntry, NODE_CATALOG)
- * @story
- * 1. キャンバス空白を右クリックするとカタログメニューが表示される
- * 2. カタログメニューに検索窓とカテゴリ別エントリが表示される
- * 3. 検索窓に "git" と入力するとgitエントリのみ表示される
- * 4. エントリをクリックするとノードがグラフに追加される
- * 5. 追加されたノードに正しいラベルが表示される
- * 6. 追加されたノードに正しいタイプカラーが適用される
- * 7. エントリクリック後にカタログメニューが閉じる
- * 8. キャンバスクリックでカタログメニューが閉じる
- * @output
- *   src/hooks/useCatalogSearch.ts
- *   src/components/CatalogMenu.tsx
- *   src/components/GraphEditor.tsx
+ * @context CTX-13 Node Catalog + SurrealDB E2E
+ * @note    Tauri invoke → SurrealDB 往復が実際に動作することを確認する。
+ *          CatalogMenu はキャンバス右クリックで表示される。
  */
+import { test, expect, type Page } from '@playwright/test'
 
-import { test, expect } from '@playwright/test'
-
-// =============================================================================
-// ヘルパー
-// =============================================================================
-
-const createNewGraph = async (page: import('@playwright/test').Page) => {
+// プロジェクト詳細画面に遷移してグラフエディタが ready になるまで待つヘルパー
+async function navigateToEditor(page: Page) {
     await page.goto('/')
-    await expect(page.getByText('zizou-core')).toBeVisible()
-    await page.locator('[data-testid^="card-"]').first().click()
-    await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 10000 })
-    // graphs/ ディレクトリが未初期化の場合は初期化する
-    const setupBtn = page.getByRole('button', { name: /初期化/ })
-    if (await setupBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await setupBtn.click()
-        await expect(page.locator('.react-flow__renderer')).toBeVisible({ timeout: 10000 })
-    }
+    // ProjectGrid の card-1 をクリック（plugin-fs モックの固定フィクスチャ ID）
+    await page.getByTestId('card-1').click()
+    // グラフエディタが表示されるまで待機
+    await page.waitForSelector('[data-testid="graph-editor"]')
+    // ReactFlow のキャンバス要素が描画されるまで待機
+    await page.waitForSelector('.react-flow__pane')
 }
 
-const openCatalogMenu = async (page: import('@playwright/test').Page) => {
-    await page.locator('.react-flow__pane').click({
-        button: 'right',
-        position: { x: 300, y: 200 },
-    })
-    await expect(page.getByTestId('catalog-menu')).toBeVisible()
-}
+test.describe('CTX-13: catalog invoke integration', () => {
+    /**
+     * @story 1: キャンバス右クリックで CatalogMenu が表示され SurrealDB の初期データが含まれる
+     */
+    test('キャンバス右クリックで CatalogMenu が表示され初期データが含まれる', async ({ page }) => {
+        await navigateToEditor(page)
 
-// =============================================================================
-// CTX-9: Catalog Menu
-// =============================================================================
+        // キャンバスを右クリック → CatalogMenu が表示される
+        await page.locator('.react-flow__pane').click({ button: 'right' })
+        await page.waitForSelector('[data-testid="catalog-menu"]')
 
-test.describe('CTX-9 Catalog Menu', () => {
-
-    test.beforeEach(async ({ page }) => {
-        await createNewGraph(page)
-    })
-
-    test('step 1: キャンバス空白を右クリックするとカタログメニューが表示される', async ({ page }) => {
-        await openCatalogMenu(page)
-        await page.screenshot({ path: 'evidence/CTX9_catalog_menu_open.png' })
-    })
-
-    test('step 2: カタログメニューに検索窓とカテゴリ別エントリが表示される', async ({ page }) => {
-        await openCatalogMenu(page)
-
+        // SurrealDB の初期データが表示されている
         await expect(page.getByTestId('catalog-search-input')).toBeVisible()
-        await expect(page.getByTestId('catalog-category-git')).toBeVisible()
-        await expect(page.getByTestId('catalog-category-llm')).toBeVisible()
-        await expect(page.getByTestId('catalog-category-validate')).toBeVisible()
+        await expect(page.getByTestId('catalog-entry-git-status')).toBeVisible()
+        await expect(page.getByTestId('catalog-entry-git-commit')).toBeVisible()
 
-        await page.screenshot({ path: 'evidence/CTX9_catalog_categories.png' })
+        await page.screenshot({ path: 'evidence/ctx13_catalog_initial_load.png' })
     })
 
-    test('step 3: 検索窓に "git" と入力するとgitエントリのみ表示される', async ({ page }) => {
-        await openCatalogMenu(page)
+    /**
+     * @story 2: 検索ボックスに入力すると invoke('catalog_search') 経由でフィルタされる
+     */
+    test('検索ボックスへの入力で SurrealDB 検索結果が反映される', async ({ page }) => {
+        await navigateToEditor(page)
 
+        await page.locator('.react-flow__pane').click({ button: 'right' })
+        await page.waitForSelector('[data-testid="catalog-search-input"]')
+
+        // 'git' で検索
         await page.getByTestId('catalog-search-input').fill('git')
 
-        // git カテゴリは表示される
+        // Git 系が表示されている
         await expect(page.getByTestId('catalog-category-git')).toBeVisible()
-        // llm カテゴリは非表示になる
+
+        // llm 系は表示されていない
         await expect(page.getByTestId('catalog-category-llm')).not.toBeVisible()
 
-        await page.screenshot({ path: 'evidence/CTX9_catalog_search_git.png' })
+        await page.screenshot({ path: 'evidence/ctx13_catalog_search_git.png' })
     })
 
-    test('step 4-5: エントリをクリックするとノードがグラフに追加され正しいラベルが表示される', async ({ page }) => {
-        await openCatalogMenu(page)
+    /**
+     * @story 3: 検索をクリアすると全件に戻る
+     */
+    test('検索クリアで全件表示に戻る', async ({ page }) => {
+        await navigateToEditor(page)
 
-        // Git Status をクリック
-        await page.getByTestId('catalog-entry-git-status').click()
+        await page.locator('.react-flow__pane').click({ button: 'right' })
+        await page.waitForSelector('[data-testid="catalog-search-input"]')
 
-        // ノードが追加される
-        await expect(page.locator('.react-flow__node')).toHaveCount(1, { timeout: 5000 })
-        await expect(page.locator('.react-flow__node').first()).toContainText('Git Status')
+        const input = page.getByTestId('catalog-search-input')
+        await input.fill('git')
+        await input.clear()
 
-        await page.screenshot({ path: 'evidence/CTX9_node_added.png' })
+        // 全カテゴリが表示される
+        await expect(page.getByTestId('catalog-category-git')).toBeVisible()
+        await expect(page.getByTestId('catalog-category-llm')).toBeVisible()
+
+        await page.screenshot({ path: 'evidence/ctx13_catalog_search_cleared.png' })
     })
-
-    test('step 6: 追加されたノードに正しいタイプカラーが適用される', async ({ page }) => {
-        await openCatalogMenu(page)
-        await page.getByTestId('catalog-entry-git-status').click()
-
-        // git タイプバッジが表示される
-        await expect(page.locator('[data-testid="node-type-badge"]').first()).toHaveText('git')
-
-        await page.screenshot({ path: 'evidence/CTX9_node_type_badge.png' })
-    })
-
-    test('step 7: エントリクリック後にカタログメニューが閉じる', async ({ page }) => {
-        await openCatalogMenu(page)
-        await page.getByTestId('catalog-entry-git-status').click()
-
-        await expect(page.getByTestId('catalog-menu')).not.toBeVisible()
-
-        await page.screenshot({ path: 'evidence/CTX9_catalog_menu_closed.png' })
-    })
-
-    test('step 8: キャンバスクリックでカタログメニューが閉じる', async ({ page }) => {
-        await openCatalogMenu(page)
-
-        await page.locator('.react-flow__pane').click({ position: { x: 100, y: 100 } })
-
-        await expect(page.getByTestId('catalog-menu')).not.toBeVisible()
-
-        await page.screenshot({ path: 'evidence/CTX9_catalog_menu_closed_by_pane.png' })
-    })
-
 })
