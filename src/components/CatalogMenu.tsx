@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import type { CatalogEntry } from '@/bom/graph'
+import type { CatalogEntry, UseCatalogSearchOptions } from '@/bom/graph'
 import { NODE_TYPES, NODE_TYPE_COLOR } from '@/bom/graph'
 import { useCatalogSearch } from '@/hooks/useCatalogSearch'
 
@@ -12,9 +12,10 @@ import { useCatalogSearch } from '@/hooks/useCatalogSearch'
  * - 検索窓に入力するとリアルタイムで絞り込む（useCatalogSearch）
  * - エントリクリックで onSelectEntry(entry) + onClose() を呼ぶ
  * - マウント時に検索窓にフォーカスする
+ * - catalogOptions: Storybook / テスト環境で invoke を差し替えるための DI
  *
- * @context CTX-9
- * @see docs/bom/graph.ts (CatalogEntry, NODE_CATALOG)
+ * @context CTX-13
+ * @see docs/bom/graph.ts (CatalogEntry, UseCatalogSearchOptions)
  * @see src/hooks/useCatalogSearch.ts
  */
 
@@ -23,12 +24,13 @@ export type CatalogMenuProps = {
     y: number
     onClose: () => void
     onSelectEntry: (entry: CatalogEntry) => void
+    catalogOptions?: UseCatalogSearchOptions
 }
 
-export function CatalogMenu({ x, y, onClose, onSelectEntry }: CatalogMenuProps) {
+export function CatalogMenu({ x, y, onClose, onSelectEntry, catalogOptions }: CatalogMenuProps) {
     const [query, setQuery] = useState('')
     const inputRef = useRef<HTMLInputElement>(null)
-    const results = useCatalogSearch(query)
+    const { results } = useCatalogSearch(query, catalogOptions)
 
     // マウント時に検索窓にフォーカス
     useEffect(() => {
