@@ -10,9 +10,16 @@
  *   - commit (Enter/blur) → updateNodeData() + onStopEditing() を呼ぶ
  *   - cancel (Escape) → onStopEditing() を呼ぶ（store 更新なし）
  *
- * @context CTX-4/5/7
+ * [CTX-14] Run Button:
+ *   service が存在するノードに "▶ Run" ボタンを表示する。
+ *   - onRun?: () => void — クリック時のコールバック（GraphEditor から注入）
+ *   - isRunning?: boolean — true のとき "⟳ Running…" 表示かつ非活性
+ *
+ * @context CTX-4/5/7/14
  * @see docs/bom/graph.ts (GraphNodeData)
+ * @see docs/bom/execute.ts (ExecuteRequest, ExecuteResponse)
  * @see docs/specs/EditableNode.spec.tsx
+ * @see docs/specs/node-execute.spec.tsx
  * @see src/stories/EditableNode.stories.tsx
  */
 
@@ -33,6 +40,10 @@ export type EditableNodeProps = NodeProps<EditableNodeType> & {
     onStartEditing?: () => void
     /** [CTX-7] commit / cancel 完了時に GraphEditor へ通知する */
     onStopEditing?: () => void
+    /** [CTX-14] Run ボタンクリック時のコールバック（GraphEditor から注入） */
+    onRun?: () => void
+    /** [CTX-14] 実行中フラグ（true のとき Running… 表示かつ非活性） */
+    isRunning?: boolean
 }
 
 export function EditableNode({
@@ -43,6 +54,8 @@ export function EditableNode({
     isEditing = false,
     onStartEditing,
     onStopEditing,
+    onRun,
+    isRunning = false,
 }: EditableNodeProps) {
     const storeUpdateNodeData = useGraphStore((s) => s.updateNodeData)
     const updateNodeData = onUpdateNode ?? ((nodeId, nodeData) => storeUpdateNodeData(nodeId, nodeData))
@@ -80,6 +93,12 @@ export function EditableNode({
         onStartEditing?.()
     }, [onStartEditing])
 
+    // [CTX-14] Run ボタンのクリックがノードのドラッグを開始しないよう stopPropagation
+    const handleRunClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation()
+        onRun?.()
+    }, [onRun])
+
     // [CTX-5] selected に応じてボーダー・グローを切り替える
     const selectedStyle = selected
         ? 'shadow-[0_0_12px_var(--primary-glow)]'
@@ -88,6 +107,9 @@ export function EditableNode({
     const borderColor = selected
         ? 'var(--primary)'
         : NODE_TYPE_COLOR[data.nodeType ?? 'custom']
+
+    // [CTX-14] service が存在するノードのみ Run ボタンを表示する
+    const showRunButton = !!data.service
 
     return (
         <div
@@ -139,6 +161,23 @@ export function EditableNode({
                 <div className="text-[11px] text-[--muted-foreground] pl-2 mt-0.5">
                     {data.description}
                 </div>
+            )}
+
+            {/* [CTX-14] Run Button — service 付きノードのみ表示 */}
+            {showRunButton && (
+                <button
+                    data-testid="btn-run-node"
+                    data-running={isRunning ? 'true' : undefined}
+                    className={[
+                        'nodrag mt-1.5 ml-1.5 px-2 py-0.5 text-[10px] font-mono rounded-[--radius] border inline-flex items-center gap-1',
+                        isRunning
+                            ? 'text-[--muted-foreground] border-[--border] pointer-events-none opacity-50'
+                            : 'text-[--primary] border-[--primary] opacity-70 hover:opacity-100 hover:shadow-[0_0_6px_var(--primary-glow)]',
+                    ].join(' ')}
+                    onClick={isRunning ? undefined : handleRunClick}
+                >
+                    {isRunning ? '⟳ Running…' : '▶ Run'}
+                </button>
             )}
 
             <Handle type="source" position={Position.Right} />

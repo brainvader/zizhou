@@ -31,13 +31,15 @@
  * - CatalogMenu でエントリ選択 → addNodeFromCatalog() でノードを追加する
  * - 追加位置は右クリック座標を ReactFlow の flowToScreenPosition で変換する
  *
- * @context CTX-2/5/6/7/8/9
+ * @context CTX-2/5/6/7/8/9/14
  * @see docs/bom/graph.ts
+ * @see docs/bom/execute.ts
  * @see src/components/nodes/EditableNode.tsx
  * @see src/components/ContextMenu.tsx
  * @see src/components/CatalogMenu.tsx
  * @see src/hooks/useGraphInit.ts
  * @see src/hooks/useGraphFile.ts
+ * @see src/hooks/useNodeExecute.ts
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -65,6 +67,7 @@ import { useGraphStore } from '@/store/useGraphStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import { useGraphFile } from '@/hooks/useGraphFile'
 import { useGraphInit } from '@/hooks/useGraphInit'
+import { useNodeExecute } from '@/hooks/useNodeExecute'
 import { EditableNode } from '@/components/nodes/EditableNode'
 import { ContextMenu } from '@/components/ContextMenu'
 import { CatalogMenu } from '@/components/CatalogMenu'
@@ -176,21 +179,38 @@ function GraphEditorInner({
     // --- [CTX-9] カタログメニュー状態 ---
     const [catalogMenu, setCatalogMenu] = useState<CatalogMenuState>(null)
 
-    // --- [CTX-7] NODE_TYPES: editingNodeId を EditableNode に注入するため useMemo 化 ---
+    // --- [CTX-14] ノード実行 ---
+    const { runningNodeId, execute } = useNodeExecute()
+
+    // --- [CTX-7/14] NODE_TYPES: editingNodeId / onRun を EditableNode に注入するため useMemo 化 ---
     const nodeTypes = useMemo(() => {
-        const node = (props: React.ComponentProps<typeof EditableNode>) => (
-            <EditableNode
-                {...props}
-                isEditing={editingNodeId === props.id}
-                onStartEditing={() => setEditingNodeId(props.id)}
-                onStopEditing={() => setEditingNodeId(null)}
-            />
-        )
+        const node = (props: React.ComponentProps<typeof EditableNode>) => {
+            const nodeData = props.data
+            const handleRun = () => {
+                if (!nodeData.service || !nodeData.provider) return
+                execute(props.id, {
+                    service: nodeData.service,
+                    provider: nodeData.provider,
+                    cwd: projectRootPathProp ?? '',
+                    input: nodeData.input ?? {},
+                })
+            }
+            return (
+                <EditableNode
+                    {...props}
+                    isEditing={editingNodeId === props.id}
+                    onStartEditing={() => setEditingNodeId(props.id)}
+                    onStopEditing={() => setEditingNodeId(null)}
+                    onRun={nodeData.service ? handleRun : undefined}
+                    isRunning={runningNodeId === props.id}
+                />
+            )
+        }
         return {
             editableNode: node,
             default: node,  // type 未指定ノードも EditableNode で描画する
         }
-    }, [editingNodeId])
+    }, [editingNodeId, runningNodeId, execute, projectRootPathProp])
 
     // --- Add Node（手動ボタン） ---
     const handleAddNode = useCallback(() => {
