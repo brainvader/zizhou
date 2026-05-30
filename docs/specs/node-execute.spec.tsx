@@ -48,6 +48,11 @@ vi.mock('sonner', () => ({
     toast: { error: mockToastError },
 }))
 
+vi.mock('@xyflow/react', () => ({
+    Handle: () => null,
+    Position: { Left: 'left', Right: 'right' },
+}))
+
 import { useNodeExecute } from '@/hooks/useNodeExecute'
 import { EditableNode } from '@/components/nodes/EditableNode'
 
