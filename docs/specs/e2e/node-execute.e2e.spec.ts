@@ -40,7 +40,7 @@ const addGitStatusNode = async (page: import('@playwright/test').Page) => {
     const canvas = page.locator('.react-flow__pane')
     await canvas.click({ button: 'right', position: { x: 200, y: 200 } })
     await expect(page.getByTestId('catalog-menu')).toBeVisible({ timeout: 5000 })
-    await page.getByTestId('catalog-entry-git-local').first().click()
+    await page.getByText('Git Status').click()
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10000 })
 }
 
