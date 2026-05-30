@@ -10,15 +10,14 @@
  *   4. [useNodeExecute] execute() 成功時に updateNodeData({ status: 'done' }) が呼ばれる
  *   5. [useNodeExecute] execute() 失敗時に updateNodeData({ status: 'todo' }) に戻され sonner toast.error が呼ばれる
  *   6. [useNodeExecute] onExecute が成功でも success:false を返したとき失敗として扱う
- *   7. [ContextMenu]   type='node' かつ service が存在するとき "Run Node" メニュー項目が表示される
- *   8. [ContextMenu]   type='node' かつ service が null のとき "Run Node" が表示されない
- *   9. [ContextMenu]   type='edge' のとき "Run Node" が表示されない
+ *   7. [EditableNode]   service が存在するとき "▶ Run" ボタンが表示される
+ *   8. [EditableNode]   service が null/undefined のとき "▶ Run" ボタンが表示されない
+ *   9. [EditableNode]   "▶ Run" ボタンクリックで onRun が呼ばれる
+ *  10. [EditableNode]   isRunning=true のとき "▶ Run" ボタンが "⟳ Running…" になり非活性になる
  * @output
  *   src/hooks/useNodeExecute.ts
- *   src/components/ContextMenu.tsx  — onRunNode prop 追加 / "Run Node" 項目追加
- *   src/components/GraphEditor.tsx  — handleRunNode 追加
- *   src-tauri/src/lib.rs            — execute_node コマンド追加
- *   src/__mocks__/api-core.ts       — execute_node モック追加
+ *   src/components/nodes/EditableNode.tsx — onRun prop 追加 / Run ボタン表示
+ *   src/components/GraphEditor.tsx        — useNodeExecute マウント / onRun 注入
  */
 
 // =============================================================================
@@ -26,8 +25,9 @@
 // =============================================================================
 
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, render, screen, fireEvent } from '@testing-library/react'
 import type { ExecuteRequest, ExecuteResponse } from '@/bom/execute'
+import type { GraphNodeData } from '@/bom/graph'
 
 // =============================================================================
 // Slot 3: モック・セットアップ
@@ -49,6 +49,7 @@ vi.mock('sonner', () => ({
 }))
 
 import { useNodeExecute } from '@/hooks/useNodeExecute'
+import { EditableNode } from '@/components/nodes/EditableNode'
 
 // ヘルパー: 成功レスポンスを生成
 const makeSuccess = (stdout = 'ok'): ExecuteResponse => ({
@@ -70,6 +71,24 @@ const makeRequest = (): ExecuteRequest => ({
     provider: 'local',
     cwd: '/mock/project',
     input: { subcommand: 'status' },
+})
+
+// ヘルパー: EditableNode の最小 props
+const makeNodeProps = (overrides: Partial<React.ComponentProps<typeof EditableNode>> = {}) => ({
+    id: 'node-001',
+    type: 'editableNode' as const,
+    positionAbsoluteX: 0,
+    positionAbsoluteY: 0,
+    zIndex: 0,
+    dragging: false,
+    draggable: true,
+    selectable: true,
+    deletable: true,
+    parentId: undefined,
+    selected: false,
+    isConnectable: true,
+    data: { label: 'Node A' } as GraphNodeData,
+    ...overrides,
 })
 
 beforeEach(() => {
@@ -181,61 +200,70 @@ describe('useNodeExecute', () => {
 })
 
 // =============================================================================
-// ContextMenu: Run Node 表示制御
+// EditableNode: Run ボタン表示制御
 // =============================================================================
 
-import { render, screen } from '@testing-library/react'
-import { ContextMenu } from '@/components/ContextMenu'
-
-describe('ContextMenu: Run Node 表示制御', () => {
+describe('EditableNode: Run Button [CTX-14]', () => {
 
     // -------------------------------------------------------------------------
-    // @story 7: type='node' かつ service が存在するとき "Run Node" が表示される
+    // @story 7: service が存在するとき "▶ Run" ボタンが表示される
     // -------------------------------------------------------------------------
-    test('feature: type="node" かつ service が存在するとき "Run Node" が表示される', () => {
+    test('feature: service が存在するとき run ボタンが表示される', () => {
         render(
-            <ContextMenu
-                type="node"
-                x={0} y={0}
-                service="git"
-                onDelete={vi.fn()}
-                onClose={vi.fn()}
-                onRunNode={vi.fn()}
+            <EditableNode
+                {...makeNodeProps({
+                    data: { label: 'Git Status', service: 'git', provider: 'local' },
+                })}
             />
         )
-        expect(screen.getByTestId('menu-item-run-node')).toBeInTheDocument()
+        expect(screen.getByTestId('btn-run-node')).toBeInTheDocument()
     })
 
     // -------------------------------------------------------------------------
-    // @story 8: type='node' かつ service が null のとき "Run Node" が表示されない
+    // @story 8: service が null/undefined のとき "▶ Run" ボタンが表示されない
     // -------------------------------------------------------------------------
-    test('feature: type="node" かつ service が null のとき "Run Node" が表示されない', () => {
+    test('feature: service が null のとき run ボタンが表示されない', () => {
         render(
-            <ContextMenu
-                type="node"
-                x={0} y={0}
-                service={null}
-                onDelete={vi.fn()}
-                onClose={vi.fn()}
+            <EditableNode
+                {...makeNodeProps({
+                    data: { label: 'Plain Node' },
+                })}
             />
         )
-        expect(screen.queryByTestId('menu-item-run-node')).not.toBeInTheDocument()
+        expect(screen.queryByTestId('btn-run-node')).not.toBeInTheDocument()
     })
 
     // -------------------------------------------------------------------------
-    // @story 9: type='edge' のとき "Run Node" が表示されない
+    // @story 9: "▶ Run" ボタンクリックで onRun が呼ばれる
     // -------------------------------------------------------------------------
-    test('feature: type="edge" のとき "Run Node" が表示されない', () => {
+    test('feature: run ボタンクリックで onRun が呼ばれる', () => {
+        const onRun = vi.fn()
         render(
-            <ContextMenu
-                type="edge"
-                x={0} y={0}
-                service="git"
-                onDelete={vi.fn()}
-                onClose={vi.fn()}
+            <EditableNode
+                {...makeNodeProps({
+                    data: { label: 'Git Status', service: 'git', provider: 'local' },
+                    onRun,
+                })}
             />
         )
-        expect(screen.queryByTestId('menu-item-run-node')).not.toBeInTheDocument()
+        fireEvent.click(screen.getByTestId('btn-run-node'))
+        expect(onRun).toHaveBeenCalledOnce()
+    })
+
+    // -------------------------------------------------------------------------
+    // @story 10: isRunning=true のとき Running… 表示かつ非活性
+    // -------------------------------------------------------------------------
+    test('feature: isRunning=true のとき Running… 表示になる', () => {
+        render(
+            <EditableNode
+                {...makeNodeProps({
+                    data: { label: 'Git Status', service: 'git', provider: 'local' },
+                    isRunning: true,
+                })}
+            />
+        )
+        const btn = screen.getByTestId('btn-run-node')
+        expect(btn).toHaveAttribute('data-running', 'true')
     })
 
 })

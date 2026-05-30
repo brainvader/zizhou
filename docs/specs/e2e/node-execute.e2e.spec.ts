@@ -1,9 +1,9 @@
 /**
  * @context CTX-14: NODE EXECUTE DISPATCH — E2E
  * @note    Storybook で確認できない結合のみを検証する。
- *          - service 付きノードの右クリックメニューに "Run Node" が表示される
- *          - "Run Node" クリックでノードの status が doing → done に変化する（モック invoke）
- *          - service なしノードの右クリックメニューに "Run Node" が表示されない
+ *          - カタログから追加した service 付きノードに "▶ Run" ボタンが表示される
+ *          - "▶ Run" クリックでノードの status が doing → done に変化する（モック invoke）
+ *          - 手動追加ノード（service なし）に "▶ Run" ボタンが表示されない
  *
  * E2E 環境: VITE_PLAYWRIGHT=true の dev server
  *   src/__mocks__/api-core.ts の execute_node モックが使われる。
@@ -37,8 +37,6 @@ const createNewGraph = async (page: import('@playwright/test').Page) => {
 
 /** カタログから Git Status ノードを追加する */
 const addGitStatusNode = async (page: import('@playwright/test').Page) => {
-    // カタログパネルを開く（右クリック → カタログから追加 or カタログボタン）
-    // 既存の実装に合わせて CatalogMenu を使う
     const canvas = page.locator('.react-flow__pane')
     await canvas.click({ button: 'right', position: { x: 200, y: 200 } })
     await expect(page.getByTestId('catalog-menu')).toBeVisible({ timeout: 5000 })
@@ -61,49 +59,39 @@ test.describe('CTX-14: Run Node [E2E]', () => {
         await page.evaluate(() => localStorage.clear())
     })
 
-    test('service 付きノードの右クリックメニューに "Run Node" が表示される', async ({ page }) => {
+    test('カタログ追加ノードに "▶ Run" ボタンが表示される', async ({ page }) => {
         await createNewGraph(page)
         await addGitStatusNode(page)
 
         const node = page.locator('.react-flow__node').first()
-        await node.click({ button: 'right' })
+        await expect(node.getByTestId('btn-run-node')).toBeVisible()
 
-        await expect(page.getByTestId('context-menu')).toBeVisible()
-        await expect(page.getByTestId('menu-item-run-node')).toBeVisible()
-
-        await page.screenshot({ path: 'evidence/CTX14_run_node_menu.png' })
+        await page.screenshot({ path: 'evidence/CTX14_run_button_visible.png' })
     })
 
-    test('"Run Node" クリックでノードの status が done になる', async ({ page }) => {
+    test('"▶ Run" クリックでノードの status が done になる', async ({ page }) => {
         await createNewGraph(page)
         await addGitStatusNode(page)
 
         const node = page.locator('.react-flow__node').first()
-        await node.click({ button: 'right' })
-        await page.getByTestId('menu-item-run-node').click()
-
-        // メニューが閉じる
-        await expect(page.getByTestId('context-menu')).not.toBeVisible()
+        await node.getByTestId('btn-run-node').click()
 
         // done になるまで待つ（モックは即時応答なので短い timeout で良い）
         await expect(
-            page.locator('.react-flow__node').first().locator('[data-status="done"]')
+            node.locator('[data-status="done"]')
         ).toBeVisible({ timeout: 5000 })
 
         await page.screenshot({ path: 'evidence/CTX14_run_node_done.png' })
     })
 
-    test('service なしノードの右クリックメニューに "Run Node" が表示されない', async ({ page }) => {
+    test('手動追加ノードに "▶ Run" ボタンが表示されない', async ({ page }) => {
         await createNewGraph(page)
         await addPlainNode(page)
 
         const node = page.locator('.react-flow__node').first()
-        await node.click({ button: 'right' })
+        await expect(node.getByTestId('btn-run-node')).not.toBeVisible()
 
-        await expect(page.getByTestId('context-menu')).toBeVisible()
-        await expect(page.getByTestId('menu-item-run-node')).not.toBeVisible()
-
-        await page.screenshot({ path: 'evidence/CTX14_no_run_node_plain.png' })
+        await page.screenshot({ path: 'evidence/CTX14_no_run_button_plain.png' })
     })
 
 })
