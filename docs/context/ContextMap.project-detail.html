@@ -2,7 +2,7 @@
 <html lang="ja">
     <head>
         <meta charset="UTF-8" />
-        <title>ContextMap: 地蔵 — Project Detail</title>
+        <title>ContextMap: 地蔵 Project Detail</title>
 
         <!-- ============================================================
              STACK
@@ -11,63 +11,11 @@
              bundler:  Vite
              styling:  Tailwind CSS v4 + shadcn/ui
              router:   TanStack Router（routing の SSOT）
-             state:    Zustand（nodes[], edges[] の SSOT）
-             persist:  Tauri fs プラグイン（グラフは {projectRootPath}/graphs/{graphId}.json に保存）
-             graph:    React Flow
-             toast:    sonner
-             icons:    lucide-react
+             state:    Zustand
+             persist:  Tauri fs プラグイン
+             db:       SurrealDB 2.6.5 (kv-mem)
              testing:  Vitest + RTL + Storybook + Playwright
              package:  pnpm
-        ============================================================ -->
-
-        <!-- ============================================================
-             PHILOSOPHY — Zizou の運用思想
-
-             Zizou は人間とエージェントの合意形成プラットフォームである。
-             エージェント主導でも人間主導でもなく、両者が同じグラフを共有し
-             作業の定義・分担・実行について合意する場を提供する。
-
-             基本運用思想は Palantir Foundry に準拠する:
-               - グラフが人間とエージェントの合意の SSOT（信頼できる唯一の情報源）
-               - 誰が何をするかをグラフが定義する
-               - 実行はグラフの定義に従う
-
-             ノード = 単一スキル（変換処理の最小単位）
-               スキルとは「入力を受け取り、何らかの変換を行い、出力を返す処理単位」である。
-               変換の種類は問わない（データ変換 / ファイル変換 / 状態変換 / 知識変換 / 人間の判断）。
-               実行主体も問わない（CLI / API / LLM エージェント / 人間）。
-               確定的な作業はソフトウェア（CLI/API）が担い、
-               不確定な作業は LLM エージェントが担う。
-
-             グラフ = 複合スキル（スキルの入れ子構造）
-               複数のノード（単一スキル）を繋いだワークフロー全体が1つのスキルを構成する。
-               グラフ自体も1つのスキルとして別グラフから参照できる（入れ子）。
-               Palantir のデータパイプラインと異なり、
-               変換対象はデータに限定されない（ファイル・状態・知識・判断も含む）。
-
-             3者の役割:
-               人間        — グラフを設計・承認することで意図とルールを定義する
-               エージェント — グラフを読んで自分の担当ノードを把握し実行する
-               ソフトウェア — ノードの定義に従い CLI/API を実行する
-
-             Core Architecture Philosophy:
-
-               Thin Orchestrator（薄い本体）
-                 Zizou はグラフの設計・管理・合意形成に100%集中する。
-                 ノードの実行は Tauri コマンドが SurrealDB のノード定義を参照して直接実行する。
-                 本体の責務を最小限に保つ。
-
-               Data-Driven Extensibility（宣言的な拡張）
-                 新しいサービスの追加にアプリケーションの再ビルドは不要である。
-                 すべてのサービスは設定ファイル（TOML）による宣言のみで動的に登録・実行され、
-                 エコシステムの拡張をシステム本体から分離する。
-                 Node Catalog = services/*.toml の一覧として自動登録される。
-
-               Ephemerality of Execution（実行の刹那性）
-                 サービスは実行時のみ起動・終了し、常駐しない。
-                 外部サイドカー・常駐プロセスは不要。Tauri プロセス内で全てが完結する。
-                 実行時のみ CLI / HTTP を起動し終了する。
-                 高コストな処理（LLM等）は入力ハッシュをキーにキャッシュで最適化する。
         ============================================================ -->
 
         <!-- ============================================================
@@ -105,7 +53,8 @@
                 "edges": [],
                 "selectedNodeId": null,
                 "selectedNodeIds": [],
-                "editingNodeId": null
+                "editingNodeId": null,
+                "runningNodeId": null
             }
         </script>
 
@@ -445,14 +394,12 @@
                 opacity: 0.7;
             }
 
-            /* [CTX-5] 複数選択中ノード */
             .mock-node.multi-selected {
                 border-color: var(--primary-soft);
                 box-shadow: 0 0 8px var(--primary-glow);
                 opacity: 0.85;
             }
 
-            /* [CTX-4] インライン編集中ノード */
             .mock-node.editing {
                 border-color: var(--primary);
                 box-shadow: 0 0 0 2px var(--primary-glow);
@@ -481,6 +428,50 @@
                 color: var(--muted-foreground);
                 padding-left: 8px;
                 margin-top: 3px;
+            }
+
+            /* [CTX-14] ノード実行ボタン */
+            .node-run-btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                margin-top: 6px;
+                margin-left: 6px;
+                padding: 2px 8px;
+                font-size: 10px;
+                font-family: var(--font-mono);
+                color: var(--primary);
+                background: transparent;
+                border: 1px solid var(--primary);
+                border-radius: var(--radius);
+                cursor: pointer;
+                opacity: 0.7;
+            }
+
+            .node-run-btn:hover {
+                opacity: 1;
+                box-shadow: 0 0 6px var(--primary-glow);
+            }
+
+            .node-run-btn.running {
+                color: var(--muted-foreground);
+                border-color: var(--border);
+                pointer-events: none;
+                animation: spin 1s linear infinite;
+            }
+
+            @keyframes spin {
+                from {
+                    opacity: 0.3;
+                }
+
+                50% {
+                    opacity: 1;
+                }
+
+                to {
+                    opacity: 0.3;
+                }
             }
 
             /* ハンドル */
@@ -696,16 +687,12 @@
         </div>
 
         <!-- ============================================================
-             CTX-TOPBAR: TOPBAR [✓]
-             責務: アプリ識別 + プロジェクト名 breadcrumb + New Graph + Settings
-             注意: ProjectDetailTopbar.tsx として独立コンポーネントで実装。
-                   breadcrumb のプロジェクト名は useProjectStore から引く。
+             CTX-TOPBAR [✓]
+             責務: アプリ識別・グローバルアクション（Settings）・パンくずナビ
         ============================================================ -->
         <header id="ctx-topbar">
             <div class="logo">
-                <div class="logo-kanji-wrap">
-                    <span class="logo-kanji">地蔵</span>
-                </div>
+                <span class="logo-kanji">地蔵</span>
                 <div class="logo-sep"></div>
                 <div class="logo-sub">
                     <span class="logo-romaji">Zizou</span>
@@ -713,18 +700,12 @@
                 </div>
             </div>
             <span class="breadcrumb-sep">/</span>
-            <span class="breadcrumb-project" data-testid="breadcrumb-project">地蔵 Core</span>
+            <span class="breadcrumb-project">zizou-core</span>
             <div class="topbar-spacer"></div>
-            <button class="btn-tool">＋ New Graph</button>
             <button class="btn-ghost" title="Settings">⚙</button>
-
             <!--
-                [✓][Feature] Logo        — 地蔵（漢字）/ Zizou（ローマ字）/ Protocol v7.00 を表示する
-                [✓][Feature] Breadcrumb  — プロジェクト名を表示する（useProjectStore から引く）
-                [✓][Feature] New Graph   — クリックで graphs/{nanoid()}.json を作成し ?graph= に遷移する
-                [✓][Feature] Settings    — アイコンボタンクリックで Settings ダイアログを開く
-                [✓][Logic]   New Graph   — writeTextFile 完了後に onNavigate(graphId) を呼ぶ
-                                           失敗時は toast.error() を表示する
+                [✓][Feature] Settings — アイコンボタンクリックで Settings ダイアログを開く
+                [✓][Logic]   Open Dialog — onSettingsClick コールバック経由で isSettingsOpen を true にする
             -->
         </header>
 
@@ -732,125 +713,36 @@
 
             <!-- ============================================================
                  CTX-1: FILE TREE [✓]
-                 責務: プロジェクトルート配下のファイルツリーを表示する
-                 注意: graphs/ 配下の .json を選択すると activeGraphId が更新される
+                 責務: プロジェクトのファイルツリーを表示し、グラフファイルの選択・新規作成のエントリーポイントを提供する
+                 注意: graphs/ ディレクトリ配下の .json ファイルのみ選択可能にする
+                       選択時に activeGraphId を更新し、GraphEditor がグラフを読み込む
             ============================================================ -->
             <nav id="ctx-file-tree">
                 <div class="pane-header">
-                    <span class="pane-title">Files</span>
+                    <span class="pane-title">Explorer</span>
                 </div>
                 <div class="file-tree">
-                    <div class="tree-item dir">
-                        <span class="tree-icon">▾</span> src
-                    </div>
-                    <div class="tree-item depth-1 dir">
-                        <span class="tree-icon">▾</span> components
-                    </div>
-                    <div class="tree-item depth-2 selected">
-                        <span class="tree-icon">·</span> ProjectGrid.tsx
-                    </div>
-                    <div class="tree-item depth-2">
-                        <span class="tree-icon">·</span> Topbar.tsx
-                    </div>
-                    <div class="tree-item depth-1 dir">
-                        <span class="tree-icon">▾</span> routes
-                    </div>
-                    <div class="tree-item depth-2">
-                        <span class="tree-icon">·</span> index.tsx
-                    </div>
-                    <div class="tree-item depth-2">
-                        <span class="tree-icon">·</span> projects.$id.tsx
-                    </div>
-                    <div class="tree-item dir">
-                        <span class="tree-icon">▾</span> docs
-                    </div>
-                    <div class="tree-item depth-1">
-                        <span class="tree-icon">·</span> bom/project.ts
-                    </div>
+                    <div class="tree-item dir"><span class="tree-icon">▼</span> graphs</div>
+                    <div class="tree-item depth-1 selected"><span class="tree-icon">◦</span> main.json</div>
+                    <div class="tree-item depth-1"><span class="tree-icon">◦</span> feature-x.json</div>
+                    <div class="tree-item dir"><span class="tree-icon">▶</span> src</div>
                 </div>
-
                 <!--
-                    [✓][Feature] File Tree Display — Tauri fs でプロジェクトルート配下を再帰的に読み込みツリー表示する
-                    [✓][Feature] Expand/Collapse   — ディレクトリをクリックで展開・折りたたむ
-                    [✓][Feature] File Select       — ファイルをクリックで selectedPath を更新する
-                                                     （graphs/ 配下の .json を選択した場合は activeGraphId を更新し
-                                                     グラフエディタにロードする）
-                    [✓][Logic]   fs Read           — Tauri fs の readDir で再帰読み込み
-                    [✓][Logic]   Root Path         — projectRootPath を global-store（Zustand経由）から取得する
+                    [✓][Feature] File Tree Display  — プロジェクトの graphs/ 配下のファイルを一覧表示する
+                    [✓][Feature] Graph Select       — .json ファイルクリックで activeGraphId を更新しグラフを切り替える
+                    [✓][Feature] New Graph          — 「＋」ボタンで新規グラフファイルを作成する
+                    [✓][Logic]   fs.readDir         — Tauri fs の readDir で graphs/ 配下を列挙する
+                    [✓][Logic]   activeGraphId Sync — ファイル選択時に useProjectDetailStore の activeGraphId を更新する
                 -->
             </nav>
 
             <!-- ============================================================
                  CTX-2: GRAPH EDITOR [✓]
-                 責務: ノードの手動配置・接続・選択・インライン編集を管理するグラフエディタ
-                 注意: React Flow を使用する
-                       nodes[], edges[] は Zustand で管理する
-                       ノード追加はダイアログなし（インライン操作）
-                       initStatus が 'checking' の場合はエディタ領域にローディングスピナーを表示する
-                       initStatus が 'ready' の場合はエディタを表示する
- 
-                 [CTX-4] インライン編集:
-                       editingNodeId を useState で管理する（GraphEditor ローカル状態。Zustand には持たない）
-                       ダブルクリックで label を inline <input> に切り替える
-                       Blur / Enter で store.updateNodeData() に commit する
-                       Escape でキャンセルし元の label に戻す
- 
-                 [CTX-4][Note] 同期競合:
-                       inline 編集中に NodeProperty を操作した場合、後から blur した方が
-                       store に上書き commit される。意図的な排他制御は行わない。
-                       データ破損はなく上書きのみ。仕様として許容する。
- 
-                 [CTX-7] ContextMenu:
-                       contextMenu / editingNodeId を GraphEditor の useState で管理する
-                       EditableNode の isEditing は prop で外部制御する（GraphEditor → editingNodeId 経由）
- 
-                 [CTX-8] Node Type:
-                       nodeType / status を GraphNodeData に追加する
-                       タイプは node_catalog の category に対応する（git / validate / analyze / llm / custom）
- 
-                 [CTX-9] Node Catalog UI: [ ]
-                       Node Catalog をフロントエンドのみで実装する（固定データ・SurrealDB 不使用）
-                       カタログパネルをグラフエディタ内に表示する
-                       カテゴリ別一覧（git / validate / analyze / llm / custom）を表示する
-                       カタログからノードをグラフに追加できる
-                       カタログデータは BOM の定数（NODE_CATALOG）としてハードコードする
-                       検索は useCatalogSearch(query) カスタムフックで filter() として実装する
-                       CTX-13 で SurrealDB に差し替える際は useCatalogSearch の内部実装のみ変更する
-                       PHILOSOPHY: ノード = 単一スキル。カタログはスキルの定義リスト。
+                 責務: グラフの表示・編集・ノード実行を担う中心エリア
 
-                 [CTX-10] Graph Export/Import: [ ]
-                       グラフ + カタログを JSON でエクスポートする
-                       エクスポート JSON は LLM へのナレッジ兼 TODO リストとして機能する
-                       edges に mapping 定義を追加する（source.output → target.input のデータフロー）
-                       PHILOSOPHY: エクスポート JSON が人間とエージェントの合意の SSOT としてエージェントに渡る
-
-                 [CTX-13] Node Catalog + SurrealDB 連携: [ ]
-                       node_catalog の SSOT を SurrealDB に移行する（CTX-9 の固定データを置き換える）
-                       SurrealDB をノード定義のデータベースとして使用する
-                       ノード定義（executor / input_schema / profiles）を SurrealDB に保存する
-                       ベクトル埋め込み（embedding）フィールドを追加しベクトル類似検索を実装する
-                       HNSW インデックスで "コードをレビューしたい" → 類似ノードを発見できるようにする
-                       フルテキスト検索（SEARCH インデックス）も併用する
-                       TOML ファイルは不要になる（ノード定義を直接 SurrealDB に INSERT する）
-                       useCatalogSearch の内部実装を SurrealDB クエリに差し替える（UI 変更不要）
-                       service-manager の GET /catalog は SurrealDB から取得する
-                       SurrealDB スキーマ:
-                         DEFINE TABLE node_catalog SCHEMAFULL;
-                         DEFINE FIELD service      ON node_catalog TYPE string;
-                         DEFINE FIELD provider     ON node_catalog TYPE string;
-                         DEFINE FIELD label        ON node_catalog TYPE string;
-                         DEFINE FIELD executor     ON node_catalog TYPE object;
-                         DEFINE FIELD input_schema ON node_catalog TYPE object;
-                         DEFINE FIELD embedding    ON node_catalog TYPE array<float>;
-                         DEFINE INDEX node_hnsw ON node_catalog FIELDS embedding HNSW DIMENSION 1536;
-
+                 実装メモ:
                  [CTX-11] Root Layout: [✓]
                        __root.tsx を作成し loadProjects() をルートレイアウトに移動した
-                       useProjectFile を useProjectLoad / useProjectSave に分割した
-                       index.tsx から loadProjects() / isHydrated を削除した
-                       ProjectGrid の isHydrated prop を削除した
-                       node-type.e2e.spec.ts の Persistence skip 2件を解除した
-                       useGraphFile の hydration race condition を修正した（module スコープ変数 + pending パターン）
 
                  [CTX-12] ProjectDetail Store の永続化: [✓]
                        useProjectDetailStore の projectRootPath / activeGraphId を永続化した
@@ -868,82 +760,77 @@
                         <button class="btn-tool">＋ ノード追加</button>
                     </div>
 
-                    <!-- 通常ノード（単一選択済み） -->
-                    <div class="mock-node selected" style="top:100px;left:120px;">
+                    <!-- 通常ノード（単一選択済み）: service なし → Run ボタン非表示 -->
+                    <div class="mock-node selected" style="top:80px;left:120px;">
                         <div class="handle left"></div>
                         <div class="node-label">ProjectGrid.tsx</div>
                         <div class="node-desc">カードグリッド表示</div>
                         <div class="handle right"></div>
                     </div>
 
+                    <!-- [CTX-8/9] カタログ紐付きノード（service=git）: Run ボタン表示 -->
+                    <div class="mock-node node-type-git" style="top:80px;left:340px;">
+                        <div class="handle left"></div>
+                        <div class="node-type-badge">git</div>
+                        <div class="node-label">Git Status</div>
+                        <!-- [CTX-14] service 付きノードの Run ボタン -->
+                        <button class="node-run-btn">▶ Run</button>
+                        <div class="handle right"></div>
+                    </div>
+
+                    <!-- [CTX-14] 実行中ノード（status=doing）: スピナー表示 -->
+                    <div class="mock-node node-type-git node-status-doing" style="top:200px;left:340px;">
+                        <div class="handle left"></div>
+                        <div class="node-type-badge">git</div>
+                        <div class="node-label">Git Commit</div>
+                        <button class="node-run-btn running">⟳ Running…</button>
+                        <div class="handle right"></div>
+                    </div>
+
                     <!-- [CTX-5] 複数選択中ノード -->
-                    <div class="mock-node multi-selected" style="top:240px;left:320px;">
+                    <div class="mock-node multi-selected" style="top:240px;left:120px;">
                         <div class="handle left"></div>
                         <div class="node-label">useProjectStore</div>
                         <div class="handle right"></div>
                     </div>
 
                     <!-- [CTX-6] エッジ（接続済み） -->
-                    <svg class="graph-svg" style="position:absolute;inset:0;pointer-events:none;">
-                        <line x1="268" y1="130" x2="320" y2="270" stroke="#c0392b" stroke-width="1.5" opacity="0.4" />
+                    <svg style="position:absolute;inset:0;pointer-events:none;">
+                        <line x1="268" y1="110" x2="340" y2="110" stroke="#c0392b" stroke-width="1.5" opacity="0.4" />
                     </svg>
 
                     <!-- [CTX-7] コンテキストメニュー（ノード右クリック後） -->
-                    <div class="context-menu" style="top:150px;left:280px;">
+                    <div class="context-menu" style="top:100px;left:480px;">
                         <div class="context-menu-item">Edit Label</div>
+                        <div class="context-menu-item">SET TYPE ▸</div>
                         <div class="context-menu-item danger">Delete Node</div>
                     </div>
 
-                    <!-- [CTX-8] ノードタイプ（色分け）・ステータス表現 -->
-                    <div class="mock-node node-type-git" style="top:100px;left:500px;">
-                        <div class="handle left"></div>
-                        <div class="node-type-badge">git</div>
-                        <div class="node-label">ブランチ作成</div>
-                        <div class="handle right"></div>
-                    </div>
-                    <div class="mock-node node-type-llm node-status-doing" style="top:200px;left:500px;">
-                        <div class="handle left"></div>
-                        <div class="node-type-badge">llm</div>
-                        <div class="node-label">実装</div>
-                        <div class="handle right"></div>
-                    </div>
-                    <div class="mock-node node-type-validate node-status-done" style="top:300px;left:500px;">
-                        <div class="handle left"></div>
-                        <div class="node-type-badge">validate</div>
-                        <div class="node-label">テスト実行</div>
-                        <div class="handle right"></div>
-                    </div>
                 </div>
 
                 <!--
-                    [✓][Feature] Add Node          — 「＋ ノード追加」クリックでノードを追加する
-                    [✓][Feature] Select Node       — ノードをクリックで選択 → selectedNodeId を更新
-                    [✓][Feature] Delete Node       — 選択中ノードを Delete キーで削除する
-                    [✓][Logic]   onNodesChange     — remove / position 変更を store に反映する
-                    [✓][Logic]   Persist           — nodes[], edges[] の変化を subscribe で自動保存する
-                    [✓][Feature] Inline Edit       — ノードのダブルクリックで label をインライン <input> に切り替える
-                    [✓][Logic]   Inline Commit     — Blur / Enter で store.updateNodeData() に label を commit する
-                    [✓][Logic]   Inline Cancel     — Escape でキャンセルし元の label に戻す
-                    [✓][Logic]   EditingNodeId     — editingNodeId を useState で管理（Zustand には持たない）
+                    [✓][Feature] Node Add           — 「＋ ノード追加」ボタンでノードをキャンバスに追加できる
+                    [✓][Feature] Node Move          — ノードをドラッグで移動できる
+                    [✓][Feature] Node Select        — ノードをクリックで単一選択できる
+                    [✓][Feature] Empty State        — nodes[] が空のとき「ノードを追加してください」を表示する
+                    [✓][Feature] Node Inline Edit   — ノードダブルクリックでインライン編集できる
+                    [✓][Logic]   EditableNode       — ReactFlow の nodeTypes に登録した EditableNode で描画する
+                                                      EditableNode の isEditing は prop で外部制御する（GraphEditor → editingNodeId 経由）
 
-                    [✓][Feature] Multi Select      — Shift+クリック / ドラッグで複数ノードを選択できる
-                    [✓][Feature] Multi Move        — 複数選択中のノードをまとめてドラッグ移動できる
-                    [✓][Feature] Multi Delete      — 複数選択中に Delete キーで一括削除できる
-                    [✓][Feature] Selection Highlight — 選択中ノードを視覚的に強調する（単一・複数共通）
-                    [✓][Logic]   selectedNodeIds   — ReactFlow の onSelectionChange で selectedNodeIds[] を更新する
-                    [✓][Logic]   Single Guard      — selectedNodeIds.length === 1 のときのみ selectedNodeId を更新する
+                    [✓][Feature] Multi Select       — Shift+クリックまたはドラッグで複数ノードを選択できる
+                    [✓][Logic]   selectedNodeIds    — onSelectionChange で selectedNodeIds[] を store に反映する
 
-                    [✓][Feature] Edge Connect      — ノードのハンドルをドラッグして別ノードに繋ぐとエッジが作成される
-                    [✓][Feature] Edge Delete       — エッジを選択して Delete キーで削除できる
-                    [✓][Logic]   onConnect         — ReactFlow の onConnect で addEdge() を呼び store に反映する
-                    [✓][Logic]   onEdgesChange     — remove イベントを store に反映する
-                    [✓][Logic]   Edge Persist      — edges[] の変化を既存の subscribe で自動保存する（追加実装不要）
+                    [✓][Feature] Edge Connect       — ノードのハンドルをドラッグして接続できる
+                    [✓][Feature] Edge Delete        — エッジを選択して Delete キーで削除できる
+                    [✓][Logic]   onConnect          — ReactFlow の onConnect で addEdge() を呼び store に反映する
+                    [✓][Logic]   onEdgesChange      — remove イベントを store に反映する
+                    [✓][Logic]   Edge Persist       — edges[] の変化を既存の subscribe で自動保存する（追加実装不要）
 
-                    [✓][Feature] Node Context Menu — ノード右クリックでコンテキストメニューを表示する
-                    [✓][Feature] Menu: Delete Node — メニューから選択中ノードを削除できる
-                    [✓][Feature] Menu: Edit Label  — メニューからインライン編集を起動できる
-                    [✓][Feature] Edge Context Menu — エッジ右クリックでコンテキストメニューを表示する
-                    [✓][Feature] Menu: Delete Edge — メニューからエッジを削除できる
+                    [✓][Feature] Node Context Menu  — ノード右クリックでコンテキストメニューを表示する
+                    [✓][Feature] Menu: Delete Node  — メニューから選択中ノードを削除できる
+                    [✓][Feature] Menu: Edit Label   — メニューからインライン編集を起動できる
+                    [✓][Feature] Edge Context Menu  — エッジ右クリックでコンテキストメニューを表示する
+                    [✓][Feature] Menu: Delete Edge  — メニューからエッジを削除できる
                     [✓][Logic]   Context Menu State — contextMenu: { type, id, x, y } | null を useState で管理する
                     [✓][Logic]   Close on Pane Click — キャンバスクリックでメニューを閉じる
 
@@ -970,7 +857,21 @@
                     [✓][CTX-13][Logic]   Node INSERT         — ノード定義を SurrealDB に直接 INSERT する（TOML 不要）
                     [✓][CTX-13][Logic]   useCatalogSearch    — 内部実装を SurrealDB クエリに差し替える（UI 変更不要）
                     [✓][CTX-13][Logic]   Tauri コマンド      — catalog_get_all / catalog_search / execute_node を実装する
-                    [✓][CTX-13][Logic]   Import Validation  — インポート時にZodでJSONを検証する
+                    [✓][CTX-13][Logic]   Import Validation   — インポート時にZodでJSONを検証する
+
+                    [ ][CTX-14][Feature] Node Run Button     — service 付きノードに「▶ Run」ボタンを表示する
+                                                               service が null のノードにはボタンを表示しない
+                    [ ][CTX-14][Feature] Run Status Visual   — 実行中（runningNodeId === nodeId）はボタンが「⟳ Running…」になり非活性になる
+                    [ ][CTX-14][Feature] Status Transition   — 実行開始で status が doing になり、完了で done になる
+                    [ ][CTX-14][Feature] Error Toast         — 実行失敗時に sonner toast.error() でエラーを表示する
+                    [ ][CTX-14][Logic]   useNodeExecute      — invoke('execute_node', { service, provider, cwd, input }) を呼ぶ hook
+                                                               開始: updateNodeData({ status: 'doing' })
+                                                               成功: updateNodeData({ status: 'done' })
+                                                               失敗: updateNodeData({ status: 'todo' }) + toast.error()
+                    [ ][CTX-14][Logic]   Run Button DI       — EditableNode に onRun?: () => void prop を追加（props DI）
+                                                               省略時は何もしない（テスト・Storybook で差し替え可能）
+                    [ ][CTX-14][Logic]   GraphEditor Wire    — useNodeExecute を GraphEditor でマウントし、
+                                                               nodeTypes の editableNode に onRun を注入する
                 -->
             </main>
 
@@ -988,17 +889,13 @@
                 <div class="property-body">
                     <div class="property-field">
                         <span class="property-label">name</span>
-                        <input class="property-input" type="text" value="ProjectGrid.tsx" />
-                        <!-- バリデーションエラー（label が空のとき表示） -->
-                        <!-- <span class="property-error">name は必須です</span> -->
+                        <input class="property-input" type="text" value="Git Status" />
                     </div>
                     <div class="property-field">
                         <span class="property-label">description</span>
-                        <textarea class="property-textarea">カードグリッド表示。projects[] を一覧表示する。</textarea>
+                        <textarea class="property-textarea">ワーキングツリーの状態を確認する。</textarea>
                     </div>
                 </div>
-
-                <!-- 空状態（未選択・複数選択）: 何も表示しない -->
 
                 <!--
                     [✓][Feature] Property Display  — 選択中ノードの name・description を表示する
@@ -1010,9 +907,8 @@
                     [✓][Logic]   Validation        — label が空のとき commit せずエラーを表示する（Zod min(1)）
                     [✓][Logic]   onUpdateNode      — 確定時に呼ぶコールバック prop（props DI）
                                                      省略時は store.updateNodeData() に直接 commit する
-
                     [✓][Feature] Hide on Multi Select — 複数ノード選択中は NodeProperty を非表示にする
-                    [✓[Logic]   Visibility Guard     — selectedNodeIds.length !== 1 のとき null を返す
+                    [✓][Logic]   Visibility Guard     — selectedNodeIds.length !== 1 のとき null を返す
                 -->
             </aside>
 
