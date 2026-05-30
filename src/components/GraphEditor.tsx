@@ -31,21 +31,13 @@
  * - CatalogMenu でエントリ選択 → addNodeFromCatalog() でノードを追加する
  * - 追加位置は右クリック座標を ReactFlow の flowToScreenPosition で変換する
  *
- * [CTX-14] Run Node:
- * - ContextMenu の "Run Node" クリックで handleRunNode() を呼ぶ
- * - 対象ノードの service / provider / input / projectRootPath を組み立てて execute() に渡す
- * - service が null のノードは Run Node を表示しない（ContextMenu 側で制御）
- * - runningNodeId を ContextMenu の isRunning prop に渡す
- *
- * @context CTX-2/5/6/7/8/9/14
+ * @context CTX-2/5/6/7/8/9
  * @see docs/bom/graph.ts
- * @see docs/bom/execute.ts
  * @see src/components/nodes/EditableNode.tsx
  * @see src/components/ContextMenu.tsx
  * @see src/components/CatalogMenu.tsx
  * @see src/hooks/useGraphInit.ts
  * @see src/hooks/useGraphFile.ts
- * @see src/hooks/useNodeExecute.ts
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -73,7 +65,6 @@ import { useGraphStore } from '@/store/useGraphStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import { useGraphFile } from '@/hooks/useGraphFile'
 import { useGraphInit } from '@/hooks/useGraphInit'
-import { useNodeExecute } from '@/hooks/useNodeExecute'
 import { EditableNode } from '@/components/nodes/EditableNode'
 import { ContextMenu } from '@/components/ContextMenu'
 import { CatalogMenu } from '@/components/CatalogMenu'
@@ -184,9 +175,6 @@ function GraphEditorInner({
 
     // --- [CTX-9] カタログメニュー状態 ---
     const [catalogMenu, setCatalogMenu] = useState<CatalogMenuState>(null)
-
-    // --- [CTX-14] ノード実行 ---
-    const { runningNodeId, execute } = useNodeExecute()
 
     // --- [CTX-7] NODE_TYPES: editingNodeId を EditableNode に注入するため useMemo 化 ---
     const nodeTypes = useMemo(() => {
@@ -308,38 +296,12 @@ function GraphEditorInner({
         storeUpdateNodeData(contextMenu.id, { nodeType: type })
     }, [contextMenu, storeUpdateNodeData])
 
-    // --- [CTX-14] Run Node ---
-    const handleRunNode = useCallback(() => {
-        if (!contextMenu || contextMenu.type !== 'node') return
-        const node = nodes.find((n) => n.id === contextMenu.id)
-        if (!node) return
-
-        const { service, provider, input } = node.data
-        if (!service || !provider) return
-
-        execute(contextMenu.id, {
-            service,
-            provider,
-            cwd: projectRootPathProp ?? '',
-            input: input ?? {},
-        })
-
-        setContextMenu(null)
-    }, [contextMenu, nodes, execute, projectRootPathProp])
-
     // --- [CTX-9] カタログからノード追加 ---
     const handleSelectCatalogEntry = useCallback((entry: CatalogEntry) => {
         if (!catalogMenu) return
         storeAddNodeFromCatalog(entry, { x: catalogMenu.flowX, y: catalogMenu.flowY })
         setCatalogMenu(null)
     }, [catalogMenu, storeAddNodeFromCatalog])
-
-    // --- contextMenu に対応するノードの service を取得 ---
-    const contextNodeService = useMemo(() => {
-        if (!contextMenu || contextMenu.type !== 'node') return null
-        const node = nodes.find((n) => n.id === contextMenu.id)
-        return node?.data.service ?? null
-    }, [contextMenu, nodes])
 
     return (
         <div
@@ -395,7 +357,7 @@ function GraphEditorInner({
                         <Controls />
                     </ReactFlow>
 
-                    {/* [CTX-7/14] Node / Edge Context Menu */}
+                    {/* [CTX-7] Node / Edge Context Menu */}
                     {contextMenu && (
                         <ContextMenu
                             type={contextMenu.type}
@@ -405,9 +367,6 @@ function GraphEditorInner({
                             onEditLabel={handleEditLabelFromMenu}
                             onClose={() => setContextMenu(null)}
                             onSetNodeType={handleSetNodeType}
-                            service={contextNodeService}
-                            onRunNode={handleRunNode}
-                            isRunning={runningNodeId === contextMenu.id}
                         />
                     )}
 
