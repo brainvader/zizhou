@@ -859,18 +859,18 @@
                     [✓][CTX-13][Logic]   Tauri コマンド      — catalog_get_all / catalog_search / execute_node を実装する
                     [✓][CTX-13][Logic]   Import Validation   — インポート時にZodでJSONを検証する
 
-                    [ ][CTX-14][Feature] Node Run Button     — service 付きノードに「▶ Run」ボタンを表示する
+                    [✓][CTX-14][Feature] Node Run Button     — service 付きノードに「▶ Run」ボタンを表示する
                                                                service が null のノードにはボタンを表示しない
-                    [ ][CTX-14][Feature] Run Status Visual   — 実行中（runningNodeId === nodeId）はボタンが「⟳ Running…」になり非活性になる
-                    [ ][CTX-14][Feature] Status Transition   — 実行開始で status が doing になり、完了で done になる
-                    [ ][CTX-14][Feature] Error Toast         — 実行失敗時に sonner toast.error() でエラーを表示する
-                    [ ][CTX-14][Logic]   useNodeExecute      — invoke('execute_node', { service, provider, cwd, input }) を呼ぶ hook
+                    [✓][CTX-14][Feature] Run Status Visual   — 実行中（runningNodeId === nodeId）はボタンが「⟳ Running…」になり非活性になる
+                    [✓][CTX-14][Feature] Status Transition   — 実行開始で status が doing になり、完了で done になる
+                    [✓][CTX-14][Feature] Error Toast         — 実行失敗時に sonner toast.error() でエラーを表示する
+                    [✓][CTX-14][Logic]   useNodeExecute      — invoke('execute_node', { service, provider, cwd, input }) を呼ぶ hook
                                                                開始: updateNodeData({ status: 'doing' })
                                                                成功: updateNodeData({ status: 'done' })
                                                                失敗: updateNodeData({ status: 'todo' }) + toast.error()
-                    [ ][CTX-14][Logic]   Run Button DI       — EditableNode に onRun?: () => void prop を追加（props DI）
+                    [✓][CTX-14][Logic]   Run Button DI       — EditableNode に onRun?: () => void prop を追加（props DI）
                                                                省略時は何もしない（テスト・Storybook で差し替え可能）
-                    [ ][CTX-14][Logic]   GraphEditor Wire    — useNodeExecute を GraphEditor でマウントし、
+                    [✓][CTX-14][Logic]   GraphEditor Wire    — useNodeExecute を GraphEditor でマウントし、
                                                                nodeTypes の editableNode に onRun を注入する
                 -->
             </main>
