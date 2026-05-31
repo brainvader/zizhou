@@ -3,22 +3,20 @@
  * @context useGraphInit — GraphEditor から切り出した初期化・ロード hook
  * @bom docs/bom/graph.ts
  * @story
- * 1. projectRootPath が設定されると setInitStatus('ready') が呼ばれる
- * 2. activeGraphId が変化したとき readTextFile でグラフを読み込み loadGraph が呼ばれる
- * 3. グラフファイルが存在しない場合 resetGraph が呼ばれる
- * 4. setHydrated が false → true の順で呼ばれる
+ * 1. projectRootPath と activeGraphId が設定されると readTextFile でグラフを読み込み loadGraph が呼ばれる
+ * 2. グラフファイルが存在しない場合 resetGraph が呼ばれる
+ * 3. setHydrated が false → true の順で呼ばれる
  * @output src/hooks/useGraphInit.ts
+ * @note initStatus / setInitStatus は SurrealDB 移行により廃止済み
  */
 
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
-import type { InitStatus } from '@/bom/graph'
 import type { UseGraphInitOptions } from '@/hooks/useGraphInit'
 import { useGraphInit } from '@/hooks/useGraphInit'
 
 const MOCK_ROOT = '/Users/user/projects/zizou-core'
 const MOCK_GRAPH = 'graph-01'
-const MOCK_GRAPHS_DIR = `${MOCK_ROOT}/graphs`
 const MOCK_FILE_PATH = `${MOCK_ROOT}/graphs/${MOCK_GRAPH}.json`
 
 const mockGraphJson = JSON.stringify({
@@ -39,8 +37,6 @@ const {
     mockUseGraphStore: vi.fn(),
 }))
 
-// useGraphFile は GraphEditor 側でインスタンス化する設計のため
-// useGraphInit 内では呼ばない。setHydrated は props DI で渡す。
 const mockSetHydrated = vi.fn()
 
 type ExistsFn = NonNullable<UseGraphInitOptions['onExists']>
@@ -63,15 +59,9 @@ vi.mock('@/store/useGraphStore', () => ({
 }))
 
 const makeDetailStoreState = (overrides: Partial<{
-    initStatus: InitStatus
-    projectRootPath: string
     activeGraphId: string | null
-    setInitStatus: ReturnType<typeof vi.fn>
 }> = {}) => ({
-    initStatus: 'checking' as InitStatus,
-    projectRootPath: MOCK_ROOT,
     activeGraphId: null,
-    setInitStatus: vi.fn(),
     ...overrides,
 })
 
@@ -100,38 +90,12 @@ beforeEach(() => {
     )
 })
 
-describe('useGraphInit: Init Check logic', () => {
-    test('projectRootPath が設定されると setInitStatus("ready") が呼ばれる', async () => {
-        const setInitStatus = vi.fn()
-
-        mockUseProjectDetailStore.mockImplementation(
-            (selector: (s: ReturnType<typeof makeDetailStoreState>) => unknown) =>
-                selector(makeDetailStoreState({ setInitStatus })),
-        )
-
-        renderHook(() =>
-            useGraphInit({
-                projectRootPath: MOCK_ROOT,
-                onExists: existsMock,
-                onReadTextFile: readTextFileMock,
-                setHydrated: mockSetHydrated,
-            }),
-        )
-
-        await waitFor(() => expect(setInitStatus).toHaveBeenCalledWith('ready'))
-    })
-})
-
 describe('useGraphInit: Load Graph logic', () => {
-    test('initStatus が ready かつ activeGraphId があると readTextFile が呼ばれる', async () => {
+    test('projectRootPath と activeGraphId があると readTextFile が呼ばれ loadGraph が呼ばれる', async () => {
         mockExists.mockResolvedValue(true)
         mockReadTextFile.mockResolvedValue(mockGraphJson)
         const loadGraph = vi.fn()
 
-        mockUseProjectDetailStore.mockImplementation(
-            (selector: (s: ReturnType<typeof makeDetailStoreState>) => unknown) =>
-                selector(makeDetailStoreState({ initStatus: 'ready', activeGraphId: MOCK_GRAPH })),
-        )
         mockUseGraphStore.mockImplementation(
             (selector: (s: ReturnType<typeof makeGraphStoreState>) => unknown) =>
                 selector(makeGraphStoreState({ loadGraph })),
@@ -140,7 +104,6 @@ describe('useGraphInit: Load Graph logic', () => {
         renderHook(() =>
             useGraphInit({
                 projectRootPath: MOCK_ROOT,
-                initStatus: 'ready',
                 activeGraphId: MOCK_GRAPH,
                 onLoadGraph: loadGraph,
                 onExists: existsMock,
@@ -156,15 +119,12 @@ describe('useGraphInit: Load Graph logic', () => {
     })
 
     test('グラフファイルが存在しない場合 resetGraph が呼ばれる', async () => {
-        mockExists.mockImplementation(async (path: string) =>
-            path === MOCK_GRAPHS_DIR,
-        )
+        mockExists.mockResolvedValue(false)
         const resetGraph = vi.fn()
 
         renderHook(() =>
             useGraphInit({
                 projectRootPath: MOCK_ROOT,
-                initStatus: 'ready',
                 activeGraphId: MOCK_GRAPH,
                 onResetGraph: resetGraph,
                 onExists: existsMock,
@@ -184,7 +144,6 @@ describe('useGraphInit: Load Graph logic', () => {
         renderHook(() =>
             useGraphInit({
                 projectRootPath: MOCK_ROOT,
-                initStatus: 'ready',
                 activeGraphId: MOCK_GRAPH,
                 onExists: existsMock,
                 onReadTextFile: readTextFileMock,
