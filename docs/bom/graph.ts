@@ -2,17 +2,6 @@ import { z } from 'zod'
 import type { Node, Edge, Connection } from '@xyflow/react'
 
 // ============================================================
-// InitStatus
-// graphs/ ディレクトリの存在確認状態。
-// 'checking':      マウント時の確認中（Tauri fs の非同期処理待ち）
-// 'uninitialized': graphs/ が存在しない → エディタ領域を Setup ビューに切り替える
-// 'ready':         graphs/ が存在する   → エディタを表示する
-// ============================================================
-
-export const InitStatusSchema = z.enum(['checking', 'uninitialized', 'ready'])
-export type InitStatus = z.infer<typeof InitStatusSchema>
-
-// ============================================================
 // NodeType
 // ノードのカテゴリ。SurrealDB の node_catalog.category に対応（CTX-13）。
 // ============================================================
@@ -21,13 +10,12 @@ export const NODE_TYPES = ['git', 'validate', 'analyze', 'llm', 'custom'] as con
 export const NodeTypeSchema = z.enum(NODE_TYPES)
 export type NodeType = z.infer<typeof NodeTypeSchema>
 
-// カラーマップ。GraphNode のスタイリングに使用する。
 export const NODE_TYPE_COLOR: Record<NodeType, string> = {
-    git: '#27ae60', // 緑
-    validate: '#2980b9', // 青
-    analyze: '#f39c12', // 黄
-    llm: '#8e44ad', // 紫
-    custom: '#555e6b', // グレー
+    git: '#27ae60',
+    validate: '#2980b9',
+    analyze: '#f39c12',
+    llm: '#8e44ad',
+    custom: '#555e6b',
 }
 
 // ============================================================
@@ -63,7 +51,7 @@ export type GraphNodeData = z.infer<typeof GraphNodeDataSchema>
 // ============================================================
 // CatalogField / CatalogProfile / CatalogEntry       [CTX-9]
 // Node Catalog のエントリ型定義。
-// CTX-13 で SurrealDB の node_catalog レコードに対応する。
+// SurrealDB の node テーブル（グローバルノードライブラリ）に対応する。
 // 1エントリ = 1スキル = 1profile（CTX-9設計決定）。
 // ============================================================
 
@@ -72,7 +60,7 @@ export const CatalogFieldSchema = z.object({
     label: z.string(),
     required: z.boolean().optional(),
     default: z.unknown().optional(),
-    values: z.array(z.string()).optional(),  // type='enum' の場合のみ
+    values: z.array(z.string()).optional(),
 })
 export type CatalogField = z.infer<typeof CatalogFieldSchema>
 
@@ -95,7 +83,8 @@ export type CatalogEntry = z.infer<typeof CatalogEntrySchema>
 // ============================================================
 // NODE_CATALOG                                        [CTX-9]
 // フロントエンドにハードコードされたカタログ定数。
-// CTX-13 で useCatalogSearch の内部実装を SurrealDB クエリに差し替える。
+// CTX-13 で useCatalogSearch の内部実装を SurrealDB クエリに差し替え済み。
+// 将来: SurrealDB の node テーブル（グローバルノードライブラリ）に移行する。
 // ============================================================
 
 export const NODE_CATALOG: CatalogEntry[] = [
@@ -198,8 +187,23 @@ export const NODE_CATALOG: CatalogEntry[] = [
 ]
 
 // ============================================================
+// GraphRecord
+// SurrealDB の graph テーブルのレコード型。
+// project -[has_graph]-> graph の関係で管理される。
+// ============================================================
+
+export const GraphRecordSchema = z.object({
+    id: z.string(),       // SurrealDB Thing 型: "graph:xxxxx"
+    name: z.string().min(1).max(100),
+    projectId: z.string(),
+})
+
+export type GraphRecord = z.infer<typeof GraphRecordSchema>
+
+// ============================================================
 // GraphFile
-// {projectRootPath}/graphs/{graphId}.json の保存形式（Zod schema）。
+// GraphEditor が扱うインメモリのグラフ表現。
+// SurrealDB の node / edge テーブルから組み立てる。
 // ============================================================
 
 export const GraphFileSchema = z.object({
@@ -207,7 +211,7 @@ export const GraphFileSchema = z.object({
     nodes: z.array(
         z.object({
             id: z.string(),
-            type: z.string().optional(),  // 'editableNode' 等。未設定時は loadGraph で補完する
+            type: z.string().optional(),
             position: z.object({ x: z.number(), y: z.number() }),
             data: GraphNodeDataSchema,
         })
@@ -227,7 +231,7 @@ export type GraphFile = z.infer<typeof GraphFileSchema>
 // GraphStore
 // Zustand store の型定義。
 // nodes[], edges[], selectedNodeId の SSOT。
-// 永続化は useGraphFile hook に委譲する（subscribe ベース）。
+// 永続化は SurrealDB embedded (Rust IPC) に委譲する。
 // ============================================================
 
 export type GraphStore = {
@@ -235,24 +239,18 @@ export type GraphStore = {
     nodes: Node<GraphNodeData>[]
     edges: Edge[]
     selectedNodeId: string | null
-    // [CTX-5] 複数選択中のノード ID 配列。ReactFlow の onSelectionChange で更新する。
     selectedNodeIds: string[]
 
     // Actions
     setNodes: (nodes: Node<GraphNodeData>[]) => void
     setEdges: (edges: Edge[]) => void
     setSelectedNodeId: (id: string | null) => void
-    // [CTX-5] selectedNodeIds を更新する。
-    // Single Guard: ids.length === 1 のときのみ selectedNodeId も同時に適用する。
     setSelectedNodeIds: (ids: string[]) => void
     addNode: (node: Node<GraphNodeData>) => void
-    // [CTX-9] CatalogEntry からノードを生成して nodes[] に追加する。
     addNodeFromCatalog: (entry: CatalogEntry, position: { x: number; y: number }) => void
     loadGraph: (graph: GraphFile) => void
     resetGraph: () => void
-    // [CTX-4] 指定 id のノードの data のみを部分更新する。
     updateNodeData: (id: string, data: Partial<GraphNodeData>) => void
-    // [CTX-6] ReactFlow の onConnect から呼ばれる。Connection を Edge に変換して edges[] に追加する。
     addEdge: (connection: Connection) => void
 }
 
@@ -260,94 +258,20 @@ export type GraphStore = {
 // ProjectDetailStore
 // project-detail 画面のグローバル状態。
 // activeProjectId は TanStack Router の useParams から取得する。
-// projectRootPath は:
-//   1. useProjectDetailLoad が AppData/project-detail-{id}.json から復元する（直アクセス時）
-//   2. projects.$id.tsx の useEffect が project?.rootPath から注入する（通常遷移時）
-//
-// isDetailHydrated:
-//   [CTX-12] useProjectDetailLoad 完了後に true になる。
-//   useProjectDetailSave が hydration 前の保存をスキップするために使用する（save-before-load 防止）。
+// activeGraphId は SurrealDB から取得したグラフ一覧から選択する。
+// isDetailHydrated: invoke('list_graphs') 完了後に true になる。
 // ============================================================
 
-export const ProjectDetailStoreSchema = z.object({
-    activeGraphId: z.string().nullable(),
-    initStatus: InitStatusSchema,
-    projectRootPath: z.string(),
-    isDetailHydrated: z.boolean(), // [CTX-12]
-})
+export type ProjectDetailStore = {
+    activeGraphId: string | null
+    isDetailHydrated: boolean
 
-export type ProjectDetailStore = z.infer<typeof ProjectDetailStoreSchema> & {
     setActiveGraphId: (id: string | null) => void
-    setInitStatus: (status: InitStatus) => void
-    setProjectRootPath: (path: string) => void
-    setDetailHydrated: (value: boolean) => void // [CTX-12]
+    setDetailHydrated: (value: boolean) => void
 }
-
-// ============================================================
-// ProjectDetailSnapshot                              [CTX-12]
-// AppData/project-detail-{projectId}.json の保存形式。
-// projectId ごとに projectRootPath / activeGraphId を保持する。
-// ============================================================
-
-export const ProjectDetailSnapshotSchema = z.object({
-    projectId: z.string(),
-    projectRootPath: z.string(),
-    activeGraphId: z.string().nullable(),
-})
-
-export type ProjectDetailSnapshot = z.infer<typeof ProjectDetailSnapshotSchema>
-
-// ============================================================
-// UseProjectDetailLoadReturn                         [CTX-12]
-// ============================================================
-
-export type UseProjectDetailLoadReturn = {
-    loadProjectDetail: (projectId: string) => Promise<void>
-}
-
-// ============================================================
-// UseProjectDetailSaveReturn                         [CTX-12]
-// ============================================================
-
-export type UseProjectDetailSaveReturn = {
-    saveProjectDetail: (snapshot: ProjectDetailSnapshot) => Promise<void>
-}
-
-// ============================================================
-// FileTreeNode
-// ctx-file-tree で表示するツリーノードの型。
-// ============================================================
-
-export const FileTreeNodeSchema: z.ZodType<FileTreeNode> = z.lazy(() =>
-    z.object({
-        name: z.string(),
-        path: z.string(),
-        isDir: z.boolean(),
-        children: z.array(FileTreeNodeSchema).optional(),
-    })
-)
-
-export type FileTreeNode = {
-    name: string
-    path: string
-    isDir: boolean
-    children?: FileTreeNode[]
-}
-
-// ============================================================
-// graphFilePath / graphsDir
-// ============================================================
-
-export const graphFilePath = (projectRootPath: string, graphId: string): string =>
-    `${projectRootPath}/graphs/${graphId}.json`
-
-export const graphsDir = (projectRootPath: string): string =>
-    `${projectRootPath}/graphs`
 
 // ============================================================
 // UseCatalogSearchOptions                            [CTX-13]
-// useCatalogSearch の props DI オプション。
-// デフォルト値は invoke() の実装。テストでは差し替える。
 // ============================================================
 export type UseCatalogSearchOptions = {
     onGetAll?: () => Promise<CatalogEntry[]>
@@ -356,9 +280,6 @@ export type UseCatalogSearchOptions = {
 
 // ============================================================
 // UseCatalogSearchReturn                             [CTX-13]
-// useCatalogSearch の戻り値型。
-// CTX-9 の CatalogEntry[] から変更（破壊的変更）。
-// CatalogMenu.tsx の呼び出し箇所1箇所を合わせて修正すること。
 // ============================================================
 export type UseCatalogSearchReturn = {
     results: CatalogEntry[]

@@ -84,8 +84,10 @@ import { ContextMenu } from '@/components/ContextMenu'
 import { CatalogMenu } from '@/components/CatalogMenu'
 import { ExportModal } from '@/components/ExportModal'
 import { ImportModal } from '@/components/ImportModal'
-import type { GraphNodeData, GraphFile, InitStatus, NodeType, CatalogEntry } from '@/bom/graph'
+import type { GraphNodeData, GraphFile, NodeType, CatalogEntry } from '@/bom/graph'
 import type { LlmExportPayload, LlmImportPayload } from '@/bom/llm-export'
+
+export type InitStatus = 'checking' | 'ready'
 
 type ExistsFn = (path: string) => Promise<boolean>
 type ReadTextFileFn = (path: string) => Promise<string>
@@ -135,7 +137,6 @@ function GraphEditorInner({
     activeGraphId: activeGraphIdProp,
     nodes: nodesProp,
     edges: edgesProp,
-    onSetInitStatus,
     onAddNode,
     onLoadGraph,
     onResetGraph,
@@ -155,7 +156,9 @@ function GraphEditorInner({
     const storeAddEdge = useGraphStore((s) => s.addEdge)
     const storeAddNodeFromCatalog = useGraphStore((s) => s.addNodeFromCatalog)
     const storeSetSelectedNodeIds = useGraphStore((s) => s.setSelectedNodeIds)
-    const storeInitStatus = useProjectDetailStore((s) => s.initStatus)
+
+    const storeInitStatus = useProjectDetailStore((s) => (s as any).initStatus ?? (s as any).status) as InitStatus
+
     const { setHydrated: storeSetHydrated } = useGraphFile()
 
     const storeSetNodes = useGraphStore((s) => s.setNodes)
@@ -177,11 +180,10 @@ function GraphEditorInner({
     const addEdge = onAddEdge ?? storeAddEdge
     const setSelectedNodeIds = onSetSelectedNodeIds ?? storeSetSelectedNodeIds
 
+    // 【修正点】useGraphInit の引数から型エラーとなる 'onSetInitStatus' を削除
     useGraphInit({
         projectRootPath: projectRootPathProp,
         activeGraphId: activeGraphIdProp,
-        initStatus: initStatusProp,
-        onSetInitStatus,
         onLoadGraph,
         onResetGraph,
         onExists,

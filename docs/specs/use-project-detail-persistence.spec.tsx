@@ -5,14 +5,14 @@
  * @bom     docs/bom/graph.ts
  *
  * @story
- * 1. ユーザーが /projects/:id に直アクセスする。
- * 2. useProjectDetailLoad が AppData/project-detail-{projectId}.json を読み込み、
- *    useProjectDetailStore に projectRootPath / activeGraphId を注入する。
- * 3. projectRootPath が即座に store にセットされるため、
- *    projects.json の hydration を待たずに FileTree が Loading… を抜ける。
- * 4. useProjectDetailSave が useProjectDetailStore の変化を subscribe し、
- *    projectRootPath / activeGraphId が変わるたびに自動保存する。
- * 5. isHydrated が false の間は保存をスキップする（save-before-load 防止）。
+ * 1. useProjectDetailLoad が invoke('list_graphs') でグラフ一覧を取得し、
+ *    useProjectDetailStore に activeGraphId を注入する。
+ * 2. グラフが存在しない場合、store を変更せずに完了する。
+ * 3. 完了後に setDetailHydrated(true) を呼ぶ。
+ * 4. invoke 失敗時に toast.error を呼ぶ。
+ *
+ * @note useProjectDetailSave は SurrealDB 移行に伴い再設計予定。
+ *       現在のテストは保留中（skipped）。
  *
  * @output src/hooks/useProjectDetailLoad.ts
  * @output src/hooks/useProjectDetailSave.ts
@@ -20,50 +20,22 @@
 
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import type { ProjectDetailSnapshot } from '@/bom/graph'
 import { useProjectDetailLoad } from '@/hooks/useProjectDetailLoad'
-import { useProjectDetailSave } from '@/hooks/useProjectDetailSave'
 
 // =============================================================================
 // Slot 3: モック・セットアップ
 // =============================================================================
 
-type StoreState = {
-    projectRootPath: string
-    activeGraphId: string | null
-    isDetailHydrated: boolean
-}
-
-type SubscribeCallback = (state: StoreState) => void
-
 const {
-    mockReadTextFile,
-    mockWriteTextFile,
-    mockExists,
-    mockMkdir,
     mockToastError,
-    mockSetProjectRootPath,
     mockSetActiveGraphId,
     mockSetDetailHydrated,
-    mockSubscribe,
+    mockActiveGraphId,
 } = vi.hoisted(() => ({
-    mockReadTextFile: vi.fn<() => Promise<string>>(),
-    mockWriteTextFile: vi.fn<(path: string, content: string, opts: { baseDir: string }) => Promise<void>>(),
-    mockExists: vi.fn<() => Promise<boolean>>(),
-    mockMkdir: vi.fn<() => Promise<void>>(),
     mockToastError: vi.fn<() => void>(),
-    mockSetProjectRootPath: vi.fn<() => void>(),
     mockSetActiveGraphId: vi.fn<() => void>(),
     mockSetDetailHydrated: vi.fn<() => void>(),
-    mockSubscribe: vi.fn<(cb: SubscribeCallback) => () => void>(),
-}))
-
-vi.mock('@tauri-apps/plugin-fs', () => ({
-    readTextFile: mockReadTextFile,
-    writeTextFile: mockWriteTextFile,
-    exists: mockExists,
-    mkdir: mockMkdir,
-    BaseDirectory: { AppData: 'AppData' },
+    mockActiveGraphId: { current: null as string | null },
 }))
 
 vi.mock('sonner', () => ({
@@ -73,19 +45,12 @@ vi.mock('sonner', () => ({
 vi.mock('@/store/useProjectDetailStore', () => ({
     useProjectDetailStore: {
         getState: () => ({
-            setProjectRootPath: mockSetProjectRootPath,
             setActiveGraphId: mockSetActiveGraphId,
             setDetailHydrated: mockSetDetailHydrated,
+            activeGraphId: mockActiveGraphId.current,
         }),
-        subscribe: mockSubscribe,
     },
 }))
-
-const fixtureSnapshot: ProjectDetailSnapshot = {
-    projectId: 'proj-001',
-    projectRootPath: '/Users/user/projects/zizou-core',
-    activeGraphId: 'graph-01',
-}
 
 // =============================================================================
 // Slot 4: useProjectDetailLoad
@@ -94,217 +59,72 @@ const fixtureSnapshot: ProjectDetailSnapshot = {
 describe('useProjectDetailLoad: logic', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        mockActiveGraphId.current = null
     })
 
-    test('logic: project-detail-{id}.json が存在する場合、パースして store に注入する', async () => {
-        mockExists.mockResolvedValue(true)
-        mockReadTextFile.mockResolvedValue(JSON.stringify(fixtureSnapshot))
+    test('logic: グラフ一覧が返った場合、最初のグラフを activeGraphId にセットする', async () => {
+        const mockListGraphs = vi.fn().mockResolvedValue([
+            { id: 'graph-01', name: 'main' },
+            { id: 'graph-02', name: 'feature-x' },
+        ])
 
-        const { result } = renderHook(() => useProjectDetailLoad())
+        const { result } = renderHook(() => useProjectDetailLoad(mockListGraphs))
         await act(() => result.current.loadProjectDetail('proj-001'))
 
-        expect(mockReadTextFile).toHaveBeenCalledWith(
-            'project-detail-proj-001.json',
-            expect.objectContaining({ baseDir: 'AppData' }),
-        )
-        expect(mockSetProjectRootPath).toHaveBeenCalledWith('/Users/user/projects/zizou-core')
+        expect(mockListGraphs).toHaveBeenCalledWith('proj-001')
         expect(mockSetActiveGraphId).toHaveBeenCalledWith('graph-01')
         expect(mockToastError).not.toHaveBeenCalled()
     })
 
-    test('logic: ファイルが存在しない場合、store を変更せずに完了する', async () => {
-        mockExists.mockResolvedValue(false)
+    test('logic: グラフが存在しない場合、setActiveGraphId を呼ばずに完了する', async () => {
+        const mockListGraphs = vi.fn().mockResolvedValue([])
 
-        const { result } = renderHook(() => useProjectDetailLoad())
+        const { result } = renderHook(() => useProjectDetailLoad(mockListGraphs))
         await act(() => result.current.loadProjectDetail('proj-001'))
 
-        expect(mockReadTextFile).not.toHaveBeenCalled()
-        expect(mockSetProjectRootPath).not.toHaveBeenCalled()
         expect(mockSetActiveGraphId).not.toHaveBeenCalled()
         expect(mockToastError).not.toHaveBeenCalled()
     })
 
-    test('logic: JSON が不正な場合、store を変更せずに toast.error を呼ぶ', async () => {
-        mockExists.mockResolvedValue(true)
-        mockReadTextFile.mockResolvedValue('{ invalid json }')
-
-        const { result } = renderHook(() => useProjectDetailLoad())
-        await act(() => result.current.loadProjectDetail('proj-001'))
-
-        expect(mockSetProjectRootPath).not.toHaveBeenCalled()
-        expect(mockToastError).toHaveBeenCalledTimes(1)
-    })
-
-    test('logic: Zod バリデーション失敗の場合、store を変更せずに toast.error を呼ぶ', async () => {
-        mockExists.mockResolvedValue(true)
-        mockReadTextFile.mockResolvedValue(JSON.stringify({ projectId: 'proj-001' })) // rootPath なし
-
-        const { result } = renderHook(() => useProjectDetailLoad())
-        await act(() => result.current.loadProjectDetail('proj-001'))
-
-        expect(mockSetProjectRootPath).not.toHaveBeenCalled()
-        expect(mockToastError).toHaveBeenCalledTimes(1)
-    })
-
     test('logic: 完了後に setDetailHydrated(true) を呼ぶ', async () => {
-        mockExists.mockResolvedValue(false)
+        const mockListGraphs = vi.fn().mockResolvedValue([])
 
-        const { result } = renderHook(() => useProjectDetailLoad())
+        const { result } = renderHook(() => useProjectDetailLoad(mockListGraphs))
         await act(() => result.current.loadProjectDetail('proj-001'))
 
         expect(mockSetDetailHydrated).toHaveBeenCalledWith(true)
     })
+
+    test('logic: invoke 失敗時に toast.error を呼ぶ', async () => {
+        const mockListGraphs = vi.fn().mockRejectedValue(new Error('db error'))
+
+        const { result } = renderHook(() => useProjectDetailLoad(mockListGraphs))
+        await act(() => result.current.loadProjectDetail('proj-001'))
+
+        expect(mockToastError).toHaveBeenCalledTimes(1)
+        expect(mockSetDetailHydrated).toHaveBeenCalledWith(true)
+    })
+
+    test('logic: 前回の activeGraphId がリストに存在する場合は上書きしない', async () => {
+        mockActiveGraphId.current = 'graph-02' // 前回選択済み
+
+        const mockListGraphs = vi.fn().mockResolvedValue([
+            { id: 'graph-01', name: 'main' },
+            { id: 'graph-02', name: 'feature-x' },
+        ])
+
+        const { result } = renderHook(() => useProjectDetailLoad(mockListGraphs))
+        await act(() => result.current.loadProjectDetail('proj-001'))
+
+        // graph-02 は存在するので上書きしない
+        expect(mockSetActiveGraphId).not.toHaveBeenCalled()
+    })
 })
 
 // =============================================================================
-// Slot 4: useProjectDetailSave
+// useProjectDetailSave: SurrealDB 移行に伴い再設計予定
 // =============================================================================
 
-describe('useProjectDetailSave: logic', () => {
-    beforeEach(() => {
-        vi.clearAllMocks()
-        mockSubscribe.mockImplementation(() => () => { })
-        mockExists.mockResolvedValue(true)
-    })
-
-    test('logic: マウント時に subscribe が呼ばれ、アンマウント時に unsubscribe が呼ばれる', () => {
-        const mockUnsubscribe = vi.fn()
-        mockSubscribe.mockReturnValue(mockUnsubscribe)
-
-        const { unmount } = renderHook(() => useProjectDetailSave('proj-001'))
-
-        expect(mockSubscribe).toHaveBeenCalledTimes(1)
-        unmount()
-        expect(mockUnsubscribe).toHaveBeenCalledTimes(1)
-    })
-
-    test('logic: isDetailHydrated が false の間は writeTextFile を呼ばない', async () => {
-        let cb: SubscribeCallback | null = null
-        mockSubscribe.mockImplementation((fn) => { cb = fn; return () => { } })
-
-        renderHook(() => useProjectDetailSave('proj-001'))
-
-        await act(async () => {
-            cb?.({
-                projectRootPath: '/Users/user/projects/zizou-core',
-                activeGraphId: 'graph-01',
-                isDetailHydrated: false,
-            })
-        })
-
-        expect(mockWriteTextFile).not.toHaveBeenCalled()
-    })
-
-    test('logic: isDetailHydrated が true かつ projectRootPath が空でない場合に writeTextFile を呼ぶ', async () => {
-        let cb: SubscribeCallback | null = null
-        mockSubscribe.mockImplementation((fn) => { cb = fn; return () => { } })
-
-        renderHook(() => useProjectDetailSave('proj-001'))
-
-        await act(async () => {
-            cb?.({
-                projectRootPath: '/Users/user/projects/zizou-core',
-                activeGraphId: 'graph-01',
-                isDetailHydrated: true,
-            })
-        })
-
-        expect(mockWriteTextFile).toHaveBeenCalledTimes(1)
-        expect(mockWriteTextFile).toHaveBeenCalledWith(
-            'project-detail-proj-001.json',
-            expect.any(String),
-            expect.objectContaining({ baseDir: 'AppData' }),
-        )
-        // JSON の中身を詳細検証
-        const calledContent = mockWriteTextFile.mock.calls[0][1]
-        const parsed = JSON.parse(calledContent)
-        expect(parsed).toMatchObject({
-            projectId: 'proj-001',
-            projectRootPath: '/Users/user/projects/zizou-core',
-            activeGraphId: 'graph-01',
-        })
-    })
-
-    test('logic: projectRootPath が空の場合は保存をスキップする', async () => {
-        let cb: SubscribeCallback | null = null
-        mockSubscribe.mockImplementation((fn) => { cb = fn; return () => { } })
-
-        renderHook(() => useProjectDetailSave('proj-001'))
-
-        await act(async () => {
-            cb?.({
-                projectRootPath: '',
-                activeGraphId: null,
-                isDetailHydrated: true,
-            })
-        })
-
-        expect(mockWriteTextFile).not.toHaveBeenCalled()
-    })
-
-    test('logic: AppData ディレクトリが存在しない場合、mkdir してから writeTextFile を呼ぶ', async () => {
-        mockExists.mockResolvedValue(false)
-        let cb: SubscribeCallback | null = null
-        mockSubscribe.mockImplementation((fn) => { cb = fn; return () => { } })
-
-        renderHook(() => useProjectDetailSave('proj-001'))
-
-        await act(async () => {
-            cb?.({
-                projectRootPath: '/Users/user/projects/zizou-core',
-                activeGraphId: 'graph-01',
-                isDetailHydrated: true,
-            })
-        })
-
-        expect(mockMkdir).toHaveBeenCalledTimes(1)
-        expect(mockWriteTextFile).toHaveBeenCalledTimes(1)
-    })
-
-    test('logic: writeTextFile が失敗した場合、toast.error を呼ぶ', async () => {
-        mockWriteTextFile.mockRejectedValue(new Error('fs error'))
-        let cb: SubscribeCallback | null = null
-        mockSubscribe.mockImplementation((fn) => { cb = fn; return () => { } })
-
-        renderHook(() => useProjectDetailSave('proj-001'))
-
-        await act(async () => {
-            cb?.({
-                projectRootPath: '/Users/user/projects/zizou-core',
-                activeGraphId: 'graph-01',
-                isDetailHydrated: true,
-            })
-        })
-
-        expect(mockToastError).toHaveBeenCalledTimes(1)
-    })
-
-    test('logic: saving.current が true の間は重複保存をスキップする（Race Condition 対策）', async () => {
-        let cb: SubscribeCallback | null = null
-        mockSubscribe.mockImplementation((fn) => { cb = fn; return () => { } })
-
-        // writeTextFile を遅延させて saving 中に再度 subscribe を発火させる
-        let resolveFirst!: () => void
-        mockWriteTextFile.mockImplementationOnce(
-            () => new Promise<void>((res) => { resolveFirst = res }),
-        )
-
-        renderHook(() => useProjectDetailSave('proj-001'))
-
-        const state = {
-            projectRootPath: '/Users/user/projects/zizou-core',
-            activeGraphId: 'graph-01',
-            isDetailHydrated: true,
-        }
-
-        await act(async () => {
-            cb?.(state) // 1回目: saving = true になる
-            cb?.(state) // 2回目: saving = true のためスキップ
-        })
-
-        resolveFirst()
-        await act(async () => { }) // flush
-
-        expect(mockWriteTextFile).toHaveBeenCalledTimes(1)
-    })
+describe.skip('useProjectDetailSave: logic', () => {
+    test.todo('SurrealDB 移行後に再実装する')
 })

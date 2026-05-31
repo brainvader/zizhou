@@ -12,7 +12,7 @@
             styling:  Tailwind CSS v4 + shadcn/ui
             router:   TanStack Router（routing の SSOT）
             state:    Zustand（projects[] の SSOT）
-            persist:  Tauri fs プラグイン（AppData に JSON 保存）
+            persist:  SurrealDB embedded（Rust IPC 経由、RocksDB で永続化）
             toast:    sonner
             icons:    lucide-react
             testing:  Vitest + RTL + Storybook + Playwright
@@ -26,23 +26,13 @@
              エージェント主導でも人間主導でもなく、両者が同じグラフを共有し
              作業の定義・分担・実行について合意する場を提供する。
 
-             基本運用思想は Palantir Foundry に準拠する:
-               - グラフが人間とエージェントの合意の SSOT（信頼できる唯一の情報源）
-               - 誰が何をするかをグラフが定義する
-               - 実行はグラフの定義に従う
-
              ノード = 単一スキル（変換処理の最小単位）
-               スキルとは「入力を受け取り、何らかの変換を行い、出力を返す処理単位」である。
-               変換の種類は問わない（データ変換 / ファイル変換 / 状態変換 / 知識変換 / 人間の判断）。
-               実行主体も問わない（CLI / API / LLM エージェント / 人間）。
-               確定的な作業はソフトウェア（CLI/API）が担い、
-               不確定な作業は LLM エージェントが担う。
+               入力を受け取り変換を行い出力を返す処理単位。
+               実行主体は問わない（CLI / API / LLM エージェント / 人間）。
 
              グラフ = 複合スキル（スキルの入れ子構造）
-               複数のノード（単一スキル）を繋いだワークフロー全体が1つのスキルを構成する。
+               複数のノードを繋いだワークフロー全体が1つのスキルを構成する。
                グラフ自体も1つのスキルとして別グラフから参照できる（入れ子）。
-               Palantir のデータパイプラインと異なり、
-               変換対象はデータに限定されない（ファイル・状態・知識・判断も含む）。
 
              3者の役割:
                人間        — グラフを設計・承認することで意図とルールを定義する
@@ -54,7 +44,8 @@
             GLOBAL STORE
             アプリ全体で共有すべき状態。
             routing は TanStack Router に委譲するため持たない。
-            永続化は Tauri fs プラグインで AppData に JSON として保存する。
+            永続化は SurrealDB embedded (Rust IPC) で管理する。
+            projects テーブルに CRUD する。フロントエンドは invoke() 経由でのみアクセスする。
         ============================================================ -->
         <script id="global-store" type="application/json">
             {
@@ -71,36 +62,13 @@
         <!-- ctx-project-grid のローカル状態 -->
         <script data-context="ctx-project-grid" class="local-state" type="application/json">
             {
-            "selectedProjectId": null,
-            "isDialogOpen": false,
-            "form": { "name": "", "description": "" },
-            "errors": { "name": null }
+                "isNewProjectDialogOpen": false,
+                "form": { "name": "", "description": "" },
+                "errors": { "name": null }
             }
         </script>
 
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500&family=DM+Mono:wght@300;400&family=Outfit:wght@400;500;600;700&display=swap');
-
-            /* ── 地蔵カラー: 石段・夜の石畳・よだれかけの朱 ── */
-            :root {
-                --background: #1c1e21;
-                --foreground: #dedad4;
-                --card: #22252a;
-                --card-foreground: #dedad4;
-                --muted: #2a2d32;
-                --muted-foreground: #707880;
-                --border: #30343a;
-                --primary: #c0392b;
-                --primary-soft: #a03020;
-                --primary-foreground: #f5ede8;
-                --primary-glow: #c0392b20;
-                --accent: #2a2d32;
-                --radius: 0.375rem;
-                --font-sans: 'Outfit', sans-serif;
-                --font-mono: 'DM Mono', monospace;
-                --font-serif: 'Noto Serif JP', serif;
-            }
-
             *,
             *::before,
             *::after {
@@ -109,22 +77,42 @@
                 padding: 0;
             }
 
-            body {
-                background-color: var(--background);
-                color: var(--foreground);
-                font-family: var(--font-sans);
-                font-size: 14px;
-                line-height: 1.5;
-                height: 100vh;
-                display: flex;
-                flex-direction: column;
-                position: relative;
+            :root {
+                --background: #0d0f11;
+                --foreground: #e8e6e3;
+                --card: #13161a;
+                --card-hover: #1a1e24;
+                --border: #242830;
+                --muted-foreground: #6b7280;
+                --accent: #1e2229;
+                --primary: #c0392b;
+                --primary-foreground: #fff;
+                --primary-soft: #7a1f16;
+                --primary-glow: #c0392b44;
+                --radius: 6px;
+                --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+                --font-serif: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
             }
 
-            /* ── Tauri titlebar ── */
+            html,
+            body {
+                height: 100%;
+                background: var(--background);
+                color: var(--foreground);
+                font-family: var(--font-sans);
+                font-size: 13px;
+            }
+
+            body {
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
             .titlebar {
-                height: 32px;
-                background: #161819;
+                height: 28px;
+                background: var(--card);
                 border-bottom: 1px solid var(--border);
                 display: flex;
                 align-items: center;
@@ -156,7 +144,6 @@
                 background: #2a4a35;
             }
 
-            /* ── TOPBAR ── */
             #ctx-topbar {
                 height: 52px;
                 background: var(--card);
@@ -187,7 +174,6 @@
                 color: var(--foreground);
                 letter-spacing: 0.15em;
                 line-height: 1;
-                text-shadow: 0 1px 3px #00000060;
             }
 
             .logo-kanji-wrap::after {
@@ -274,7 +260,21 @@
                 border-color: var(--border);
             }
 
-            /* ── MAIN CONTENT ── */
+            .btn-outline {
+                background: transparent;
+                color: var(--foreground);
+                border: 1px solid var(--border);
+                padding: 6px 16px;
+                height: 32px;
+                border-radius: var(--radius);
+                font-size: 12px;
+                cursor: pointer;
+            }
+
+            .btn-outline:hover {
+                background: var(--accent);
+            }
+
             #ctx-project-grid {
                 flex: 1;
                 overflow-y: auto;
@@ -298,7 +298,6 @@
                 gap: 10px;
             }
 
-            /* ── Card ── */
             .card {
                 background: var(--card);
                 border: 1px solid var(--border);
@@ -309,114 +308,78 @@
                 transition: all 0.18s;
                 display: flex;
                 flex-direction: column;
+                justify-content: center;
                 gap: 6px;
-                position: relative;
-                overflow: hidden;
-            }
-
-            .card::before {
-                content: '';
-                position: absolute;
-                left: 0;
-                top: 12px;
-                bottom: 12px;
-                width: 2px;
-                background: var(--border);
-                border-radius: 1px;
-                transition: background 0.18s;
             }
 
             .card:hover {
-                border-color: #3e4248;
-                box-shadow: 0 6px 24px #00000050;
-                translate: 0 -1px;
-            }
-
-            .card:hover::before {
-                background: var(--primary);
-                opacity: 0.7;
+                background: var(--card-hover);
+                border-color: #3a3f4a;
+                box-shadow: 0 2px 12px #00000040;
             }
 
             .card-title {
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 600;
-                color: var(--card-foreground);
-                letter-spacing: 0.01em;
-                line-height: 1.3;
-                padding-left: 10px;
+                color: var(--foreground);
             }
 
             .card-description {
-                font-size: 12px;
+                font-size: 11px;
                 color: var(--muted-foreground);
                 line-height: 1.5;
-                padding-left: 10px;
                 display: -webkit-box;
                 -webkit-line-clamp: 2;
+                line-clamp: 2;
                 -webkit-box-orient: vertical;
                 overflow: hidden;
             }
 
-            /* ── New card ── */
             .card.new {
                 border-style: dashed;
-                border-color: #30343a;
+                border-color: #2e333d;
+                background: transparent;
                 align-items: center;
                 justify-content: center;
-                flex-direction: row;
-                gap: 8px;
-                min-height: 60px;
-                opacity: 0.35;
-            }
-
-            .card.new::before {
-                display: none;
             }
 
             .card.new:hover {
-                opacity: 0.9;
-                border-color: var(--primary);
-                box-shadow: 0 0 18px var(--primary-glow);
-                translate: 0 -1px;
+                border-color: #454b59;
+                background: var(--accent);
             }
 
             .new-text {
-                font-size: 11px;
+                font-size: 12px;
                 color: var(--muted-foreground);
-                letter-spacing: 0.12em;
-                font-family: var(--font-mono);
+                letter-spacing: 0.05em;
             }
 
-            /* ── CTX-3: NEW PROJECT DIALOG (shadcn Dialog) ── */
             .dialog-overlay {
                 position: fixed;
                 inset: 0;
-                width: 100vw;
-                height: 100vh;
-                background: rgba(0, 0, 0, 0.7);
+                background: #00000080;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                z-index: 9999;
+                z-index: 50;
             }
 
             .dialog {
-                all: unset;
-                display: flex;
-                flex-direction: column;
-                box-sizing: border-box;
                 background: var(--card);
                 border: 1px solid var(--border);
-                border-radius: var(--radius);
+                border-radius: calc(var(--radius) * 1.5);
                 padding: 24px;
                 width: 400px;
-                gap: 16px;
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+                box-shadow: 0 8px 32px #00000080;
             }
 
             .dialog-title {
                 font-size: 15px;
                 font-weight: 600;
-                color: var(--foreground);
+                letter-spacing: 0.02em;
             }
 
             .dialog-field {
@@ -427,9 +390,8 @@
 
             .dialog-label {
                 font-size: 11px;
-                font-family: var(--font-mono);
                 color: var(--muted-foreground);
-                letter-spacing: 0.1em;
+                letter-spacing: 0.05em;
             }
 
             .dialog-input {
@@ -437,9 +399,9 @@
                 border: 1px solid var(--border);
                 border-radius: var(--radius);
                 padding: 8px 10px;
+                font-size: 12px;
                 color: var(--foreground);
                 font-family: var(--font-sans);
-                font-size: 13px;
                 outline: none;
             }
 
@@ -447,43 +409,20 @@
                 border-color: var(--primary);
             }
 
-            .dialog-input.error {
-                border-color: #8b3a3a;
-            }
-
             .dialog-error {
-                font-size: 10px;
-                color: #c0392b;
-                font-family: var(--font-mono);
+                font-size: 11px;
+                color: var(--primary);
             }
 
             .dialog-footer {
                 display: flex;
                 justify-content: flex-end;
                 gap: 8px;
-                padding-top: 4px;
-            }
-
-            .btn-outline {
-                background: transparent;
-                border: 1px solid var(--border);
-                color: var(--muted-foreground);
-                padding: 6px 14px;
-                height: 32px;
-                font-size: 12px;
-                border-radius: var(--radius);
-                cursor: pointer;
-            }
-
-            .btn-outline:hover {
-                border-color: var(--border);
-                color: var(--foreground);
             }
         </style>
     </head>
     <body>
 
-        <!-- Tauri titlebar -->
         <div class="titlebar">
             <div class="dots">
                 <div class="dot r"></div>
@@ -494,10 +433,10 @@
 
         <!-- ============================================================
             CTX-1: TOPBAR [✓]
-            責務: アプリ識別・グローバルアクション（New Project / Settings）
+            責務: アプリ識別・グローバルアクション（Settings）
             注意: サイドバーなし。Settings はアイコンボタン一つ。
         ============================================================ -->
-        <header id="ctx-topbar" class="context-area">
+        <header id="ctx-topbar">
             <div class="logo">
                 <div class="logo-kanji-wrap">
                     <span class="logo-kanji">地蔵</span>
@@ -505,83 +444,75 @@
                 <div class="logo-sep"></div>
                 <div class="logo-sub">
                     <span class="logo-romaji">Zizou</span>
-                    <span class="logo-ver">Protocol v7.00</span>
+                    <span class="logo-ver">Protocol v8.10</span>
                 </div>
             </div>
             <div class="topbar-spacer"></div>
             <button class="btn btn-ghost" title="Settings">⚙</button>
 
             <!--
-                [✓][Feature] Settings — アイコンボタンクリックで CTX-4 Settings ダイアログを開く
-                [✓][Logic]   Open Dialog — onSettingsClick コールバック経由で isSettingsOpen を true にす
+                [✓][Feature] Settings    — アイコンボタンクリックで CTX-4 Settings ダイアログを開く
+                [✓][Logic]   Open Dialog — onSettingsClick コールバック経由で isSettingsOpen を true にする
             -->
         </header>
 
         <!-- ============================================================
-            CTX-2: PROJECT-GRID [✓]
-            責務: global-store の projects[] を一覧表示・新規作成のエントリーポイント
+            CTX-2: PROJECT-GRID [ ]
+            責務: SurrealDB の projects テーブルを一覧表示・新規作成のエントリーポイント
             注意: クリックで /projects/:id へ遷移（routing を更新）
         ============================================================ -->
-        <main id="ctx-project-grid" class="context-area">
+        <main id="ctx-project-grid">
 
             <div class="grid">
-
                 <div class="card">
                     <div class="card-title">地蔵 Core</div>
                     <div class="card-description">グラフベースのプロジェクト管理OS。</div>
                 </div>
-
                 <div class="card">
                     <div class="card-title">Graph Renderer</div>
                     <div class="card-description">ノード・エッジの依存関係を可視化するビューエンジン。</div>
                 </div>
-
                 <div class="card">
                     <div class="card-title">HITL Gate</div>
                     <div class="card-description">Human-in-the-loop の承認フロー制御モジュール。</div>
                 </div>
-
                 <div class="card">
                     <div class="card-title">Spec Extractor</div>
                     <div class="card-description">実装完了時にコードと同期した仕様書を自動生成する。</div>
                 </div>
-
                 <div class="card">
                     <div class="card-title">Auth Module</div>
                     <div class="card-description">Tauriキーチェーン連携によるローカルファースト認証。</div>
                 </div>
-
-                <div class="card new">
-                    <span class="new-text">＋ new project</span>
-                </div>
-
+                <div class="card new"><span class="new-text">＋ new project</span></div>
             </div>
 
             <!--
-                [✓][Feature] Project List     — global-store の projects[] をカードグリッドで表示する
+                [ ][Feature] Project List     — SurrealDB から取得した projects[] をカードグリッドで表示する
                 [✓][Feature] Open Project     — カードを TanStack Router の <Link to="/projects/$id"> でラップして遷移する
-                [✓][Feature] New Project Card — 破線カードクリックで shadcn Dialog を開き name・description を入力して作成する
-                [✓][Logic]   Empty State      — projects[] が空のとき破線カードのみを表示する
+                [ ][Feature] New Project Card — 破線カードクリックで shadcn Dialog を開き name・description を入力して作成する
+                [ ][Logic]   Empty State      — projects[] が空のとき破線カードのみを表示する
                 [✓][Logic]   Routing          — TanStack Router に委譲。Zustand に currentPath は持たない
-                [✓][Logic]   Persist          — 起動時に Tauri fs で projects.json を読み込み、変更時に書き出す
+                [ ][Logic]   Load             — 起動時に invoke('list_projects') で SurrealDB から projects[] を取得する
             -->
         </main>
 
         <!-- ============================================================
-            CTX-3: NEW PROJECT DIALOG [✓]
+            CTX-3: NEW PROJECT DIALOG [ ]
             責務: プロジェクトの新規作成フォーム
             トリガー: 破線カード（＋ new project）クリック
             使用コンポーネント: shadcn Dialog / Input / Button
+            注意: </body> 直前に配置（position:fixed のため）
         ============================================================ -->
         <div class="dialog-overlay">
-            <dialog id="ctx-new-project-dialog" class="dialog" open>
+            <dialog id="ctx-new-project-dialog" class="dialog" open
+                style="all:unset; display:flex; flex-direction:column; gap:20px; background:#13161a; border:1px solid #242830; border-radius:9px; padding:24px; width:400px; box-shadow:0 8px 32px #00000080;">
 
                 <div class="dialog-title">New Project</div>
 
                 <div class="dialog-field">
                     <label class="dialog-label">name *</label>
                     <input class="dialog-input" type="text" placeholder="My Awesome App" />
-                    <!-- バリデーション: 未入力で送信した場合にエラー表示 -->
                     <span class="dialog-error">name は必須です</span>
                 </div>
 
@@ -596,11 +527,11 @@
                 </div>
 
                 <!--
-                    [✓][Feature] Create Project — name・description を入力して「作成」で projects[] に追加する
-                    [✓][Feature] Cancel         — 「キャンセル」または overlay クリックでダイアログを閉じる
-                    [✓][Logic]   Validation     — name が空のとき「作成」ボタンを押すとエラーメッセージを表示し送信しない（Zod）
-                    [✓][Logic]   Submit         — バリデーション通過後、Zustand の projects[] に追加し Tauri fs で保存、dialog を閉じる
-                    [✓][Logic]   ID生成         — 新規プロジェクトの id は nanoid() で生成する
+                    [ ][Feature] Create Project — name・description を入力して「作成」で projects[] に追加する
+                    [ ][Feature] Cancel         — 「キャンセル」または overlay クリックでダイアログを閉じる
+                    [ ][Logic]   Validation     — name が空のとき「作成」ボタンを押すとエラーを表示し送信しない（Zod）
+                    [ ][Logic]   Submit         — invoke('create_project', { name, description }) で SurrealDB の project テーブルに INSERT し、Zustand の projects[] を更新してダイアログを閉じる
+                    [ ][Logic]   ID生成         — id は SurrealDB が自動生成する（nanoid 不要）
                 -->
             </dialog>
         </div>
@@ -613,7 +544,8 @@
             注意: </body> 直前に配置（position:fixed のため）
         ============================================================ -->
         <div class="dialog-overlay">
-            <dialog id="ctx-settings-dialog" class="dialog" open>
+            <dialog id="ctx-settings-dialog" class="dialog" open
+                style="all:unset; display:flex; flex-direction:column; gap:20px; background:#13161a; border:1px solid #242830; border-radius:9px; padding:24px; width:400px; box-shadow:0 8px 32px #00000080;">
 
                 <div class="dialog-title">Settings</div>
 
@@ -635,7 +567,7 @@
         ============================================================ -->
         <!--
             src/routes/__root.tsx       — Root Layout。useProjectLoad を呼び出し、
-                                          どのルートに直接アクセスしても hydration を保証する。[✓] CTX-11
+                                          どのルートに直接アクセスしても hydration を保証する。
             src/router.tsx              — createRouter() + RouterProvider のエクスポート
             src/routes/index.tsx        — "/" ルート（ProjectGrid をレンダリング）
             src/routes/projects.$id.tsx — "/projects/$id" ルート
@@ -643,7 +575,7 @@
             [✓][Feature] Project Detail Route — /projects/$id を開くと useParams で id を取得して表示する
             [✓][Logic]   Router Setup         — createRouter() でルートツリーを構築し App.tsx で RouterProvider をラップする
             [✓][Logic]   Link Wrap            — ProjectGrid の各カードを <Link to="/projects/$id"> でラップする（CTX-2 Open Project の実装）
-            [✓][Logic]   Root Layout          — __root.tsx で useProjectLoad を呼び出し全ルートで hydration を保証する（CTX-11）
+            [✓][Logic]   Root Layout          — __root.tsx で useProjectLoad を呼び出し全ルートで hydration を保証する
             [✓][Logic]   Direct Navigation    — /projects/:id に直接アクセスしても ProjectGrid に戻った後プロジェクトが表示される
         -->
 

@@ -1,13 +1,14 @@
 //! lib.rs — Tauri エントリポイント
 //!
-//! @context CTX-13: catalog_get_all / catalog_search コマンド追加
-//! @context CTX-14: execute_node コマンド追加
+//! @context CTX-13: catalog_get_all / catalog_search コマンド
+//! @context CTX-14: execute_node コマンド
+//! @context CTX-SurrealDB-migration: list_projects / create_project / list_graphs / create_graph コマンド追加
 
 mod db;
 
-use db::{Db, NodeCatalog};
+use db::{Db, GraphInput, NodeCatalog, ProjectInput};
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{Manager, State};
 
 // ============================================================
 // execute_node 用の型定義
@@ -27,18 +28,14 @@ pub struct ExecuteResponse {
 }
 
 // ============================================================
-// Tauri コマンド
+// Tauri コマンド — Node Catalog
 // ============================================================
 
-/// 全カタログエントリを返す。
-/// フロントの useCatalogSearch が query 空のとき呼ぶ。
 #[tauri::command]
 async fn catalog_get_all(db: State<'_, Db>) -> Result<Vec<NodeCatalog>, String> {
     db.select("node_catalog").await.map_err(|e| e.to_string())
 }
 
-/// query で label / service を部分一致検索して返す。
-/// フロントの useCatalogSearch が query ありのとき呼ぶ。
 #[tauri::command]
 async fn catalog_search(query: String, db: State<'_, Db>) -> Result<Vec<NodeCatalog>, String> {
     let q = query.to_lowercase();
@@ -54,18 +51,70 @@ async fn catalog_search(query: String, db: State<'_, Db>) -> Result<Vec<NodeCata
     .map_err(|e| e.to_string())
 }
 
-/// ノードを単体実行する。
-///
-/// 1. SurrealDB から service + provider に一致するカタログエントリを取得する
-/// 2. input.subcommand とプロファイルの subcommand が一致するか確認する
-/// 3. profile.args のテンプレート（{input.xxx}）を input の値で展開する
-/// 4. CLI を std::process::Command で実行する
-///
-/// # エラーコード
-/// - SERVICE_NOT_FOUND:          service + provider に一致するエントリなし
-/// - PROFILE_NOT_FOUND:          input.subcommand がプロファイルの subcommand と不一致
-/// - TEMPLATE_RESOLUTION_FAILED: {input.xxx} のキーが input に存在しない
-/// - CLI_EXECUTION_FAILED:       プロセス起動失敗
+// ============================================================
+// Tauri コマンド — Project
+// ============================================================
+
+/// 全プロジェクトを返す。起動時に invoke('list_projects') で呼ぶ。
+#[tauri::command]
+async fn list_projects(db: State<'_, Db>) -> Result<Vec<serde_json::Value>, String> {
+    db.select("project").await.map_err(|e| e.to_string())
+}
+
+/// プロジェクトを作成する。id は SurrealDB が自動生成する。
+#[tauri::command]
+async fn create_project(
+    name: String,
+    description: Option<String>,
+    db: State<'_, Db>,
+) -> Result<serde_json::Value, String> {
+    let input = ProjectInput { name, description };
+    let created: Option<serde_json::Value> = db
+        .create("project")
+        .content(input)
+        .await
+        .map_err(|e| e.to_string())?;
+    created.ok_or_else(|| "Failed to create project".into())
+}
+
+// ============================================================
+// Tauri コマンド — Graph
+// ============================================================
+
+/// 指定プロジェクトのグラフ一覧を返す。
+#[tauri::command]
+async fn list_graphs(
+    project_id: String,
+    db: State<'_, Db>,
+) -> Result<Vec<serde_json::Value>, String> {
+    db.query("SELECT * FROM graph WHERE project_id = $pid")
+        .bind(("pid", project_id))
+        .await
+        .map_err(|e| e.to_string())?
+        .take(0)
+        .map_err(|e| e.to_string())
+}
+
+/// グラフを作成する。id は SurrealDB が自動生成する。
+#[tauri::command]
+async fn create_graph(
+    project_id: String,
+    name: String,
+    db: State<'_, Db>,
+) -> Result<serde_json::Value, String> {
+    let input = GraphInput { name, project_id };
+    let created: Option<serde_json::Value> = db
+        .create("graph")
+        .content(input)
+        .await
+        .map_err(|e| e.to_string())?;
+    created.ok_or_else(|| "Failed to create graph".into())
+}
+
+// ============================================================
+// Tauri コマンド — execute_node
+// ============================================================
+
 #[tauri::command]
 async fn execute_node(
     db: State<'_, Db>,
@@ -74,7 +123,6 @@ async fn execute_node(
     cwd: String,
     input: serde_json::Value,
 ) -> Result<ExecuteResponse, String> {
-    // 1. SurrealDB からノード定義を取得
     let mut result = db
         .query("SELECT * FROM node_catalog WHERE service = $s AND provider = $p LIMIT 1")
         .bind(("s", service.clone()))
@@ -98,12 +146,10 @@ async fn execute_node(
         }
     };
 
-    // 2. subcommand の一致確認（防御的チェック）
     let subcommand = input
         .get("subcommand")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-
     if node.profile.subcommand != subcommand {
         return Ok(ExecuteResponse {
             success: false,
@@ -118,7 +164,6 @@ async fn execute_node(
         });
     }
 
-    // 3. テンプレート展開
     let resolved = match resolve_args(&node.profile.args, &input) {
         Ok(args) => args,
         Err(msg) => {
@@ -133,7 +178,6 @@ async fn execute_node(
         }
     };
 
-    // 4. CLI 実行（シェル文字列渡し禁止。args を配列として渡す）
     let output = match std::process::Command::new("git")
         .args(&resolved)
         .current_dir(&cwd)
@@ -177,8 +221,6 @@ async fn execute_node(
 // テンプレート展開ヘルパー
 // ============================================================
 
-/// profile.args 内の "{input.xxx}" を input の値で展開する。
-/// 例: "{input.subcommand}" → input["subcommand"] の文字列値
 fn resolve_args(args: &[String], input: &serde_json::Value) -> Result<Vec<String>, String> {
     args.iter()
         .map(|arg| {
@@ -202,17 +244,29 @@ fn resolve_args(args: &[String], input: &serde_json::Value) -> Result<Vec<String
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let db = tauri::async_runtime::block_on(db::init_db()).expect("Failed to initialize SurrealDB");
-
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .manage(db)
+        .setup(|app| {
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("Failed to get app data dir");
+            std::fs::create_dir_all(&app_data_dir).expect("Failed to create app data dir");
+            let db = tauri::async_runtime::block_on(db::init_db(app_data_dir))
+                .expect("Failed to initialize SurrealDB");
+            app.manage(db);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             catalog_get_all,
             catalog_search,
             execute_node,
+            list_projects,
+            create_project,
+            list_graphs,
+            create_graph,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
