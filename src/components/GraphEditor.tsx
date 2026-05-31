@@ -19,27 +19,34 @@
  * - onPaneClick で null にクリアする
  * - editingNodeId を useState で管理する（ローカル状態。Zustand には持たない）
  * - NODE_TYPES を useMemo 化し editingNodeId を EditableNode に prop で注入する
- * - Delete Node/Edge は onNodesChange/onEdgesChange(remove) 経由で処理する（ReactFlow の想定フロー）
+ * - Delete Node/Edge は onNodesChange/onEdgesChange(remove) 経由で処理する
  *
  * [CTX-8] Set Node Type:
  * - onSetNodeType は store.updateNodeData() に直結している
- * - 現状は E2E（Playwright）で結合確認する
  *
  * [CTX-9] Catalog Menu:
  * - キャンバス空白右クリックで CatalogMenu を表示する
- * - onPaneContextMenu で catalogMenu state をセットする
  * - CatalogMenu でエントリ選択 → addNodeFromCatalog() でノードを追加する
- * - 追加位置は右クリック座標を ReactFlow の flowToScreenPosition で変換する
  *
- * @context CTX-2/5/6/7/8/9/14
+ * [CTX-10] Export / Import:
+ * - キャンバス左上にツールバーボタン（Export / Import）を固定配置する
+ * - Export: buildLlmExport() で LlmExportPayload を生成し ExportModal に渡す
+ * - Import: ImportModal で JSON 入力 → Zod バリデーション → loadGraph()
+ *
+ * @context CTX-2/5/6/7/8/9/10/14
  * @see docs/bom/graph.ts
  * @see docs/bom/execute.ts
+ * @see docs/bom/llm-export.ts
  * @see src/components/nodes/EditableNode.tsx
  * @see src/components/ContextMenu.tsx
  * @see src/components/CatalogMenu.tsx
+ * @see src/components/ExportModal.tsx
+ * @see src/components/ImportModal.tsx
  * @see src/hooks/useGraphInit.ts
  * @see src/hooks/useGraphFile.ts
  * @see src/hooks/useNodeExecute.ts
+ * @see src/hooks/useGraphExport.ts
+ * @see src/hooks/useGraphImport.ts
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -62,16 +69,23 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { nanoid } from 'nanoid'
-import { exists, readTextFile } from '@tauri-apps/plugin-fs'
+import { exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
+import { save } from '@tauri-apps/plugin-dialog'
+import { toast } from 'sonner'
 import { useGraphStore } from '@/store/useGraphStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import { useGraphFile } from '@/hooks/useGraphFile'
 import { useGraphInit } from '@/hooks/useGraphInit'
 import { useNodeExecute } from '@/hooks/useNodeExecute'
+import { useGraphExport } from '@/hooks/useGraphExport'
+import { useGraphImport } from '@/hooks/useGraphImport'
 import { EditableNode } from '@/components/nodes/EditableNode'
 import { ContextMenu } from '@/components/ContextMenu'
 import { CatalogMenu } from '@/components/CatalogMenu'
+import { ExportModal } from '@/components/ExportModal'
+import { ImportModal } from '@/components/ImportModal'
 import type { GraphNodeData, GraphFile, InitStatus, NodeType, CatalogEntry } from '@/bom/graph'
+import type { LlmExportPayload, LlmImportPayload } from '@/bom/llm-export'
 
 type ExistsFn = (path: string) => Promise<boolean>
 type ReadTextFileFn = (path: string) => Promise<string>
@@ -88,8 +102,8 @@ type ContextMenuState = {
 type CatalogMenuState = {
     x: number
     y: number
-    flowX: number  // ReactFlow座標系でのX（ノード配置に使う）
-    flowY: number  // ReactFlow座標系でのY
+    flowX: number
+    flowY: number
 } | null
 
 export type GraphEditorProps = {
@@ -110,6 +124,8 @@ export type GraphEditorProps = {
     onExists?: ExistsFn
     onReadTextFile?: ReadTextFileFn
     setHydrated?: (hydrated: boolean) => void
+    // [CTX-10] Export/Import 用プロジェクトID。省略時は ''
+    projectId?: string
 }
 
 // [CTX-9] ReactFlow の useReactFlow を使うため内部コンポーネントに分離する
@@ -128,6 +144,7 @@ function GraphEditorInner({
     onExists = exists,
     onReadTextFile = readTextFile,
     setHydrated: setHydratedProp,
+    projectId: projectIdProp = '',
 }: GraphEditorProps) {
     const { screenToFlowPosition } = useReactFlow()
 
@@ -182,6 +199,56 @@ function GraphEditorInner({
     // --- [CTX-14] ノード実行 ---
     const { runningNodeId, execute } = useNodeExecute()
 
+    // --- [CTX-10] Export / Import ---
+    const [exportPayload, setExportPayload] = useState<LlmExportPayload | null>(null)
+    const [showImport, setShowImport] = useState(false)
+
+    const { exportGraph } = useGraphExport({ projectId: projectIdProp })
+    const { importGraph } = useGraphImport()
+
+    const handleExport = useCallback(async () => {
+        try {
+            const payload = await exportGraph()
+            setExportPayload(payload)
+        } catch {
+            toast.error('エクスポートに失敗しました')
+        }
+    }, [exportGraph])
+
+    const handleExportCopy = useCallback(async () => {
+        if (!exportPayload) return
+        try {
+            await navigator.clipboard.writeText(JSON.stringify(exportPayload, null, 2))
+            toast.success('クリップボードにコピーしました')
+            setExportPayload(null)
+        } catch {
+            toast.error('コピーに失敗しました')
+        }
+    }, [exportPayload])
+
+    const handleExportSave = useCallback(async () => {
+        if (!exportPayload) return
+        try {
+            const filePath = await save({
+                filters: [{ name: 'JSON', extensions: ['json'] }],
+                defaultPath: `graph-export-${Date.now()}.json`,
+            })
+            if (filePath) {
+                await writeTextFile(filePath, JSON.stringify(exportPayload, null, 2))
+                toast.success('ファイルに保存しました')
+                setExportPayload(null)
+            }
+        } catch {
+            toast.error('保存に失敗しました')
+        }
+    }, [exportPayload])
+
+    const handleImport = useCallback(async (payload: LlmImportPayload) => {
+        await importGraph(payload)
+        setShowImport(false)
+        toast.success('グラフをインポートしました')
+    }, [importGraph])
+
     // --- [CTX-7/14] NODE_TYPES: editingNodeId / onRun を EditableNode に注入するため useMemo 化 ---
     const nodeTypes = useMemo(() => {
         const node = (props: React.ComponentProps<typeof EditableNode>) => {
@@ -208,7 +275,7 @@ function GraphEditorInner({
         }
         return {
             editableNode: node,
-            default: node,  // type 未指定ノードも EditableNode で描画する
+            default: node,
         }
     }, [editingNodeId, runningNodeId, execute, projectRootPathProp])
 
@@ -275,7 +342,6 @@ function GraphEditorInner({
 
     // --- [CTX-9] Pane 右クリック → カタログメニュー ---
     const handlePaneContextMenu = useCallback((e: MouseEvent | React.MouseEvent) => {
-        // onPaneContextMenu は MouseEvent | React.MouseEvent のユニオン型
         e.preventDefault()
         setContextMenu(null)
         const flowPos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
@@ -328,13 +394,26 @@ function GraphEditorInner({
             data-testid="graph-editor"
             style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0, height: '100%' }}
         >
+            {/* ツールバー */}
             {initStatus === 'ready' && (
-                <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10 }}>
+                <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10, display: 'flex', gap: 4 }}>
                     <button
                         data-testid="btn-add-node"
                         onClick={handleAddNode}
                     >
                         ＋ ノード追加
+                    </button>
+                    <button
+                        data-testid="btn-export"
+                        onClick={handleExport}
+                    >
+                        Export
+                    </button>
+                    <button
+                        data-testid="btn-import"
+                        onClick={() => setShowImport(true)}
+                    >
+                        Import
                     </button>
                 </div>
             )}
@@ -399,6 +478,24 @@ function GraphEditorInner({
                             onSelectEntry={handleSelectCatalogEntry}
                         />
                     )}
+
+                    {/* [CTX-10] Export Modal */}
+                    {exportPayload && (
+                        <ExportModal
+                            payload={exportPayload}
+                            onCopy={handleExportCopy}
+                            onSave={handleExportSave}
+                            onClose={() => setExportPayload(null)}
+                        />
+                    )}
+
+                    {/* [CTX-10] Import Modal */}
+                    {showImport && (
+                        <ImportModal
+                            onImport={handleImport}
+                            onClose={() => setShowImport(false)}
+                        />
+                    )}
                 </>
             )}
         </div>
@@ -406,8 +503,6 @@ function GraphEditorInner({
 }
 
 // useReactFlow() は ReactFlowProvider の子孫でしか使えない。
-// GraphEditorInner が ReactFlow の外側で useReactFlow() を呼ぶため
-// ReactFlowProvider で明示的にラップする。
 export function GraphEditor(props: GraphEditorProps = {}) {
     return (
         <ReactFlowProvider>
