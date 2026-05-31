@@ -13,17 +13,30 @@ import { test, expect } from '@playwright/test'
 
 // ─── ヘルパー ──────────────────────────────────────────────────────────────
 
-/** / に goto → zizou-core カードクリック → プロジェクト詳細へ遷移 */
+/** / に goto → プロジェクト作成 → プロジェクト詳細へ遷移 */
 const gotoProjectDetail = async (page: import('@playwright/test').Page) => {
     await page.goto('/')
-    await expect(page.getByText('zizou-core')).toBeVisible()
-    await page.locator('[data-testid^="card-"]').first().click()
-    await expect(page.getByText('Loading…')).toBeHidden({ timeout: 10000 })
+
+    const newProjectBtn = page.getByText('＋ new project')
+    await expect(newProjectBtn).toBeEnabled({ timeout: 10000 })
+
+    await newProjectBtn.click()
+    await page.waitForSelector('[role="dialog"]')
+    await page.getByPlaceholder('My Awesome App').fill('E2E Test Project')
+    await page.getByRole('button', { name: '作成' }).click()
+    await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
+
+    await page.getByRole('link', { name: 'E2E Test Project' }).click()
+    await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 10000 })
 }
 
 /** New Graph を作成してエディタが ready になるまで待つ */
 const createNewGraph = async (page: import('@playwright/test').Page) => {
     await gotoProjectDetail(page)
+
+    // New Graph ボタンが有効になるまで待機
+    await expect(page.getByTestId('new-graph-btn')).toBeEnabled({ timeout: 10000 })
+
     await page.locator('[data-testid="new-graph-btn"]').click()
     await page.waitForFunction(() => {
         const el = document.querySelector('[data-testid="graph-editor"]')
@@ -76,7 +89,6 @@ test.describe('CTX-14: Run Node [E2E]', () => {
         const node = page.locator('.react-flow__node').first()
         await node.getByTestId('btn-run-node').click()
 
-        // done になるまで待つ（モックは即時応答なので短い timeout で良い）
         await expect(
             node.locator('[data-status="done"]')
         ).toBeVisible({ timeout: 5000 })

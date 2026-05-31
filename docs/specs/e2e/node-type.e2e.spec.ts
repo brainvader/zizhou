@@ -24,6 +24,10 @@ const gotoProjectDetail = async (page: import('@playwright/test').Page) => {
 
 const createNewGraph = async (page: import('@playwright/test').Page) => {
     await gotoProjectDetail(page)
+
+    // New Graph ボタンが有効になるまで待機
+    await expect(page.getByTestId('new-graph-btn')).toBeEnabled({ timeout: 10000 })
+
     await page.locator('[data-testid="new-graph-btn"]').click()
     await page.waitForFunction(() => {
         const el = document.querySelector('[data-testid="graph-editor"]')

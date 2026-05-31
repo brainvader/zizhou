@@ -80,7 +80,7 @@ async fn create_project(
         .content(input)
         .await
         .map_err(|e| e.to_string())?;
-    let mut record = created.ok_or_else(|| "Failed to create project".into())?;
+    let mut record = created.ok_or_else(|| String::from("Failed to create project"))?;
     normalize_id(&mut record);
     Ok(record)
 }
@@ -116,7 +116,7 @@ async fn create_graph(
         .content(input)
         .await
         .map_err(|e| e.to_string())?;
-    created.ok_or_else(|| "Failed to create graph".into())
+    created.ok_or_else(|| String::from("Failed to create graph"))
 }
 
 // ============================================================

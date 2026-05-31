@@ -33,10 +33,6 @@ export type ProjectDetailTopbarProps = {
     disabled?: boolean
     /** プロトコルのバージョン表現を外部制御するためのオプショナルProps。Storybookとの整合性のために使用。 */
     protocolVersion?: string
-    /** * 【修正点】Storybookのテスト（Play関数）から初期化状態を擬似的に制御するためのProps。
-     * これにより、Storybook側で `args: { initStatus: 'checking' }` が安全に指定可能になります。
-     */
-    initStatus?: 'checking' | 'ready'
 }
 
 // ============================================================
@@ -59,20 +55,14 @@ export const ProjectDetailTopbar = ({
     LinkComponent,
     disabled: disabledProp,
     protocolVersion = 'v8.10',
-    initStatus: initStatusProp, // 【修正点】Propsからの注入を受け取る
 }: ProjectDetailTopbarProps) => {
     const storeProject = useProjectStore((s) => s.projects.find((p) => p.id === projectId))
     const project = projectProp ?? storeProject
 
-    // 【修正点】Propsから注入があればそれを優先、なければZustandストアのリアルタイム状態を参照（型安全）
-    const storeInitStatus = useProjectDetailStore(
-        (state: { initStatus: 'checking' | 'ready' }) => state.initStatus
-    )
-    const currentInitStatus = initStatusProp ?? storeInitStatus
-    const isChecking = currentInitStatus === 'checking'
+    const isDetailHydrated = useProjectDetailStore((s) => s.isDetailHydrated)
 
-    // 外部からの明示的な disabled 指定、または初期チェック中の場合はボタンを非活性にする
-    const isButtonDisabled = disabledProp ?? isChecking
+    // 外部からの明示的な disabled 指定、または hydration 未完了の場合はボタンを非活性にする
+    const isButtonDisabled = disabledProp ?? !isDetailHydrated
 
     const NavLink = LinkComponent ?? DefaultLink
 
