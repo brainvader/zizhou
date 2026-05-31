@@ -12,7 +12,7 @@
  */
 
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, fn, userEvent, within } from 'storybook/test'
+import { expect, fn, userEvent, within, fireEvent } from 'storybook/test'
 import { ImportModal } from '@/components/ImportModal'
 
 const validJson = JSON.stringify({
@@ -53,8 +53,7 @@ export const ValidImport: Story = {
     play: async ({ canvasElement, args }: { canvasElement: HTMLElement; args: any }) => {
         const canvas = within(canvasElement)
         const textarea = canvas.getByTestId('import-textarea')
-        await userEvent.clear(textarea)
-        await userEvent.type(textarea, validJson)
+        fireEvent.change(textarea, { target: { value: validJson } })
         await userEvent.click(canvas.getByTestId('import-submit-btn'))
         await expect(args.onImport).toHaveBeenCalledOnce()
         const payload = (args.onImport as ReturnType<typeof fn>).mock.calls[0][0]
@@ -67,8 +66,7 @@ export const InvalidJson: Story = {
     play: async ({ canvasElement, args }: { canvasElement: HTMLElement; args: any }) => {
         const canvas = within(canvasElement)
         const textarea = canvas.getByTestId('import-textarea')
-        await userEvent.clear(textarea)
-        await userEvent.type(textarea, invalidJson)
+        fireEvent.change(textarea, { target: { value: invalidJson } })
         await userEvent.click(canvas.getByTestId('import-submit-btn'))
         await expect(args.onImport).not.toHaveBeenCalled()
         await expect(canvas.getByTestId('import-error')).toBeVisible()
@@ -80,8 +78,7 @@ export const MalformedJson: Story = {
     play: async ({ canvasElement, args }: { canvasElement: HTMLElement; args: any }) => {
         const canvas = within(canvasElement)
         const textarea = canvas.getByTestId('import-textarea')
-        await userEvent.clear(textarea)
-        await userEvent.type(textarea, '{ invalid json }')
+        fireEvent.change(textarea, { target: { value: '{ invalid json }' } })
         await userEvent.click(canvas.getByTestId('import-submit-btn'))
         await expect(args.onImport).not.toHaveBeenCalled()
         await expect(canvas.getByTestId('import-error')).toBeVisible()
