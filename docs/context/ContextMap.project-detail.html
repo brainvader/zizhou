@@ -12,8 +12,8 @@
              styling:  Tailwind CSS v4 + shadcn/ui
              router:   TanStack Router（routing の SSOT）
              state:    Zustand
-             persist:  Tauri fs プラグイン
-             db:       SurrealDB 2.6.5 (kv-mem)
+             persist:  SurrealDB embedded（Rust IPC 経由、RocksDB で永続化）
+             db:       SurrealDB embedded（kv-surrealkv、RocksDB 永続化）
              testing:  Vitest + RTL + Storybook + Playwright
              package:  pnpm
         ============================================================ -->
@@ -21,20 +21,18 @@
         <!-- ============================================================
              GLOBAL STORE
              routing は TanStack Router に委譲するため持たない。
-             グラフデータは Tauri fs プラグインで {projectRootPath}/graphs/{graphId}.json に保存する。
-             activeGraphId: 現在表示中のグラフID（ファイルツリーで graphs/ 配下の .json を選択して切り替える）
+             グラフデータは SurrealDB embedded (Rust IPC) で管理する。
+             node / edge テーブルに保存し、RELATE で graph との関係を表現する。
+             activeGraphId: 現在表示中のグラフID（サイドバーで graph レコードを選択して切り替える）
                             初期値は null（グラフ未選択）
-             initStatus: graphs/ ディレクトリの存在確認状態（'checking': 確認中 / 'ready': 存在）
              activeProjectId: 現在表示中のプロジェクトID（TanStack Router の useParams から取得）
-             projectRootPath: 現在プロジェクトのルートパス（BOM で型定義する: string）
              注意: projects[] はここでは持たない。SSOTはZustandのuseProjectStore。
+             注意: projectRootPath は不要（ファイルパス管理から SurrealDB 管理へ移行）。
         ============================================================ -->
         <script id="global-store" type="application/json">
             {
                 "activeProjectId": "1",
-                "activeGraphId": null,
-                "initStatus": "checking",
-                "projectRootPath": "/Users/user/projects/zizou-core"
+                "activeGraphId": null
             }
         </script>
 
@@ -696,7 +694,7 @@
                 <div class="logo-sep"></div>
                 <div class="logo-sub">
                     <span class="logo-romaji">Zizou</span>
-                    <span class="logo-ver">Protocol v7.00</span>
+                    <span class="logo-ver">Protocol v8.10</span>
                 </div>
             </div>
             <span class="breadcrumb-sep">/</span>
@@ -712,7 +710,7 @@
         <div class="workspace">
 
             <!-- ============================================================
-                 CTX-1: FILE TREE [✓]
+                 CTX-1: FILE TREE [ ]
                  責務: プロジェクトのファイルツリーを表示し、グラフファイルの選択・新規作成のエントリーポイントを提供する
                  注意: graphs/ ディレクトリ配下の .json ファイルのみ選択可能にする
                        選択時に activeGraphId を更新し、GraphEditor がグラフを読み込む
@@ -728,11 +726,11 @@
                     <div class="tree-item dir"><span class="tree-icon">▶</span> src</div>
                 </div>
                 <!--
-                    [✓][Feature] File Tree Display  — プロジェクトの graphs/ 配下のファイルを一覧表示する
-                    [✓][Feature] Graph Select       — .json ファイルクリックで activeGraphId を更新しグラフを切り替える
-                    [✓][Feature] New Graph          — 「＋」ボタンで新規グラフファイルを作成する
-                    [✓][Logic]   fs.readDir         — Tauri fs の readDir で graphs/ 配下を列挙する
-                    [✓][Logic]   activeGraphId Sync — ファイル選択時に useProjectDetailStore の activeGraphId を更新する
+                    [ ][Feature] Graph List Display  — invoke('list_graphs', { projectId }) で SurrealDB から graphs[] を取得し一覧表示する
+                    [ ][Feature] Graph Select       — グラフクリックで activeGraphId を更新しグラフを切り替える
+                    [ ][Feature] New Graph          — 「＋」ボタンで invoke('create_graph', { projectId }) を呼び新規グラフを作成する
+                    [ ][Logic]   SurrealDB Load     — invoke('list_graphs') で project -[has_graph]-> graph を辿り取得する
+                    [ ][Logic]   activeGraphId Sync — グラフ選択時に useProjectDetailStore の activeGraphId を更新する
                 -->
             </nav>
 
@@ -744,14 +742,10 @@
                  [CTX-11] Root Layout: [✓]
                        __root.tsx を作成し loadProjects() をルートレイアウトに移動した
 
-                 [CTX-12] ProjectDetail Store の永続化: [✓]
-                       useProjectDetailStore の projectRootPath / activeGraphId を永続化した
-                       AppData/project-detail-{projectId}.json に保存・復元する
-                       useProjectDetailLoad: projects.$id.tsx マウント時に json を読み込み store に hydrate する
-                       useProjectDetailSave: subscribe ベースで projectRootPath / activeGraphId の変化を自動保存する
-                       isDetailHydrated を ProjectDetailStore に追加し save-before-load を防止する
-                       src/__mocks__/plugin-fs.ts に project-detail-*.json の localStorage バックエンドを追加した
-                       file-tree.e2e.spec.ts の step 10 skip を解除した
+                 [CTX-12] ProjectDetail Store の永続化: [ ] ← SurrealDB 移行により再実装
+                       activeGraphId は SurrealDB embedded で管理する（Tauri fs JSON 廃止）
+                       useProjectDetailLoad / useProjectDetailSave は invoke() ベースに置き換える
+                       projectRootPath は不要（SurrealDB がプロジェクトデータを管理するため）
             ============================================================ -->
             <main id="ctx-graph-editor">
                 <div class="graph-canvas">
