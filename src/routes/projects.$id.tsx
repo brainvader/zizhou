@@ -1,4 +1,4 @@
-import { useParams, useSearch } from '@tanstack/react-router'
+import { useParams, useSearch, useRouter } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import { FileTree } from '@/components/FileTree'
 import { GraphEditor } from '@/components/GraphEditor'
@@ -46,6 +46,7 @@ export const ProjectDetailRoute = () => {
     const setProjectRootPath = useProjectDetailStore((s) => s.setProjectRootPath)
     const setActiveGraphId = useProjectDetailStore((s) => s.setActiveGraphId)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+    const router = useRouter()
 
     // CTX-12: 直アクセス時に project-detail-{id}.json から projectRootPath を復元する
     const { loadProjectDetail } = useProjectDetailLoad()
@@ -78,7 +79,18 @@ export const ProjectDetailRoute = () => {
                 color: 'var(--foreground)',
             }}
         >
-            <ProjectDetailTopbar projectId={id} onSettingsClick={() => setIsSettingsOpen(true)} />
+            // ProjectDetailTopbar の呼び出しを修正
+            <ProjectDetailTopbar
+                projectId={id}
+                onSettingsClick={() => setIsSettingsOpen(true)}
+                onNavigate={(graphId) =>
+                    router.navigate({
+                        to: '/projects/$id',
+                        params: { id },
+                        search: { graph: graphId },
+                    })
+                }
+            />
 
             <ResizablePanelGroup
                 style={{ flex: 1, overflow: 'hidden' }}
