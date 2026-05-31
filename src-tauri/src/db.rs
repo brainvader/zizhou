@@ -45,7 +45,7 @@ pub struct NodeCatalog {
 // ============================================================
 // Project / Graph 型定義（フロントの Project / GraphRecord に対応）
 // ============================================================
-
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Project {
     pub id: Option<surrealdb::sql::Thing>,
@@ -61,6 +61,7 @@ pub struct ProjectInput {
     pub description: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Graph {
     pub id: Option<surrealdb::sql::Thing>,

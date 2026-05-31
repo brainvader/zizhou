@@ -8,7 +8,7 @@ mod db;
 
 use db::{Db, GraphInput, NodeCatalog, ProjectInput};
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{Manager, State};
 
 // ============================================================
 // execute_node 用の型定義
