@@ -58,10 +58,16 @@ async fn catalog_search(query: String, db: State<'_, Db>) -> Result<Vec<NodeCata
 /// 全プロジェクトを返す。起動時に invoke('list_projects') で呼ぶ。
 #[tauri::command]
 async fn list_projects(db: State<'_, Db>) -> Result<Vec<serde_json::Value>, String> {
-    db.select("project").await.map_err(|e| e.to_string())
+    let mut records: Vec<serde_json::Value> =
+        db.select("project").await.map_err(|e| e.to_string())?;
+    for r in &mut records {
+        normalize_id(r);
+    }
+    Ok(records)
 }
 
 /// プロジェクトを作成する。id は SurrealDB が自動生成する。
+/// id フィールドを文字列に正規化して返す。
 #[tauri::command]
 async fn create_project(
     name: String,
@@ -74,7 +80,9 @@ async fn create_project(
         .content(input)
         .await
         .map_err(|e| e.to_string())?;
-    created.ok_or_else(|| "Failed to create project".into())
+    let mut record = created.ok_or_else(|| "Failed to create project".into())?;
+    normalize_id(&mut record);
+    Ok(record)
 }
 
 // ============================================================
@@ -214,6 +222,32 @@ async fn execute_node(
                 message: stderr,
             }),
         })
+    }
+}
+
+// ============================================================
+// SurrealDB Thing 型を文字列 id に正規化するヘルパー
+// ============================================================
+
+fn normalize_id(record: &mut serde_json::Value) {
+    if let Some(id_val) = record.get("id").cloned() {
+        let id_str = match &id_val {
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Object(obj) => {
+                let tb = obj.get("tb").and_then(|v| v.as_str()).unwrap_or("record");
+                let id_part = obj
+                    .get("id")
+                    .and_then(|v| v.as_object())
+                    .and_then(|o| o.get("String"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                format!("{}:{}", tb, id_part)
+            }
+            _ => id_val.to_string(),
+        };
+        if let Some(obj) = record.as_object_mut() {
+            obj.insert("id".to_string(), serde_json::Value::String(id_str));
+        }
     }
 }
 
