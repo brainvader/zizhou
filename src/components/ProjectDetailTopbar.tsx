@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { useRouter, Link } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { nanoid } from 'nanoid'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { toast } from 'sonner'
@@ -15,37 +15,26 @@ type WriteTextFileFn = (path: string, contents: string) => Promise<void>
 type NavigateFn = (graphId: string) => void
 
 export type ProjectDetailTopbarProps = {
-    /** TanStack Router の useParams から渡されるプロジェクト ID */
     projectId: string
-    /** Settings アイコンボタンクリック時のコールバック */
     onSettingsClick?: () => void
-    // props DI
     project?: Project
     initStatus?: InitStatus
     projectRootPath?: string
-    /** New Graph 作成後のナビゲーション（省略時は router.navigate にフォールバック） */
-    onNavigate?: NavigateFn
+    /**
+     * New Graph 作成後のナビゲーション。
+     * 省略時は router.navigate にフォールバックするため、
+     * Storybook / テストでは必ず渡すこと。
+     */
+    onNavigate: NavigateFn
     onWriteTextFile?: WriteTextFileFn
+    /** props DI: Storybook / テスト用。省略時は TanStack Router の Link を使用 */
+    LinkComponent?: React.ComponentType<{ to: string; children: React.ReactNode; className?: string }>
 }
 
-/**
- * ProjectDetailTopbar
- *
- * 責務: project-detail 画面のヘッダー。
- * - 地蔵ロゴ
- * - プロジェクト名 breadcrumb（projectId prop → useProjectStore で解決）
- * - New Graph ボタン（initStatus が 'ready' 以外のとき disabled）
- * - Settings ボタン（onSettingsClick コールバック経由）
- *
- * New Graph クリック後は ?graph={graphId} を URL に反映する（activeGraphId の SSOT は URL）。
- * props DI: project / initStatus / projectRootPath / onNavigate / onWriteTextFile を受け取る。
- * 省略時は Tauri 実装・Zustand store・router にフォールバックする。
- *
- * @see docs/bom/graph.ts
- * @see docs/bom/project.ts
- * @see docs/specs/project-detail-topbar.spec.tsx
- * @see docs/specs/project-detail-topbar.e2e.spec.ts
- */
+const DefaultLink = ({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) => (
+    <Link to={to} search={{}} className={className}>{children}</Link>
+)
+
 export const ProjectDetailTopbar = ({
     projectId,
     onSettingsClick,
@@ -54,8 +43,8 @@ export const ProjectDetailTopbar = ({
     projectRootPath: projectRootPathProp,
     onNavigate,
     onWriteTextFile = writeTextFile,
+    LinkComponent,
 }: ProjectDetailTopbarProps) => {
-    const router = useRouter()
     const storeProject = useProjectStore((s) => s.projects.find((p) => p.id === projectId))
     const storeInitStatus = useProjectDetailStore((s) => s.initStatus)
     const storeProjectRootPath = useProjectDetailStore((s) => s.projectRootPath)
@@ -64,15 +53,8 @@ export const ProjectDetailTopbar = ({
     const initStatus = initStatusProp ?? storeInitStatus
     const projectRootPath = projectRootPathProp ?? storeProjectRootPath
 
-    const navigate = onNavigate ?? ((graphId: string) => {
-        router.navigate({
-            to: '/projects/$id',
-            params: { id: projectId },
-            search: { graph: graphId },
-        })
-    })
+    const NavLink = LinkComponent ?? DefaultLink
 
-    // --- New Graph ---
     const handleNewGraph = useCallback(async () => {
         const graphId = nanoid()
         const filePath = graphFilePath(projectRootPath, graphId)
@@ -81,11 +63,11 @@ export const ProjectDetailTopbar = ({
         try {
             await onWriteTextFile(filePath, JSON.stringify(graphFile, null, 2))
             toast.success('グラフを作成しました')
-            navigate(graphId)
+            onNavigate(graphId)
         } catch {
             toast.error('グラフファイルの作成に失敗しました')
         }
-    }, [projectRootPath, navigate, onWriteTextFile])
+    }, [projectRootPath, onNavigate, onWriteTextFile])
 
     return (
         <header
@@ -115,13 +97,12 @@ export const ProjectDetailTopbar = ({
 
             {/* Breadcrumb */}
             <span className="text-border text-base mx-1.5 select-none">/</span>
-            <Link
+            <NavLink
                 to="/"
-                search={{}}
                 className="font-mono text-[11px] text-muted-foreground tracking-widest hover:text-foreground transition-colors"
             >
                 Home
-            </Link>
+            </NavLink>
             {project && (
                 <>
                     <span className="text-border text-base mx-1.5 select-none">/</span>

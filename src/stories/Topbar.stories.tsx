@@ -8,7 +8,7 @@
  * 4. onSettingsClick が未指定でもクリックでエラーが発生しない
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, fn } from 'storybook/test'
+import { expect, fn, userEvent } from 'storybook/test'
 import { Topbar } from '@/components/Topbar'
 
 const meta: Meta<typeof Topbar> = {
@@ -34,7 +34,7 @@ export const Default: Story = {
 
 // @story 状態 3: Settings ボタンクリックで onSettingsClick が発火する
 export const ClickSettings: Story = {
-    play: async ({ canvas, userEvent, args }) => {
+    play: async ({ canvas, args }) => {
         await userEvent.click(canvas.getByRole('button', { name: /settings/i }))
         await expect(args.onSettingsClick).toHaveBeenCalledTimes(1)
     },
