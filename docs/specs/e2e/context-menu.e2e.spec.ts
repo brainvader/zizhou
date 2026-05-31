@@ -1,12 +1,12 @@
 /**
  * @context CTX-7: ContextMenu E2E
  * @note Storybook で確認できないことのみを検証する。
- *       - ノード右クリックでコンテキストメニューが表示される
- *       - メニューから Delete Node を実行するとノードが消える
- *       - エッジ右クリックでコンテキストメニューが表示される
- *       - メニューから Delete Edge を実行するとエッジが消える
- *       - メニューから Edit Label を実行するとインライン編集が起動する
- *       - キャンバスクリックでメニューが閉じる
+ * - ノード右クリックでコンテキストメニューが表示される
+ * - メニューから Delete Node を実行するとノードが消える
+ * - エッジ右クリックでコンテキストメニューが表示される
+ * - メニューから Delete Edge を実行するとエッジが消える
+ * - メニューから Edit Label を実行するとインライン編集が起動する
+ * - キャンバスクリックでメニューが閉じる
  */
 import { test, expect } from '@playwright/test'
 
@@ -124,36 +124,39 @@ test.describe('ContextMenu — Edge [CTX-7]', () => {
         await page.evaluate(() => localStorage.clear())
     })
 
-    /** 2ノードを追加してエッジを接続するヘルパー */
     const connectTwoNodes = async (page: import('@playwright/test').Page) => {
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
+        const json = JSON.stringify({
+            graph: {
+                nodes: [
+                    { id: 'a', label: 'Node A' },
+                    { id: 'b', label: 'Node B' },
+                ],
+                edges: [{ source: 'a', target: 'b' }],
+            },
+        })
 
-        const nodeA = page.locator('.react-flow__node').nth(0)
-        const nodeB = page.locator('.react-flow__node').nth(1)
-        const sourceHandle = nodeA.locator('.react-flow__handle-right, .react-flow__handle-bottom').first()
-        const targetHandle = nodeB.locator('.react-flow__handle-left, .react-flow__handle-top').first()
+        await page.getByTestId('btn-import').click()
+        await expect(page.getByTestId('import-textarea')).toBeVisible({ timeout: 5000 })
+        await page.getByTestId('import-textarea').fill(json)
+        await page.getByTestId('import-submit-btn').click()  // ← 正しいtestid
 
-        const sourceBox = await sourceHandle.boundingBox()
-        const targetBox = await targetHandle.boundingBox()
-
-        if (sourceBox && targetBox) {
-            await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2)
-            await page.mouse.down()
-            await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 10 })
-            await page.mouse.up()
-        }
-        await page.waitForTimeout(500)
-        await expect(page.locator('.react-flow__edge')).toHaveCount(1, { timeout: 5000 })
+        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 5000 })
+        await expect(page.getByRole('group', { name: /^Edge from/ })).toHaveCount(1, { timeout: 5000 })
     }
 
     test('エッジ右クリックで context-menu が表示される（Edit Label なし）', async ({ page }) => {
         await createNewGraph(page)
         await connectTwoNodes(page)
 
-        const edge = page.locator('.react-flow__edge').first()
-        await edge.click({ button: 'right' })
+        // エッジをビューポート内に収める
+        await page.getByRole('button', { name: 'Fit View' }).click()
+        await page.waitForTimeout(500)
+
+        // SVG要素はviewport外判定されやすいため boundingBox + page.mouse で右クリック
+        const edgePath = page.locator('.react-flow__edge-interaction').first()
+        const box = await edgePath.boundingBox()
+        if (!box) throw new Error('edge bounding box not found')
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' })
 
         await expect(page.getByTestId('context-menu')).toBeVisible()
         await expect(page.getByTestId('menu-item-edit-label')).not.toBeVisible()
@@ -167,13 +170,18 @@ test.describe('ContextMenu — Edge [CTX-7]', () => {
         await createNewGraph(page)
         await connectTwoNodes(page)
 
-        const edge = page.locator('.react-flow__edge').first()
-        await edge.click({ button: 'right' })
+        await page.getByRole('button', { name: 'Fit View' }).click()
+        await page.waitForTimeout(500)
+
+        const edgePath = page.locator('.react-flow__edge-interaction').first()
+        const box = await edgePath.boundingBox()
+        if (!box) throw new Error('edge bounding box not found')
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' })
         await expect(page.getByTestId('context-menu')).toBeVisible()
 
         await page.getByTestId('menu-item-delete').click()
 
-        await expect(page.locator('.react-flow__edge')).toHaveCount(0)
+        await expect(page.getByRole('group', { name: /^Edge from/ })).toHaveCount(0)
         await expect(page.getByTestId('context-menu')).not.toBeVisible()
 
         await page.screenshot({ path: 'evidence/CTX7_delete_edge.png' })
