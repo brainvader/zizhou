@@ -117,14 +117,14 @@ export const ValidationError: Story = {
         await userEvent.click(submitBtn)
 
         // バリデーションエラーテキストの表出を確実に追尾
-        const errorMsg = await screen.findByText('プロジェクト名は必須です')
+        const errorMsg = await screen.findByText('name は必須です')
         await expect(errorMsg).toBeVisible()
     },
 }
 
 // @story 状態 6: フォームに入力して「作成」をクリックするとダイアログが閉じる
 export const SubmitSuccess: Story = {
-    render: (args) => <WithStore {...args} projects={[]} isHydrated={true} />,
+    render: (args) => <WithStore {...args} projects={[]} isHydrated={true} onCreateProject={async (name, description) => ({ id: 'new-id', name, description })} />,
     play: async ({ userEvent }) => {
         const newProjectBtn = await screen.findByText('＋ new project')
         await userEvent.click(newProjectBtn)
