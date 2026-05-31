@@ -10,27 +10,23 @@
  * 6. Settings ボタンクリックで onSettingsClick が発火する
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, fn } from 'storybook/test'
-import { RouterProvider, createRouter, createMemoryHistory } from '@tanstack/react-router'
-import { router as appRouter } from '@/router'
+import { expect, fn, userEvent } from 'storybook/test'
 import { ProjectDetailTopbar } from '@/components/ProjectDetailTopbar'
+
+/** Storybook 用 Link スタブ（Router context 不要） */
+const StubLink = ({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) => (
+    <a href={to} className={className}>{children}</a>
+)
 
 const meta: Meta<typeof ProjectDetailTopbar> = {
     component: ProjectDetailTopbar,
     title: 'Project Detail/Topbar',
     parameters: { layout: 'fullscreen' },
-    decorators: [
-        (Story) => {
-            const memoryRouter = createRouter({
-                ...appRouter.options,
-                history: createMemoryHistory({ initialEntries: ['/projects/proj-001'] }),
-            })
-            return <RouterProvider router={memoryRouter} defaultComponent={() => <Story />} />
-        },
-    ],
     args: {
         onSettingsClick: fn(),
+        onNavigate: fn(),
         onWriteTextFile: async () => { },
+        LinkComponent: StubLink,
     },
 }
 export default meta
@@ -50,7 +46,6 @@ export const Ready: Story = {
         project: mockProject,
         initStatus: 'ready',
         projectRootPath: '/Users/user/projects/zizou-core',
-        onNavigate: fn(),
     },
     play: async ({ canvas }) => {
         await expect(canvas.getByText('地蔵')).toBeVisible()
@@ -95,8 +90,9 @@ export const ClickSettings: Story = {
         project: mockProject,
         initStatus: 'ready',
         projectRootPath: '/Users/user/projects/zizou-core',
+        onSettingsClick: fn(),
     },
-    play: async ({ canvas, userEvent, args }) => {
+    play: async ({ canvas, args }) => {
         await userEvent.click(canvas.getByRole('button', { name: /settings/i }))
         await expect(args.onSettingsClick).toHaveBeenCalledTimes(1)
     },

@@ -24,11 +24,15 @@ const INITIAL_ERRORS = { name: null as string | null, description: null as strin
 
 type MkdirFn = (path: string, options?: { recursive: boolean }) => Promise<void>
 
+type StubLinkProps = { to: string; params?: Record<string, string>; search?: Record<string, unknown>; children: React.ReactNode; className?: string; 'data-testid'?: string }
+
 type ProjectGridProps = {
     /** フォルダ選択ダイアログを開く関数（省略時は RootPathInput が Tauri plugin-dialog にフォールバック） */
     onOpenDirectory?: () => Promise<string | null>
     /** graphs/ ディレクトリ作成関数（省略時は Tauri plugin-fs にフォールバック） */
     onMkdir?: MkdirFn
+    /** props DI: Storybook / テスト用。省略時は TanStack Router の Link を使用 */
+    LinkComponent?: React.ComponentType<StubLinkProps>
 }
 
 /**
@@ -41,8 +45,9 @@ type ProjectGridProps = {
  * @see docs/bom/project.ts
  * @see docs/specs/project-list.spec.tsx
  */
-export const ProjectGrid = ({ onOpenDirectory, onMkdir = mkdir }: ProjectGridProps) => {
+export const ProjectGrid = ({ onOpenDirectory, onMkdir = mkdir, LinkComponent }: ProjectGridProps) => {
     const { projects, addProject, isHydrated } = useProjectStore()
+    const NavLink = LinkComponent ?? Link
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [form, setForm] = useState<NewProjectForm>(INITIAL_FORM)
     const [errors, setErrors] = useState(INITIAL_ERRORS)
@@ -84,7 +89,7 @@ export const ProjectGrid = ({ onOpenDirectory, onMkdir = mkdir }: ProjectGridPro
         <main data-testid="project-grid" className="p-6">
             <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
                 {projects.map((project) => (
-                    <Link
+                    <NavLink
                         key={project.id}
                         to="/projects/$id"
                         params={{ id: project.id }}
@@ -96,7 +101,7 @@ export const ProjectGrid = ({ onOpenDirectory, onMkdir = mkdir }: ProjectGridPro
                         {project.description && (
                             <div className="text-muted-foreground text-xs mt-1">{project.description}</div>
                         )}
-                    </Link>
+                    </NavLink>
                 ))}
 
                 {/* ＋ new project 破線カード — loadProjects 完了前は disabled */}

@@ -23,11 +23,9 @@ type Story = StoryObj<typeof SettingsDialog>
 
 // @story 状態 1: 開いている — タイトルと閉じるボタンの表示確認
 export const Open: Story = {
-    args: {
-        open: true,
-    },
+    args: { open: true },
     play: async () => {
-        await expect(screen.getByText('Settings')).toBeVisible()
+        await expect(await screen.findByText('Settings')).toBeVisible()
         await expect(screen.getByRole('button', { name: '閉じる' })).toBeVisible()
     },
 }
@@ -44,11 +42,9 @@ export const Closed: Story = {
 
 // @story 状態 3: 「閉じる」ボタンクリックで onOpenChange(false) が呼ばれる
 export const CloseButton: Story = {
-    args: {
-        open: true,
-    },
+    args: { open: true },
     play: async ({ userEvent, args }) => {
-        await userEvent.click(screen.getByRole('button', { name: '閉じる' }))
+        await userEvent.click(await screen.findByRole('button', { name: '閉じる' }))
         await expect(args.onOpenChange).toHaveBeenCalledWith(false)
         await expect(args.onOpenChange).toHaveBeenCalledTimes(1)
     },

@@ -22,7 +22,12 @@ test.describe('ResizableLayout: Integration', () => {
     test('should render 3 panes on /projects/:id', async ({ page }) => {
         await expect(page.getByTestId('file-tree')).toBeVisible()
         await expect(page.getByTestId('graph-editor')).toBeVisible()
-        await expect(page.getByTestId('node-property-pane')).toBeVisible()
+
+        // NodeProperty はノード単一選択時のみ表示される
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await page.locator('.react-flow__node').first().click()
+        await expect(page.getByTestId('node-property')).toBeVisible({ timeout: 5000 })
+
         await page.screenshot({ path: 'evidence/resizable-layout_initial.png' })
     })
 

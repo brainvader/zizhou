@@ -53,41 +53,6 @@ const createNewGraph = async (page: import('@playwright/test').Page) => {
  * ノードが重なるとエッジが z-index の関係でクリックできなくなるため、
  * ドラッグで明示的に離れた座標に配置する。
  */
-const addTwoNodesApart = async (page: import('@playwright/test').Page) => {
-    await page.getByRole('button', { name: /ノード追加/ }).click()
-    await expect(page.locator('.react-flow__node')).toHaveCount(1, { timeout: 10000 })
-    await page.getByRole('button', { name: /ノード追加/ }).click()
-    await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
-
-    // nodeA を左上に移動
-    const nodeA = page.locator('.react-flow__node').nth(0)
-    const boxA = await nodeA.boundingBox()
-    if (boxA) {
-        const cx = boxA.x + boxA.width / 2
-        const cy = boxA.y + boxA.height / 2
-        await page.mouse.move(cx, cy)
-        await page.mouse.down()
-        await page.waitForTimeout(100)
-        await page.mouse.move(cx - 150, cy - 80, { steps: 20 })
-        await page.mouse.up()
-        await page.waitForTimeout(200)
-    }
-
-    // nodeB を右下に移動
-    const nodeB = page.locator('.react-flow__node').nth(1)
-    const boxB = await nodeB.boundingBox()
-    if (boxB) {
-        const cx = boxB.x + boxB.width / 2
-        const cy = boxB.y + boxB.height / 2
-        await page.mouse.move(cx, cy)
-        await page.mouse.down()
-        await page.waitForTimeout(100)
-        await page.mouse.move(cx + 150, cy + 80, { steps: 20 })
-        await page.mouse.up()
-        await page.waitForTimeout(200)
-    }
-}
-
 // =============================================================================
 // Integration
 // =============================================================================
@@ -154,27 +119,28 @@ test.describe('GraphEditor — 永続化', () => {
      */
     test('ノード A・B 追加 → エッジ接続 → 再ナビゲーション → エッジが復元される', async ({ page }) => {
         await createNewGraph(page)
-        await addTwoNodesApart(page)
 
-        const nodeA = page.locator('.react-flow__node').nth(0)
-        const nodeB = page.locator('.react-flow__node').nth(1)
-        const sourceHandle = nodeA.locator('.react-flow__handle-right, .react-flow__handle-bottom').first()
-        const targetHandle = nodeB.locator('.react-flow__handle-left, .react-flow__handle-top').first()
-
-        const sourceBox = await sourceHandle.boundingBox()
-        const targetBox = await targetHandle.boundingBox()
-
-        if (sourceBox && targetBox) {
-            await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2)
-            await page.mouse.down()
-            await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 10 })
-            await page.mouse.up()
-        }
+        // エッジ込みでインポートして確定状態を作る
+        const json = JSON.stringify({
+            graph: {
+                nodes: [
+                    { id: 'a', label: 'Node A', position: { x: 100, y: 200 } },
+                    { id: 'b', label: 'Node B', position: { x: 420, y: 200 } },
+                ],
+                edges: [{ source: 'a', target: 'b' }],
+            },
+        })
+        await page.getByTestId('btn-import').click()
+        await expect(page.getByTestId('import-textarea')).toBeVisible({ timeout: 5000 })
+        await page.getByTestId('import-textarea').fill(json)
+        await page.getByTestId('import-submit-btn').click()
+        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 5000 })
+        await expect(page.getByRole('group', { name: /^Edge from/ })).toHaveCount(1, { timeout: 5000 })
 
         await page.waitForTimeout(500)
         await page.screenshot({ path: 'evidence/GraphEditor_persist_edge-connected.png' })
 
-        const edgeCountBefore = await page.locator('.react-flow__edge').count()
+        const edgeCountBefore = await page.getByRole('group', { name: /^Edge from/ }).count()
 
         const graphParam = new URL(page.url()).searchParams.get('graph')
         await renavigateWithGraph(page, graphParam)
@@ -182,7 +148,7 @@ test.describe('GraphEditor — 永続化', () => {
         await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10000 })
 
         await expect(page.locator('.react-flow__node')).toHaveCount(2)
-        const edgeCountAfter = await page.locator('.react-flow__edge').count()
+        const edgeCountAfter = await page.getByRole('group', { name: /^Edge from/ }).count()
         expect(edgeCountAfter).toBe(edgeCountBefore)
 
         await page.screenshot({ path: 'evidence/GraphEditor_persist_edge-restored.png' })
@@ -309,6 +275,29 @@ test.describe('GraphEditor — ラベル編集 [CTX-4]', () => {
 // [CTX-5] 複数選択シナリオ
 // =============================================================================
 
+/** 確定位置に2ノードをインポートして Fit View まで完了するヘルパー */
+const setupTwoNodes = async (page: import('@playwright/test').Page) => {
+    const json = JSON.stringify({
+        graph: {
+            nodes: [
+                { id: 'a', label: 'Node A', position: { x: 100, y: 200 } },
+                { id: 'b', label: 'Node B', position: { x: 420, y: 200 } },
+            ],
+            edges: [],
+        },
+    })
+
+    await page.getByTestId('btn-import').click()
+    await expect(page.getByTestId('import-textarea')).toBeVisible({ timeout: 5000 })
+    await page.getByTestId('import-textarea').fill(json)
+    await page.getByTestId('import-submit-btn').click()
+
+    await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 5000 })
+
+    await page.getByRole('button', { name: 'Fit View' }).click()
+    await page.waitForTimeout(300)
+}
+
 test.describe('GraphEditor — 複数選択 [CTX-5]', () => {
 
     test.beforeEach(async ({ page }) => {
@@ -322,10 +311,7 @@ test.describe('GraphEditor — 複数選択 [CTX-5]', () => {
      */
     test('Shift+クリックで 2 ノード選択 → NodeProperty が非表示になる', async ({ page }) => {
         await createNewGraph(page)
-
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
+        await setupTwoNodes(page)
 
         await page.locator('.react-flow__node').nth(0).click()
         await expect(page.getByTestId('node-property')).toBeVisible({ timeout: 5000 })
@@ -341,13 +327,9 @@ test.describe('GraphEditor — 複数選択 [CTX-5]', () => {
      */
     test('Shift+クリックで 2 ノード選択 → 両ノードに selected クラスが付く', async ({ page }) => {
         await createNewGraph(page)
-
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
+        await setupTwoNodes(page)
 
         const nodes = page.locator('.react-flow__node')
-        await expect(nodes).toHaveCount(2, { timeout: 10000 })
         await nodes.nth(0).click()
         await page.waitForTimeout(300)
         await nodes.nth(1).click({ modifiers: ['Shift'] })
@@ -363,10 +345,7 @@ test.describe('GraphEditor — 複数選択 [CTX-5]', () => {
      */
     test('Shift+クリックで 2 ノード選択 → Delete で一括削除される', async ({ page }) => {
         await createNewGraph(page)
-
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
+        await setupTwoNodes(page)
 
         await page.locator('.react-flow__node').nth(0).click()
         await page.locator('.react-flow__node').nth(1).click({ modifiers: ['Shift'] })
@@ -383,10 +362,7 @@ test.describe('GraphEditor — 複数選択 [CTX-5]', () => {
      */
     test('複数選択後にキャンバスをクリック → 選択解除 → NodeProperty が非表示のまま', async ({ page }) => {
         await createNewGraph(page)
-
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 10000 })
+        await setupTwoNodes(page)
 
         await page.locator('.react-flow__node').nth(0).click()
         await page.locator('.react-flow__node').nth(1).click({ modifiers: ['Shift'] })
@@ -417,24 +393,29 @@ test.describe('GraphEditor — Edge Connect / Delete [CTX-6]', () => {
      */
     test('2ノード間をハンドルでドラッグ接続するとエッジが作成される', async ({ page }) => {
         await createNewGraph(page)
-        await addTwoNodesApart(page)
+        await setupTwoNodes(page)
 
         const nodeA = page.locator('.react-flow__node').nth(0)
         const nodeB = page.locator('.react-flow__node').nth(1)
-        const sourceHandle = nodeA.locator('.react-flow__handle-right, .react-flow__handle-bottom').first()
-        const targetHandle = nodeB.locator('.react-flow__handle-left, .react-flow__handle-top').first()
+        const sourceHandle = nodeA.locator('[data-handlepos="right"]').first()
+        const targetHandle = nodeB.locator('[data-handlepos="left"]').first()
+
+        await sourceHandle.waitFor({ state: 'visible' })
+        await targetHandle.waitFor({ state: 'visible' })
 
         const sourceBox = await sourceHandle.boundingBox()
         const targetBox = await targetHandle.boundingBox()
 
         if (sourceBox && targetBox) {
             await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2)
+            await page.waitForTimeout(100)
             await page.mouse.down()
-            await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 10 })
+            await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 20 })
+            await page.waitForTimeout(100)
             await page.mouse.up()
         }
 
-        await expect(page.locator('.react-flow__edge')).toHaveCount(1, { timeout: 5000 })
+        await expect(page.getByRole('group', { name: /^Edge from/ })).toHaveCount(1, { timeout: 5000 })
         await page.screenshot({ path: 'evidence/GraphEditor_ctx6_edge-connected.png' })
     })
 
@@ -444,28 +425,35 @@ test.describe('GraphEditor — Edge Connect / Delete [CTX-6]', () => {
      */
     test('エッジを選択して Delete キーで削除できる', async ({ page }) => {
         await createNewGraph(page)
-        await addTwoNodesApart(page)
 
-        const nodeA = page.locator('.react-flow__node').nth(0)
-        const nodeB = page.locator('.react-flow__node').nth(1)
-        const sourceHandle = nodeA.locator('.react-flow__handle-right, .react-flow__handle-bottom').first()
-        const targetHandle = nodeB.locator('.react-flow__handle-left, .react-flow__handle-top').first()
+        // エッジ込みでインポートして確定状態を作る
+        const json = JSON.stringify({
+            graph: {
+                nodes: [
+                    { id: 'a', label: 'Node A', position: { x: 100, y: 200 } },
+                    { id: 'b', label: 'Node B', position: { x: 420, y: 200 } },
+                ],
+                edges: [{ source: 'a', target: 'b' }],
+            },
+        })
+        await page.getByTestId('btn-import').click()
+        await expect(page.getByTestId('import-textarea')).toBeVisible({ timeout: 5000 })
+        await page.getByTestId('import-textarea').fill(json)
+        await page.getByTestId('import-submit-btn').click()
+        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 5000 })
+        await expect(page.getByRole('group', { name: /^Edge from/ })).toHaveCount(1, { timeout: 5000 })
+        await page.getByRole('button', { name: 'Fit View' }).click()
+        await page.waitForTimeout(500)
 
-        const sourceBox = await sourceHandle.boundingBox()
-        const targetBox = await targetHandle.boundingBox()
-
-        if (sourceBox && targetBox) {
-            await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2)
-            await page.mouse.down()
-            await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 10 })
-            await page.mouse.up()
-        }
-
-        await expect(page.locator('.react-flow__edge')).toHaveCount(1, { timeout: 5000 })
-
-        await page.locator('.react-flow__edge').first().click()
+        // エッジを page.mouse で選択して Delete
+        const edgePath = page.locator('.react-flow__edge-interaction').first()
+        const box = await edgePath.boundingBox()
+        if (!box) throw new Error('edge bounding box not found')
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+        await page.waitForTimeout(200)
         await page.keyboard.press('Delete')
-        await expect(page.locator('.react-flow__edge')).toHaveCount(0, { timeout: 5000 })
+
+        await expect(page.getByRole('group', { name: /^Edge from/ })).toHaveCount(0, { timeout: 5000 })
         await page.screenshot({ path: 'evidence/GraphEditor_ctx6_edge-deleted.png' })
     })
 

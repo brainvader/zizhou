@@ -12,25 +12,35 @@
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, screen } from 'storybook/test'
-import { RouterProvider, createRouter, createMemoryHistory } from '@tanstack/react-router'
-import { router as appRouter } from '@/router'
 import { ProjectGrid } from '@/components/ProjectGrid'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useEffect } from 'react'
+
+/** Storybook 用 Link スタブ（Router context 不要） */
+const StubLink = ({ children, className, 'data-testid': testId }: any) => (
+    <a href="#" className={className} data-testid={testId}>{children}</a>
+)
+
+/** ストア状態を注入するラッパー */
+const WithStore = ({
+    projects = [],
+    isHydrated = true,
+    ...props
+}: React.ComponentProps<typeof ProjectGrid> & {
+    projects?: any[]
+    isHydrated?: boolean
+}) => {
+    useEffect(() => {
+        useProjectStore.setState({ projects, isHydrated })
+        return () => useProjectStore.setState({ projects: [], isHydrated: false })
+    }, [])
+    return <ProjectGrid {...props} LinkComponent={StubLink} />
+}
 
 const meta: Meta<typeof ProjectGrid> = {
     component: ProjectGrid,
     title: 'Projects/ProjectGrid',
     parameters: { layout: 'fullscreen' },
-    decorators: [
-        (Story) => {
-            const memoryRouter = createRouter({
-                ...appRouter.options,
-                history: createMemoryHistory({ initialEntries: ['/'] }),
-            })
-            return <RouterProvider router={memoryRouter} defaultComponent={() => <Story />} />
-        },
-    ],
     args: {
         onMkdir: fn(async () => { }),
     },
@@ -38,23 +48,14 @@ const meta: Meta<typeof ProjectGrid> = {
 export default meta
 type Story = StoryObj<typeof ProjectGrid>
 
-// ストアにプロジェクトを注入するラッパー
-const WithProjects = (props: React.ComponentProps<typeof ProjectGrid>) => {
-    useEffect(() => {
-        useProjectStore.setState({
-            projects: [
-                { id: 'proj-001', name: '地蔵 Core', description: 'グラフベースのプロジェクト管理OS。', rootPath: '/Users/user/projects/zizou-core' },
-                { id: 'proj-002', name: 'Visual Thinkering', description: '', rootPath: '/Users/user/projects/vt' },
-            ]
-        })
-        return () => useProjectStore.setState({ projects: [] })
-    }, [])
-    return <ProjectGrid {...props} />
-}
+const mockProjects = [
+    { id: 'proj-001', name: '地蔵 Core', description: 'グラフベースのプロジェクト管理OS。', rootPath: '/Users/user/projects/zizou-core' },
+    { id: 'proj-002', name: 'Visual Thinkering', description: '', rootPath: '/Users/user/projects/vt' },
+]
 
 // @story 状態 1: 空（projects[] なし）
 export const Empty: Story = {
-    args: { isHydrated: true },
+    render: (args) => <WithStore {...args} projects={[]} isHydrated={true} />,
     play: async () => {
         await expect(screen.getByText('＋ new project')).toBeVisible()
         await expect(screen.queryByRole('article')).not.toBeInTheDocument()
@@ -63,8 +64,7 @@ export const Empty: Story = {
 
 // @story 状態 2: プロジェクトあり
 export const WithProjectList: Story = {
-    args: { isHydrated: true },
-    render: (args) => <WithProjects {...args} />,
+    render: (args) => <WithStore {...args} projects={mockProjects} isHydrated={true} />,
     play: async () => {
         await expect(screen.getByText('地蔵 Core')).toBeVisible()
         await expect(screen.getByText('Visual Thinkering')).toBeVisible()
@@ -74,7 +74,7 @@ export const WithProjectList: Story = {
 
 // @story 状態 3: ハイドレーション前（disabled）
 export const NotHydrated: Story = {
-    args: { isHydrated: false },
+    render: (args) => <WithStore {...args} projects={[]} isHydrated={false} />,
     play: async () => {
         const btn = screen.getByText('＋ new project').closest('button') ??
             screen.getByText('＋ new project').closest('[aria-disabled]')
@@ -84,7 +84,7 @@ export const NotHydrated: Story = {
 
 // @story 状態 4: ダイアログを開く
 export const OpenDialog: Story = {
-    args: { isHydrated: true },
+    render: (args) => <WithStore {...args} projects={[]} isHydrated={true} />,
     play: async ({ userEvent }) => {
         await userEvent.click(screen.getByText('＋ new project'))
         await expect(await screen.findByText('New Project')).toBeInTheDocument()
@@ -93,7 +93,7 @@ export const OpenDialog: Story = {
 
 // @story 状態 5: バリデーションエラー
 export const ValidationError: Story = {
-    args: { isHydrated: true },
+    render: (args) => <WithStore {...args} projects={[]} isHydrated={true} />,
     play: async ({ userEvent }) => {
         await userEvent.click(screen.getByText('＋ new project'))
         await screen.findByRole('dialog')
@@ -105,10 +105,8 @@ export const ValidationError: Story = {
 
 // @story 状態 6: 正常作成 → ダイアログが閉じる
 export const SubmitSuccess: Story = {
-    args: {
-        isHydrated: true,
-        onMkdir: fn(async () => { }),
-    },
+    args: { onMkdir: fn(async () => { }) },
+    render: (args) => <WithStore {...args} projects={[]} isHydrated={true} />,
     play: async ({ userEvent }) => {
         await userEvent.click(screen.getByText('＋ new project'))
         await userEvent.type(screen.getByPlaceholderText('My Awesome App'), '地蔵 Core')
@@ -127,13 +125,12 @@ export const SubmitSuccess: Story = {
 
 // @story 状態 7: キャンセル → ダイアログが閉じ form がリセットされる
 export const CancelAndReset: Story = {
-    args: { isHydrated: true },
+    render: (args) => <WithStore {...args} projects={[]} isHydrated={true} />,
     play: async ({ userEvent }) => {
         await userEvent.click(screen.getByText('＋ new project'))
         await userEvent.type(screen.getByPlaceholderText('My Awesome App'), 'Draft Name')
         await userEvent.click(screen.getByText('キャンセル'))
         await expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-        // フォームリセット確認
         await userEvent.click(screen.getByText('＋ new project'))
         await expect(screen.getByPlaceholderText('My Awesome App')).toHaveValue('')
     },
