@@ -3,15 +3,13 @@ import { z } from 'zod'
 // ============================================================
 // Project
 // プロジェクト一覧画面で管理される、各アプリへの参照エントリ。
-// id は nanoid() で生成する。
-// rootPath はプロジェクトのルートディレクトリの絶対パス。
+// id は SurrealDB が自動生成する（Thing 型: "project:xxxxx"）。
 // ============================================================
 
 export const ProjectSchema = z.object({
     id: z.string(),
     name: z.string().min(1, 'name は必須です').max(50),
     description: z.string().max(200).optional(),
-    rootPath: z.string().min(1, 'rootPath は必須です'),
 })
 
 export type Project = z.infer<typeof ProjectSchema>
@@ -25,7 +23,6 @@ export type Project = z.infer<typeof ProjectSchema>
 export const NewProjectFormSchema = z.object({
     name: z.string().min(1, 'name は必須です'),
     description: z.string().max(200).optional(),
-    rootPath: z.string().min(1, 'rootPath は必須です'),
 })
 
 export type NewProjectForm = z.infer<typeof NewProjectFormSchema>
@@ -34,9 +31,8 @@ export type NewProjectForm = z.infer<typeof NewProjectFormSchema>
 // ProjectStore
 // Zustand global-store の型定義。
 // routing は TanStack Router に委譲するため持たない。
-// 永続化は useProjectLoad / useProjectSave hook に委譲する。
-// isHydrated: useProjectLoad 完了後に true になる。
-//             useProjectSave が hydration 前の保存スキップ判断に使用する。
+// 永続化は SurrealDB embedded (Rust IPC) に委譲する。
+// isHydrated: invoke('list_projects') 完了後に true になる。
 // ============================================================
 
 export type ProjectStore = {
@@ -54,6 +50,7 @@ export type ProjectStore = {
 // UseProjectLoadReturn
 // useProjectLoad hook の戻り値型。
 // __root.tsx で呼び出す。起動時の一度きりの読み込みに特化。
+// invoke('list_projects') で SurrealDB から projects[] を取得する。
 // ============================================================
 
 export type UseProjectLoadReturn = {
@@ -63,10 +60,10 @@ export type UseProjectLoadReturn = {
 // ============================================================
 // UseProjectSaveReturn
 // useProjectSave hook の戻り値型。
-// IndexRoute で呼び出す。subscribe ベースの自動保存に特化。
-// saveProjects は E2E・手動テスト用に公開する。
+// New Project ダイアログの作成ボタン押下時に呼び出す。
+// invoke('create_project', { name, description }) で SurrealDB に INSERT する。
 // ============================================================
 
 export type UseProjectSaveReturn = {
-    saveProjects: (projects: Project[]) => Promise<void>
+    createProject: (form: NewProjectForm) => Promise<Project>
 }
