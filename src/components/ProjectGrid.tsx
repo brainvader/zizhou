@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { nanoid } from 'nanoid'
 import { Link } from '@tanstack/react-router'
-import { mkdir } from '@tauri-apps/plugin-fs'
+import { invoke } from '@tauri-apps/api/core'
+import { toast } from 'sonner'
 import { useProjectStore } from '@/store/useProjectStore'
-import { NewProjectFormSchema, type NewProjectForm } from '@/bom/project'
-import { graphsDir } from '@/bom/graph'
+import { NewProjectFormSchema, type NewProjectForm, type Project } from '@/bom/project'
 import {
     Dialog,
     DialogContent,
@@ -16,57 +15,53 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { RootPathInput } from '@/components/RootPathInput'
 
 /** フォームの初期状態 */
-const INITIAL_FORM: NewProjectForm = { name: '', description: '', rootPath: '' }
-const INITIAL_ERRORS = { name: null as string | null, description: null as string | null, rootPath: null as string | null }
+const INITIAL_FORM: NewProjectForm = { name: '', description: '' }
+const INITIAL_ERRORS = { name: null as string | null, description: null as string | null }
 
-type MkdirFn = (path: string, options?: { recursive: boolean }) => Promise<void>
-
+type CreateProjectFn = (name: string, description?: string) => Promise<Project>
 type StubLinkProps = { to: string; params?: Record<string, string>; search?: Record<string, unknown>; children: React.ReactNode; className?: string; 'data-testid'?: string }
 
 type ProjectGridProps = {
-    /** フォルダ選択ダイアログを開く関数（省略時は RootPathInput が Tauri plugin-dialog にフォールバック） */
-    onOpenDirectory?: () => Promise<string | null>
-    /** graphs/ ディレクトリ作成関数（省略時は Tauri plugin-fs にフォールバック） */
-    onMkdir?: MkdirFn
+    /** props DI: Storybook / テスト用。省略時は invoke('create_project') を使用 */
+    onCreateProject?: CreateProjectFn
     /** props DI: Storybook / テスト用。省略時は TanStack Router の Link を使用 */
     LinkComponent?: React.ComponentType<StubLinkProps>
 }
 
+const defaultCreateProject: CreateProjectFn = (name, description) =>
+    invoke('create_project', { name, description })
+
 /**
  * ProjectGrid
- * global-store の projects[] をカードグリッドで表示し、新規作成のエントリーポイントを提供する。
- *
- * [B] ダイアログ制御: isDialogOpen && <Dialog/> の条件付きレンダリング（shadcn Dialog）
- * [C] ID生成: 「作成」ボタン押下時に nanoid() を実行し Project に合成してから addProject を呼ぶ
+ * SurrealDB から取得した projects[] をカードグリッドで表示し、新規作成のエントリーポイントを提供する。
  *
  * @see docs/bom/project.ts
  * @see docs/specs/project-list.spec.tsx
  */
-export const ProjectGrid = ({ onOpenDirectory, onMkdir = mkdir, LinkComponent }: ProjectGridProps) => {
+export const ProjectGrid = ({
+    onCreateProject = defaultCreateProject,
+    LinkComponent,
+}: ProjectGridProps) => {
     const { projects, addProject, isHydrated } = useProjectStore()
     const NavLink = LinkComponent ?? Link
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [form, setForm] = useState<NewProjectForm>(INITIAL_FORM)
     const [errors, setErrors] = useState(INITIAL_ERRORS)
 
-    /** ダイアログを開く */
     const handleOpenDialog = () => {
         setForm(INITIAL_FORM)
         setErrors(INITIAL_ERRORS)
         setIsDialogOpen(true)
     }
 
-    /** ダイアログを閉じる（キャンセル） */
     const handleCancel = () => {
         setForm(INITIAL_FORM)
         setErrors(INITIAL_ERRORS)
         setIsDialogOpen(false)
     }
 
-    /** 「作成」ボタン押下: Zod バリデーション → graphs/ 作成 → addProject → ダイアログを閉じる */
     const handleSubmit = async () => {
         const result = NewProjectFormSchema.safeParse(form)
         if (!result.success) {
@@ -74,15 +69,18 @@ export const ProjectGrid = ({ onOpenDirectory, onMkdir = mkdir, LinkComponent }:
             setErrors({
                 name: fieldErrors.name?.[0] ?? null,
                 description: fieldErrors.description?.[0] ?? null,
-                rootPath: fieldErrors.rootPath?.[0] ?? null,
             })
             return
         }
-        await onMkdir(graphsDir(result.data.rootPath), { recursive: true })
-        addProject({ id: nanoid(), ...result.data })
-        setIsDialogOpen(false)
-        setForm(INITIAL_FORM)
-        setErrors(INITIAL_ERRORS)
+        try {
+            const project = await onCreateProject(result.data.name, result.data.description)
+            addProject(project)
+            setIsDialogOpen(false)
+            setForm(INITIAL_FORM)
+            setErrors(INITIAL_ERRORS)
+        } catch {
+            toast.error('プロジェクトの作成に失敗しました')
+        }
     }
 
     return (
@@ -156,13 +154,6 @@ export const ProjectGrid = ({ onOpenDirectory, onMkdir = mkdir, LinkComponent }:
                                     <span className="font-mono text-xs text-destructive">{errors.description}</span>
                                 )}
                             </div>
-
-                            <RootPathInput
-                                value={form.rootPath}
-                                onChange={(v) => setForm((f) => ({ ...f, rootPath: v }))}
-                                error={errors.rootPath}
-                                onOpenDirectory={onOpenDirectory}
-                            />
                         </div>
 
                         <DialogFooter>

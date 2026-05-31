@@ -2,7 +2,6 @@ import { useCallback } from 'react'
 import { readTextFile, exists, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { toast } from 'sonner'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
-import { ProjectDetailSnapshotSchema } from '@/bom/graph'
 import type { UseProjectDetailLoadReturn } from '@/bom/graph'
 
 type ReadTextFileFn = (path: string, opts: { baseDir: typeof BaseDirectory.AppData }) => Promise<string>

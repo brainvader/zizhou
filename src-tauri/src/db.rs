@@ -1,11 +1,12 @@
 //! db.rs — SurrealDB セットアップ・スキーマ定義・初期データ INSERT
 //!
-//! @context CTX-13
-//! @note    kv-mem（インメモリ）を使用。アプリ再起動で初期化される。
+//! @context CTX-13: node_catalog テーブル
+//! @context CTX-SurrealDB-migration: project / graph / node / edge テーブル追加
+//! @note    kv-surrealkv（RocksDB 永続化）を使用。
 //!          surrealdb 2.6.x (stable) を使用。
 
 use serde::{Deserialize, Serialize};
-use surrealdb::engine::local::Mem;
+use surrealdb::engine::local::SurrealKv;
 use surrealdb::Surreal;
 
 // ============================================================
@@ -42,24 +43,75 @@ pub struct NodeCatalog {
 }
 
 // ============================================================
+// Project / Graph 型定義（フロントの Project / GraphRecord に対応）
+// ============================================================
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Project {
+    pub id: Option<surrealdb::sql::Thing>,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ProjectInput {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Graph {
+    pub id: Option<surrealdb::sql::Thing>,
+    pub name: String,
+    pub project_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GraphInput {
+    pub name: String,
+    pub project_id: String,
+}
+
+// ============================================================
 // DB 初期化
 // ============================================================
 
 pub type Db = Surreal<surrealdb::engine::local::Db>;
 
-pub async fn init_db() -> Result<Db, surrealdb::Error> {
-    let db = Surreal::new::<Mem>(()).await?;
-    db.use_ns("zizhou").use_db("catalog").await?;
+pub async fn init_db(app_data_dir: std::path::PathBuf) -> Result<Db, surrealdb::Error> {
+    let db_path = app_data_dir.join("zizhou.db");
+    let db = Surreal::new::<SurrealKv>(db_path).await?;
+    db.use_ns("zizhou").use_db("zizhou").await?;
 
-    // スキーマ定義（SCHEMALESS でネストオブジェクトを自由に保存する）
+    // スキーマ定義
     db.query(
         "DEFINE TABLE node_catalog SCHEMALESS;
          DEFINE INDEX idx_label   ON node_catalog FIELDS label;
-         DEFINE INDEX idx_service ON node_catalog FIELDS service;",
+         DEFINE INDEX idx_service ON node_catalog FIELDS service;
+
+         DEFINE TABLE project SCHEMALESS;
+         DEFINE INDEX idx_project_name ON project FIELDS name;
+
+         DEFINE TABLE graph SCHEMALESS;
+         DEFINE INDEX idx_graph_project ON graph FIELDS project_id;",
     )
     .await?;
 
-    seed_catalog(&db).await?;
+    // node_catalog が空のときだけシードする（再起動で重複しない）
+    let count: Option<serde_json::Value> = db
+        .query("SELECT count() FROM node_catalog GROUP ALL")
+        .await?
+        .take(0)?;
+    let is_empty = count
+        .and_then(|v| v.get("count").and_then(|c| c.as_i64()))
+        .unwrap_or(0)
+        == 0;
+
+    if is_empty {
+        seed_catalog(&db).await?;
+    }
 
     Ok(db)
 }

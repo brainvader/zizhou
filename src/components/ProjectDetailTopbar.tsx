@@ -1,32 +1,28 @@
 import { useCallback } from 'react'
 import { Link } from '@tanstack/react-router'
-import { nanoid } from 'nanoid'
-import { writeTextFile } from '@tauri-apps/plugin-fs'
+import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
 import { Settings, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
-import { graphFilePath } from '@/bom/graph'
-import type { GraphFile, InitStatus } from '@/bom/graph'
 import type { Project } from '@/bom/project'
 
-type WriteTextFileFn = (path: string, contents: string) => Promise<void>
 type NavigateFn = (graphId: string) => void
+type CreateGraphFn = (projectId: string, name: string) => Promise<{ id: string }>
 
 export type ProjectDetailTopbarProps = {
     projectId: string
     onSettingsClick?: () => void
     project?: Project
-    initStatus?: InitStatus
-    projectRootPath?: string
     /**
      * New Graph 作成後のナビゲーション。
      * 省略時は router.navigate にフォールバックするため、
      * Storybook / テストでは必ず渡すこと。
      */
     onNavigate: NavigateFn
-    onWriteTextFile?: WriteTextFileFn
+    /** props DI: Storybook / テスト用。省略時は invoke('create_graph') を使用 */
+    onCreateGraph?: CreateGraphFn
     /** props DI: Storybook / テスト用。省略時は TanStack Router の Link を使用 */
     LinkComponent?: React.ComponentType<{ to: string; children: React.ReactNode; className?: string }>
 }
@@ -35,39 +31,31 @@ const DefaultLink = ({ to, children, className }: { to: string; children: React.
     <Link to={to} search={{}} className={className}>{children}</Link>
 )
 
+const defaultCreateGraph: CreateGraphFn = (projectId, name) =>
+    invoke('create_graph', { projectId, name })
+
 export const ProjectDetailTopbar = ({
     projectId,
     onSettingsClick,
     project: projectProp,
-    initStatus: initStatusProp,
-    projectRootPath: projectRootPathProp,
     onNavigate,
-    onWriteTextFile = writeTextFile,
+    onCreateGraph = defaultCreateGraph,
     LinkComponent,
 }: ProjectDetailTopbarProps) => {
     const storeProject = useProjectStore((s) => s.projects.find((p) => p.id === projectId))
-    const storeInitStatus = useProjectDetailStore((s) => s.initStatus)
-    const storeProjectRootPath = useProjectDetailStore((s) => s.projectRootPath)
-
     const project = projectProp ?? storeProject
-    const initStatus = initStatusProp ?? storeInitStatus
-    const projectRootPath = projectRootPathProp ?? storeProjectRootPath
 
     const NavLink = LinkComponent ?? DefaultLink
 
     const handleNewGraph = useCallback(async () => {
-        const graphId = nanoid()
-        const filePath = graphFilePath(projectRootPath, graphId)
-        const graphFile: GraphFile = { id: graphId, nodes: [], edges: [] }
-
         try {
-            await onWriteTextFile(filePath, JSON.stringify(graphFile, null, 2))
+            const graph = await onCreateGraph(projectId, `graph-${Date.now()}`)
             toast.success('グラフを作成しました')
-            onNavigate(graphId)
+            onNavigate(graph.id)
         } catch {
-            toast.error('グラフファイルの作成に失敗しました')
+            toast.error('グラフの作成に失敗しました')
         }
-    }, [projectRootPath, onNavigate, onWriteTextFile])
+    }, [projectId, onNavigate, onCreateGraph])
 
     return (
         <header
@@ -90,7 +78,7 @@ export const ProjectDetailTopbar = ({
                         Zizou
                     </span>
                     <span className="font-mono text-[8px] text-[#6b7280] tracking-[0.15em]">
-                        Protocol v7.00
+                        Protocol v8.10
                     </span>
                 </div>
             </div>
@@ -124,7 +112,6 @@ export const ProjectDetailTopbar = ({
                 variant="ghost"
                 size="icon"
                 aria-label="New Graph"
-                disabled={initStatus !== 'ready'}
                 onClick={handleNewGraph}
                 className="w-8 h-8 text-muted-foreground hover:text-foreground"
             >
