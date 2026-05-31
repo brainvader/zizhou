@@ -5,7 +5,6 @@ import { toast } from 'sonner'
 import { Settings, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useProjectStore } from '@/store/useProjectStore'
-import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import type { Project } from '@/bom/project'
 
 type NavigateFn = (graphId: string) => void
