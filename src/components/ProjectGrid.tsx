@@ -16,7 +16,6 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
-/** フォームの初期状態 */
 const INITIAL_FORM: NewProjectForm = { name: '', description: '' }
 const INITIAL_ERRORS = { name: null as string | null, description: null as string | null }
 
@@ -24,42 +23,28 @@ type CreateProjectFn = (name: string, description?: string) => Promise<Project>
 type StubLinkProps = { to: string; params?: Record<string, string>; search?: Record<string, unknown>; children: React.ReactNode; className?: string; 'data-testid'?: string }
 
 type ProjectGridProps = {
-    /** props DI: Storybook / テスト用。省略時は invoke('create_project') を使用 */
     onCreateProject?: CreateProjectFn
-    /** props DI: Storybook / テスト用。省略時は TanStack Router の Link を使用 */
     LinkComponent?: React.ComponentType<StubLinkProps>
 }
 
-const defaultCreateProject: CreateProjectFn = (name, description) =>
-    invoke('create_project', { name, description })
+const DefaultLink = ({ to, params, search, children, className, 'data-testid': testId }: StubLinkProps) => (
+    <Link to={to} params={params} search={search} className={className} data-testid={testId}>
+        {children}
+    </Link>
+)
 
-/**
- * ProjectGrid
- * SurrealDB から取得した projects[] をカードグリッドで表示し、新規作成のエントリーポイントを提供する。
- *
- * @see docs/bom/project.ts
- * @see docs/specs/project-list.spec.tsx
- */
-export const ProjectGrid = ({
-    onCreateProject = defaultCreateProject,
-    LinkComponent,
-}: ProjectGridProps) => {
-    const { projects, addProject, isHydrated } = useProjectStore()
-    const NavLink = LinkComponent ?? Link
-    const [isDialogOpen, setIsDialogOpen] = useState(false)
+export function ProjectGrid({ onCreateProject, LinkComponent }: ProjectGridProps) {
+    const { projects, isHydrated } = useProjectStore()
+    const [open, setOpen] = useState(false)
     const [form, setForm] = useState<NewProjectForm>(INITIAL_FORM)
     const [errors, setErrors] = useState(INITIAL_ERRORS)
 
-    const handleOpenDialog = () => {
-        setForm(INITIAL_FORM)
-        setErrors(INITIAL_ERRORS)
-        setIsDialogOpen(true)
-    }
+    const CustomLink = LinkComponent ?? DefaultLink
 
     const handleCancel = () => {
+        setOpen(false)
         setForm(INITIAL_FORM)
         setErrors(INITIAL_ERRORS)
-        setIsDialogOpen(false)
     }
 
     const handleSubmit = async () => {
@@ -70,62 +55,71 @@ export const ProjectGrid = ({
                 name: fieldErrors.name?.[0] ?? null,
                 description: fieldErrors.description?.[0] ?? null,
             })
-            return
+            return // ✨【修正】バリデーションエラー時はここで処理を中断させる
         }
+
         try {
-            const project = await onCreateProject(result.data.name, result.data.description)
-            addProject(project)
-            setIsDialogOpen(false)
+            const createFn =
+                onCreateProject ??
+                (async (name, desc) => invoke<Project>('create_project', { name, description: desc }))
+            const newProj = await createFn(form.name, form.description)
+
+            useProjectStore.setState((state) => ({
+                projects: [...state.projects, newProj],
+            }))
+
+            toast.success(`プロジェクト「${newProj.name}」を作成しました`)
+            setOpen(false)
             setForm(INITIAL_FORM)
             setErrors(INITIAL_ERRORS)
-        } catch {
+        } catch (e) {
             toast.error('プロジェクトの作成に失敗しました')
         }
     }
 
     return (
-        <main data-testid="project-grid" className="p-6">
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
+        <main className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {projects.map((project) => (
-                    <NavLink
+                    <CustomLink
                         key={project.id}
                         to="/projects/$id"
                         params={{ id: project.id }}
-                        search={{ graph: undefined }}
-                        data-testid={`card-${project.id}`}
-                        className="rounded-md border border-border bg-card p-4 cursor-pointer hover:-translate-y-px transition-transform block no-underline"
+                        className="block p-4 border rounded-lg hover:border-foreground transition-colors"
                     >
-                        <div className="font-medium text-card-foreground text-sm">{project.name}</div>
+                        <h2 className="font-bold text-lg truncate">{project.name}</h2>
                         {project.description && (
-                            <div className="text-muted-foreground text-xs mt-1">{project.description}</div>
+                            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                                {project.description}
+                            </p>
                         )}
-                    </NavLink>
+                    </CustomLink>
                 ))}
 
-                {/* ＋ new project 破線カード — loadProjects 完了前は disabled */}
-                <button
-                    onClick={handleOpenDialog}
+                <Button
+                    onClick={() => setOpen(true)}
                     disabled={!isHydrated}
-                    className="rounded-md border border-dashed border-border bg-transparent p-4 flex items-center justify-center hover:border-primary hover:shadow-[0_0_18px_var(--primary-glow)] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-border disabled:hover:shadow-none"
+                    variant="outline"
+                    className="h-full min-h-[120px] border-dashed flex flex-col gap-2 items-center justify-center text-muted-foreground hover:text-foreground"
                 >
-                    <span className="font-mono text-xs text-muted-foreground tracking-wider">＋ new project</span>
-                </button>
+                    <span>＋ new project</span>
+                </Button>
             </div>
 
-            {isDialogOpen && (
-                <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleCancel()}>
+            {open && (
+                <Dialog open={open} onOpenChange={(v) => !v && handleCancel()}>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>New Project</DialogTitle>
-                            <DialogDescription className="sr-only">
-                                新しいプロジェクトを作成します
+                            <DialogTitle>Create New Project</DialogTitle>
+                            <DialogDescription>
+                                新しいローカルプロジェクトを追加します。プロジェクト情報はローカルデータベースに保存されます。
                             </DialogDescription>
                         </DialogHeader>
 
-                        <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-4 py-4">
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="project-name" className="font-mono text-xs tracking-wide">
-                                    name *
+                                    name <span className="text-destructive">*</span>
                                 </Label>
                                 <Input
                                     id="project-name"

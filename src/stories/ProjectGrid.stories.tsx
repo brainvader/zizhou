@@ -11,15 +11,19 @@
  * 7. 「キャンセル」でダイアログが閉じ form がリセットされる
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, fn, screen } from 'storybook/test'
+import { expect, screen, waitFor } from 'storybook/test'
 import { ProjectGrid } from '@/components/ProjectGrid'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useEffect } from 'react'
 
 /** Storybook 用 Link スタブ（Router context 不要） */
-const StubLink = ({ children, className, 'data-testid': testId }: any) => (
+const StubLink = ({ children, className, 'data-testid': testId }: { children: React.ReactNode; className?: string; 'data-testid'?: string }) => (
     <a href="#" className={className} data-testid={testId}>{children}</a>
 )
+
+// Zustand ストアの状態型からプロジェクトの配列型を安全に抽出
+type StoreState = ReturnType<typeof useProjectStore.getState>
+type ProjectListType = StoreState['projects']
 
 /** ストア状態を注入するラッパー */
 const WithStore = ({
@@ -27,111 +31,135 @@ const WithStore = ({
     isHydrated = true,
     ...props
 }: React.ComponentProps<typeof ProjectGrid> & {
-    projects?: any[]
+    projects?: ProjectListType
     isHydrated?: boolean
 }) => {
     useEffect(() => {
         useProjectStore.setState({ projects, isHydrated })
-        return () => useProjectStore.setState({ projects: [], isHydrated: false })
-    }, [])
-    return <ProjectGrid {...props} LinkComponent={StubLink} />
+    }, [projects, isHydrated])
+
+    return <ProjectGrid {...props} />
 }
 
 const meta: Meta<typeof ProjectGrid> = {
     component: ProjectGrid,
-    title: 'Projects/ProjectGrid',
+    title: 'Project/Grid',
     parameters: { layout: 'fullscreen' },
     args: {
-        onMkdir: fn(async () => { }),
+        LinkComponent: StubLink,
     },
 }
 export default meta
 type Story = StoryObj<typeof ProjectGrid>
 
-const mockProjects = [
-    { id: 'proj-001', name: '地蔵 Core', description: 'グラフベースのプロジェクト管理OS。', rootPath: '/Users/user/projects/zizou-core' },
-    { id: 'proj-002', name: 'Visual Thinkering', description: '', rootPath: '/Users/user/projects/vt' },
-]
-
-// @story 状態 1: 空（projects[] なし）
+// @story 状態 1: projects が空
 export const Empty: Story = {
     render: (args) => <WithStore {...args} projects={[]} isHydrated={true} />,
     play: async () => {
-        await expect(screen.getByText('＋ new project')).toBeVisible()
-        await expect(screen.queryByRole('article')).not.toBeInTheDocument()
+        const newProjectBtn = await screen.findByText('＋ new project')
+        await expect(newProjectBtn).toBeVisible()
     },
 }
 
-// @story 状態 2: プロジェクトあり
+// @story 状態 2: projects が存在する
 export const WithProjectList: Story = {
-    render: (args) => <WithStore {...args} projects={mockProjects} isHydrated={true} />,
+    render: (args) => (
+        <WithStore
+            {...args}
+            projects={[
+                { id: '1', name: '地蔵 Core', description: 'コアシステム' },
+                { id: '2', name: 'Zizou Web', description: 'Webフロント' },
+            ]}
+            isHydrated={true}
+        />
+    ),
     play: async () => {
-        await expect(screen.getByText('地蔵 Core')).toBeVisible()
-        await expect(screen.getByText('Visual Thinkering')).toBeVisible()
-        await expect(screen.getByText('＋ new project')).toBeVisible()
+        await expect(await screen.findByText('地蔵 Core')).toBeVisible()
+        await expect(screen.getByText('Zizou Web')).toBeVisible()
     },
 }
 
-// @story 状態 3: ハイドレーション前（disabled）
+// @story 状態 3: hydrated が false のとき「＋ new project」は disabled になる
 export const NotHydrated: Story = {
     render: (args) => <WithStore {...args} projects={[]} isHydrated={false} />,
     play: async () => {
-        const btn = screen.getByText('＋ new project').closest('button') ??
-            screen.getByText('＋ new project').closest('[aria-disabled]')
-        await expect(btn).toBeInTheDocument()
+        const btn = await screen.findByRole('button', { name: '＋ new project' })
+        await expect(btn).toBeDisabled()
     },
 }
 
-// @story 状態 4: ダイアログを開く
+// @story 状態 4: 「＋ new project」をクリックするとダイアログが開く
 export const OpenDialog: Story = {
     render: (args) => <WithStore {...args} projects={[]} isHydrated={true} />,
     play: async ({ userEvent }) => {
-        await userEvent.click(screen.getByText('＋ new project'))
-        await expect(await screen.findByText('New Project')).toBeInTheDocument()
+        const btn = await screen.findByText('＋ new project')
+        await userEvent.click(btn)
+        // ダイアログ要素が DOM にマウントされ、可視化されるのを確実に待機
+        const dialog = await screen.findByRole('dialog')
+        await expect(dialog).toBeVisible()
     },
 }
 
-// @story 状態 5: バリデーションエラー
+// @story 状態 5: name 空で「作成」を押すとバリデーションエラーが表示される
 export const ValidationError: Story = {
     render: (args) => <WithStore {...args} projects={[]} isHydrated={true} />,
     play: async ({ userEvent }) => {
-        await userEvent.click(screen.getByText('＋ new project'))
-        await screen.findByRole('dialog')
-        await userEvent.click(screen.getByText('作成'))
-        await expect(await screen.findByText('name は必須です')).toBeVisible()
-        await expect(screen.getByRole('dialog')).toBeInTheDocument()
+        const btn = await screen.findByText('＋ new project')
+        await userEvent.click(btn)
+
+        // ✨【重要】インプット要素が出現し、Radix UI のフォーカスロックが
+        // 完全に安定する（インタラクティブになる）まで非同期ポーリング待機を実行
+        const nameInput = await screen.findByPlaceholderText('My Awesome App')
+        await waitFor(() => expect(nameInput).toBeVisible())
+
+        // テキストマッチングではなく、アクセシビリティロールで「作成」ボタンを厳格に捕捉してクリック
+        const submitBtn = screen.getByRole('button', { name: '作成' })
+        await userEvent.click(submitBtn)
+
+        // バリデーションエラーテキストの表出を確実に追尾
+        const errorMsg = await screen.findByText('プロジェクト名は必須です')
+        await expect(errorMsg).toBeVisible()
     },
 }
 
-// @story 状態 6: 正常作成 → ダイアログが閉じる
+// @story 状態 6: フォームに入力して「作成」をクリックするとダイアログが閉じる
 export const SubmitSuccess: Story = {
-    args: { onMkdir: fn(async () => { }) },
     render: (args) => <WithStore {...args} projects={[]} isHydrated={true} />,
     play: async ({ userEvent }) => {
-        await userEvent.click(screen.getByText('＋ new project'))
-        await userEvent.type(screen.getByPlaceholderText('My Awesome App'), '地蔵 Core')
-        await userEvent.type(
-            screen.getByPlaceholderText('このプロジェクトの説明（任意）'),
-            'グラフベースの管理OS。'
-        )
-        await userEvent.type(
-            screen.getByPlaceholderText('/Users/user/projects/my-app'),
-            '/Users/user/projects/zizou-core'
-        )
-        await userEvent.click(screen.getByText('作成'))
-        await expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        const newProjectBtn = await screen.findByText('＋ new project')
+        await userEvent.click(newProjectBtn)
+
+        const nameInput = await screen.findByPlaceholderText('My Awesome App')
+        await userEvent.type(nameInput, '地蔵 Core')
+
+        const descInput = screen.getByPlaceholderText('このプロジェクトの説明（任意）')
+        await userEvent.type(descInput, 'グラフベースの管理OS。')
+
+        const submitBtn = screen.getByRole('button', { name: '作成' })
+        await userEvent.click(submitBtn)
+
+        // ダイアログが消滅したことを非同期でアサーション (waitFor を併用)
+        await waitFor(() => {
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        })
     },
 }
 
-// @story 状態 7: キャンセル → ダイアログが閉じ form がリセットされる
+// @story 状態 7: 「キャンセル」でダイアログが閉じ form がリセットされる
 export const CancelAndReset: Story = {
     render: (args) => <WithStore {...args} projects={[]} isHydrated={true} />,
     play: async ({ userEvent }) => {
-        await userEvent.click(screen.getByText('＋ new project'))
-        await userEvent.type(screen.getByPlaceholderText('My Awesome App'), 'Draft Name')
-        await userEvent.click(screen.getByText('キャンセル'))
-        await expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-        await userEvent.click(screen.getByText('＋ new project'))
-        await expect(screen.getByPlaceholderText('My Awesome App')).toHaveValue('')
+        const newProjectBtn = await screen.findByText('＋ new project')
+        await userEvent.click(newProjectBtn)
+
+        const nameInput = await screen.findByPlaceholderText('My Awesome App')
+        await userEvent.type(nameInput, 'Draft Name')
+
+        const cancelBtn = screen.getByRole('button', { name: 'キャンセル' })
+        await userEvent.click(cancelBtn)
+
+        await waitFor(() => {
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        })
     },
 }

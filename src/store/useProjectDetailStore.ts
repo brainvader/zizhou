@@ -1,5 +1,28 @@
 import { create } from 'zustand'
-import type { ProjectDetailStore } from '@/bom/graph'
+
+// ============================================================
+// Types
+// ============================================================
+
+// 【修正点】@/bom/graph から InitStatus がエクスポートされていないため、
+// 外部からのインポートを削除し、ここで直接型を定義してエラーを解消します。
+export type InitStatus = 'checking' | 'ready'
+
+export type ProjectDetailStoreState = {
+    activeGraphId: string | null
+    initStatus: InitStatus
+    projectRootPath: string
+    isDetailHydrated: boolean
+}
+
+export type ProjectDetailStoreActions = {
+    setActiveGraphId: (id: string | null) => void
+    setInitStatus: (status: InitStatus) => void
+    setProjectRootPath: (path: string) => void
+    setDetailHydrated: (value: boolean) => void
+}
+
+export type ProjectDetailStore = ProjectDetailStoreState & ProjectDetailStoreActions
 
 /**
  * useProjectDetailStore
@@ -7,12 +30,12 @@ import type { ProjectDetailStore } from '@/bom/graph'
  * project-detail 画面のグローバル状態。
  * activeProjectId は TanStack Router の useParams から取得する。
  * projectRootPath / activeGraphId は:
- *   1. useProjectDetailLoad が AppData/project-detail-{id}.json から復元する（直アクセス時）
- *   2. projects.$id.tsx の useEffect が project?.rootPath / URL ?graph= から注入する（通常遷移時）
+ * 1. useProjectDetailLoad が AppData/project-detail-{id}.json から復元する（直アクセス時）
+ * 2. projects.$id.tsx の useEffect が project?.rootPath / URL ?graph= から注入する（通常遷移時）
  *
  * isDetailHydrated:
- *   useProjectDetailLoad 完了後に true になる。
- *   useProjectDetailSave が hydration 前の保存をスキップするために使用する（save-before-load 防止）。
+ * useProjectDetailLoad 完了後に true になる。
+ * useProjectDetailSave が hydration 前の保存をスキップするために使用する（save-before-load 防止）。
  *
  * @see src/hooks/useProjectDetailLoad.ts
  * @see src/hooks/useProjectDetailSave.ts
@@ -26,8 +49,8 @@ export const useProjectDetailStore = create<ProjectDetailStore>((set) => ({
     isDetailHydrated: false,
 
     // Actions
-    setActiveGraphId: (id) => set({ activeGraphId: id }),
-    setInitStatus: (status) => set({ initStatus: status }),
-    setProjectRootPath: (path) => set({ projectRootPath: path }),
-    setDetailHydrated: (value) => set({ isDetailHydrated: value }),
+    setActiveGraphId: (id: string | null) => set({ activeGraphId: id }),
+    setInitStatus: (status: InitStatus) => set({ initStatus: status }),
+    setProjectRootPath: (path: string) => set({ projectRootPath: path }),
+    setDetailHydrated: (value: boolean) => set({ isDetailHydrated: value }),
 }))

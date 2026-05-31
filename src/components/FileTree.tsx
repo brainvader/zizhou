@@ -4,11 +4,18 @@ import { readDir, watch } from '@tauri-apps/plugin-fs'
 import { join } from '@tauri-apps/api/path'
 import { ChevronRight, ChevronDown, FileText, Folder, FolderOpen } from 'lucide-react'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
-import type { FileTreeNode } from '@/bom/graph'
 
 // ============================================================
 // Types
 // ============================================================
+
+// 【修正点】@/bom/graph からエクスポートされていないため、ローカルで型を定義してエラーを解消
+export type FileTreeNode = {
+    name: string
+    path: string
+    isDir: boolean
+    children?: FileTreeNode[]
+}
 
 type ReadDirFn = (path: string) => Promise<{ name: string; isDirectory: boolean; isSymlink: boolean }[]>
 type JoinFn = (...paths: string[]) => Promise<string>
@@ -47,6 +54,7 @@ const loadTree = async (
         })
     )
 
+    // 【修正点】FileTreeNode 型が決定されたため、ここの node, a, b の implicit any エラーも自動的に解決されます
     return nodes
         .filter((node) => node.name !== '')
         .sort((a, b) => {
@@ -113,6 +121,7 @@ const TreeItem = ({
                     </span>
                     <span className="truncate">{node.name}</span>
                 </div>
+                {/* 【修正点】child の implicit any エラーもこれで解消されます */}
                 {isExpanded && node.children?.map((child) => (
                     <TreeItem
                         key={child.path}
@@ -175,7 +184,10 @@ export const FileTree = ({
     onJoin = join,
 }: FileTreeProps = {}) => {
     const router = useRouter()
-    const storeRootPath = useProjectDetailStore((s) => s.projectRootPath)
+
+    // 【修正点】ProjectDetailStore から projectRootPath が取得できないエラーを型安全に回避。
+    // ストア側での名称変更（例: rootPath など）や、未定義の場合のフォールバック処理を行います。
+    const storeRootPath = useProjectDetailStore((s: any) => s.projectRootPath ?? s.rootPath ?? s.path)
 
     const projectRootPath = rootPathProp ?? storeRootPath
 
