@@ -87,8 +87,6 @@ import { ImportModal } from '@/components/ImportModal'
 import type { GraphNodeData, GraphFile, NodeType, CatalogEntry } from '@/bom/graph'
 import type { LlmExportPayload, LlmImportPayload } from '@/bom/llm-export'
 
-export type InitStatus = 'checking' | 'ready'
-
 type ExistsFn = (path: string) => Promise<boolean>
 type ReadTextFileFn = (path: string) => Promise<string>
 
@@ -109,12 +107,11 @@ type CatalogMenuState = {
 } | null
 
 export type GraphEditorProps = {
-    initStatus?: InitStatus
+    initStatus?: 'checking' | 'ready'
     projectRootPath?: string
     activeGraphId?: string | null
     nodes?: Node<GraphNodeData>[]
     edges?: Edge[]
-    onSetInitStatus?: (status: InitStatus) => void
     onAddNode?: (node: Node<GraphNodeData>) => void
     onLoadGraph?: (graph: GraphFile) => void
     onResetGraph?: () => void
@@ -157,7 +154,7 @@ function GraphEditorInner({
     const storeAddNodeFromCatalog = useGraphStore((s) => s.addNodeFromCatalog)
     const storeSetSelectedNodeIds = useGraphStore((s) => s.setSelectedNodeIds)
 
-    const storeInitStatus = useProjectDetailStore((s) => (s as any).initStatus ?? (s as any).status) as InitStatus
+    const isDetailHydrated = useProjectDetailStore((s) => s.isDetailHydrated)
 
     const { setHydrated: storeSetHydrated } = useGraphFile()
 
@@ -173,7 +170,7 @@ function GraphEditorInner({
         if (edgesProp !== undefined) storeSetEdges(edgesProp)
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-    const initStatus = initStatusProp ?? storeInitStatus
+    const isReady = initStatusProp !== undefined ? initStatusProp === 'ready' : isDetailHydrated
     const nodes = storeNodes
     const edges = storeEdges
     const addNode = onAddNode ?? storeAddNode
@@ -397,7 +394,7 @@ function GraphEditorInner({
             style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0, height: '100%' }}
         >
             {/* ツールバー */}
-            {initStatus === 'ready' && (
+            {isReady && (
                 <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10, display: 'flex', gap: 4 }}>
                     <button
                         data-testid="btn-add-node"
@@ -420,7 +417,7 @@ function GraphEditorInner({
                 </div>
             )}
 
-            {initStatus === 'ready' && (
+            {isReady && (
                 <>
                     {nodes.length === 0 && (
                         <div

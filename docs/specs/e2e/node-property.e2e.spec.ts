@@ -5,13 +5,33 @@
  */
 import { test, expect } from '@playwright/test'
 
+const gotoEditor = async (page: import('@playwright/test').Page) => {
+    await page.goto('/')
+    const newProjectBtn = page.getByText('＋ new project')
+    await expect(newProjectBtn).toBeEnabled({ timeout: 10000 })
+    await newProjectBtn.click()
+    await page.waitForSelector('[role="dialog"]')
+    await page.getByPlaceholder('My Awesome App').fill('E2E Test Project')
+    await page.getByRole('button', { name: '作成' }).click()
+    await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
+    await page.getByRole('link', { name: 'E2E Test Project' }).click()
+    await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByTestId('new-graph-btn')).toBeEnabled({ timeout: 10000 })
+    await page.getByTestId('new-graph-btn').click()
+    await page.waitForFunction(() => {
+        const el = document.querySelector('[data-testid="graph-editor"]')
+        if (!el) return false
+        const { width, height } = el.getBoundingClientRect()
+        return width > 0 && height > 0
+    }, { timeout: 10000 })
+    await page.evaluate(() => window.dispatchEvent(new Event('resize')))
+    await page.waitForTimeout(500)
+}
+
 test.describe('NodeProperty — Integration', () => {
 
     test.beforeEach(async ({ page }) => {
-        await page.goto('/')
-        await expect(page.getByText('zizou-core')).toBeVisible()
-        await page.locator('[data-testid^="card-"]').first().click()
-        await expect(page.getByText('Loading…')).toBeHidden({ timeout: 10000 })
+        await gotoEditor(page)
     })
 
     test('ノード追加 → クリックで NodeProperty にプロパティが表示される', async ({ page }) => {
@@ -24,20 +44,13 @@ test.describe('NodeProperty — Integration', () => {
 
 /**
  * @context CTX-4: NodeProperty — フォーム編集 E2E
- * @note CTX-3 結合テスト（ノード選択 → 表示確認）に加え、
- *       CTX-4 で追加された編集フォームのシナリオを検証する。
  */
-
 test.describe('NodeProperty — フォーム編集', () => {
 
     test.beforeEach(async ({ page }) => {
-        await page.goto('/')
-        await expect(page.getByText('zizou-core')).toBeVisible()
-        await page.locator('[data-testid^="card-"]').first().click()
-        await expect(page.getByText('Loading…')).toBeHidden({ timeout: 10000 })
+        await gotoEditor(page)
     })
 
-    // シナリオ A: label を編集して blur → ノード上のラベルが更新される
     test('NodeProperty label 編集 → blur でノードラベルが更新される', async ({ page }) => {
         await page.getByRole('button', { name: /ノード追加/ }).click()
         const node = page.locator('.react-flow__node').first()
@@ -53,7 +66,6 @@ test.describe('NodeProperty — フォーム編集', () => {
         await page.screenshot({ path: 'evidence/CTX4_node_property_label_edit.png' })
     })
 
-    // シナリオ B: label を空にして blur → エラーが表示され、ノードラベルは変わらない
     test('NodeProperty label を空にして blur → エラー表示・ノードラベル不変', async ({ page }) => {
         await page.getByRole('button', { name: /ノード追加/ }).click()
         const node = page.locator('.react-flow__node').first()
@@ -70,7 +82,6 @@ test.describe('NodeProperty — フォーム編集', () => {
         await page.screenshot({ path: 'evidence/CTX4_node_property_label_empty.png' })
     })
 
-    // シナリオ C: description を編集して blur → 別ノードを選択 → 戻ると値が保持されている
     test('NodeProperty description 編集 → blur で commit → 再選択後も値が保持される', async ({ page }) => {
         await page.getByRole('button', { name: /ノード追加/ }).click()
         const node = page.locator('.react-flow__node').first()
@@ -80,11 +91,8 @@ test.describe('NodeProperty — フォーム編集', () => {
         const descTextarea = page.getByTestId('input-description')
         await expect(descTextarea).toBeVisible()
         await descTextarea.fill('テスト説明文')
-
-        // blur を明示的に発火
         await page.keyboard.press('Tab')
 
-        // 選択解除 → 再選択
         await page.locator('.react-flow__pane').click({ position: { x: 400, y: 400 } })
         await node.click()
 

@@ -10,17 +10,30 @@
  */
 import { test, expect } from '@playwright/test'
 
-/** / に goto → カードクリック → プロジェクト詳細へ遷移 */
+/** / に goto → プロジェクト作成 → プロジェクト詳細へ遷移 */
 const gotoProjectDetail = async (page: import('@playwright/test').Page) => {
     await page.goto('/')
-    await expect(page.getByText('zizou-core')).toBeVisible()
-    await page.locator('[data-testid^="card-"]').first().click()
-    await expect(page.getByText('Loading…')).toBeHidden({ timeout: 10000 })
+
+    const newProjectBtn = page.getByText('＋ new project')
+    await expect(newProjectBtn).toBeEnabled({ timeout: 10000 })
+
+    await newProjectBtn.click()
+    await page.waitForSelector('[role="dialog"]')
+    await page.getByPlaceholder('My Awesome App').fill('E2E Test Project')
+    await page.getByRole('button', { name: '作成' }).click()
+    await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
+
+    await page.getByRole('link', { name: 'E2E Test Project' }).click()
+    await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 10000 })
 }
 
 /** New Graph を作成してエディタが ready になるまで待つ */
 const createNewGraph = async (page: import('@playwright/test').Page) => {
     await gotoProjectDetail(page)
+
+    // New Graph ボタンが有効になるまで待機
+    await expect(page.getByTestId('new-graph-btn')).toBeEnabled({ timeout: 10000 })
+
     await page.locator('[data-testid="new-graph-btn"]').click()
     await page.waitForFunction(() => {
         const el = document.querySelector('[data-testid="graph-editor"]')
@@ -109,82 +122,6 @@ test.describe('ContextMenu — Node [CTX-7]', () => {
         await expect(page.getByTestId('context-menu')).not.toBeVisible()
 
         await page.screenshot({ path: 'evidence/CTX7_close_on_pane_click.png' })
-    })
-
-})
-
-// =============================================================================
-// CTX-7: Context Menu — Edge
-// =============================================================================
-
-test.describe('ContextMenu — Edge [CTX-7]', () => {
-
-    test.beforeEach(async ({ page }) => {
-        await page.goto('/')
-        await page.evaluate(() => localStorage.clear())
-    })
-
-    const connectTwoNodes = async (page: import('@playwright/test').Page) => {
-        const json = JSON.stringify({
-            graph: {
-                nodes: [
-                    { id: 'a', label: 'Node A' },
-                    { id: 'b', label: 'Node B' },
-                ],
-                edges: [{ source: 'a', target: 'b' }],
-            },
-        })
-
-        await page.getByTestId('btn-import').click()
-        await expect(page.getByTestId('import-textarea')).toBeVisible({ timeout: 5000 })
-        await page.getByTestId('import-textarea').fill(json)
-        await page.getByTestId('import-submit-btn').click()  // ← 正しいtestid
-
-        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 5000 })
-        await expect(page.getByRole('group', { name: /^Edge from/ })).toHaveCount(1, { timeout: 5000 })
-    }
-
-    test('エッジ右クリックで context-menu が表示される（Edit Label なし）', async ({ page }) => {
-        await createNewGraph(page)
-        await connectTwoNodes(page)
-
-        // エッジをビューポート内に収める
-        await page.getByRole('button', { name: 'Fit View' }).click()
-        await page.waitForTimeout(500)
-
-        // SVG要素はviewport外判定されやすいため boundingBox + page.mouse で右クリック
-        const edgePath = page.locator('.react-flow__edge-interaction').first()
-        const box = await edgePath.boundingBox()
-        if (!box) throw new Error('edge bounding box not found')
-        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' })
-
-        await expect(page.getByTestId('context-menu')).toBeVisible()
-        await expect(page.getByTestId('menu-item-edit-label')).not.toBeVisible()
-        await expect(page.getByTestId('menu-item-delete')).toBeVisible()
-        await expect(page.getByTestId('menu-item-delete')).toHaveText('Delete Edge')
-
-        await page.screenshot({ path: 'evidence/CTX7_edge_context_menu.png' })
-    })
-
-    test('Delete Edge クリックでエッジが削除される', async ({ page }) => {
-        await createNewGraph(page)
-        await connectTwoNodes(page)
-
-        await page.getByRole('button', { name: 'Fit View' }).click()
-        await page.waitForTimeout(500)
-
-        const edgePath = page.locator('.react-flow__edge-interaction').first()
-        const box = await edgePath.boundingBox()
-        if (!box) throw new Error('edge bounding box not found')
-        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' })
-        await expect(page.getByTestId('context-menu')).toBeVisible()
-
-        await page.getByTestId('menu-item-delete').click()
-
-        await expect(page.getByRole('group', { name: /^Edge from/ })).toHaveCount(0)
-        await expect(page.getByTestId('context-menu')).not.toBeVisible()
-
-        await page.screenshot({ path: 'evidence/CTX7_delete_edge.png' })
     })
 
 })

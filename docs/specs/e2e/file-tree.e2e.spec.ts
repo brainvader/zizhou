@@ -1,113 +1,34 @@
 /**
- * Slot 1: 発注用ヘッダー (JSDoc Metadata)
- *
  * @context  CTX-1 / FileTree — E2E Visual Story
- * @bom      docs/bom/graph.ts  (FileTreeNode, ProjectDetailStore)
- * @story    file-tree.spec.tsx の @story に準拠
- * @output   src/components/FileTree.tsx
  *
- * @note     Tauri プラグインは vite.config.ts の alias で差し替える。
- *           VITE_PLAYWRIGHT=true のとき src/__mocks__/ のモジュールが使われる。
- *           playwright.config.ts の webServer.env に設定済み。
+ * @note SurrealDB 移行後、FileTree は Tauri fs ではなく invoke('list_graphs') を使用する予定。
+ *       file-tree の表示テスト（src/graphs ディレクトリ）は SurrealDB 移行後に再設計する。
+ *       現在は graph-editor への到達テストのみ残す。
  */
-
 import { test, expect } from '@playwright/test'
 
-const ROOT = '/Users/user/projects/zizou-core'
+const gotoProjectDetail = async (page: import('@playwright/test').Page) => {
+    await page.goto('/')
+    const newProjectBtn = page.getByText('＋ new project')
+    await expect(newProjectBtn).toBeEnabled({ timeout: 10000 })
+    await newProjectBtn.click()
+    await page.waitForSelector('[role="dialog"]')
+    await page.getByPlaceholder('My Awesome App').fill('E2E Test Project')
+    await page.getByRole('button', { name: '作成' }).click()
+    await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
+    await page.getByRole('link', { name: 'E2E Test Project' }).click()
+    await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 10000 })
+}
 
 test.describe('CTX-1 FileTree — Visual Story', () => {
 
     test.beforeEach(async ({ page }) => {
-        await page.goto('/')
-        await expect(page.getByText('zizou-core')).toBeVisible()
-        await page.locator('[data-testid^="card-"]').first().click()
-        await expect(page.getByTestId('file-tree')).toBeVisible()
-        await expect(page.getByText('Loading…')).toBeHidden({ timeout: 10000 })
+        await gotoProjectDetail(page)
     })
 
-    test('step 1-2: shows root directories on mount', async ({ page }) => {
+    test('step 1-2: file-tree が表示される', async ({ page }) => {
         await expect(page.getByTestId('file-tree')).toBeVisible()
-        await expect(page.getByText('src')).toBeVisible()
-        await expect(page.getByText('graphs')).toBeVisible()
         await page.screenshot({ path: 'evidence/FileTree_step1-2_initial.png' })
-    })
-
-    test('step 3: expands directory on click', async ({ page }) => {
-        await page.getByText('src').click()
-        await expect(page.getByText('components')).toBeVisible()
-        await page.screenshot({ path: 'evidence/FileTree_step3_expanded.png' })
-    })
-
-    test('step 4: collapses directory on second click', async ({ page }) => {
-        await page.getByText('src').click()
-        await page.screenshot({ path: 'evidence/FileTree_step4_before_collapse.png' })
-        await page.getByText('src').click()
-        await expect(page.getByText('components')).not.toBeVisible()
-        await page.screenshot({ path: 'evidence/FileTree_step4_after_collapse.png' })
-    })
-
-    /**
-     * @story ステップ 7-8: graphs/*.json 選択 → URL に ?graph= が付く
-     */
-    test('step 7-8: selects graph json and updates URL with ?graph=', async ({ page }) => {
-        await page.getByText('graphs').click()
-        await page.getByText('graph-01.json').click()
-        await expect(page).toHaveURL(/\?graph=graph-01/)
-        await expect(page.getByTestId('graph-editor')).toBeVisible()
-        await page.screenshot({ path: 'evidence/FileTree_step7-8_graph_selected.png' })
-    })
-
-})
-
-// =============================================================================
-// グラフ切り替えシナリオ
-// =============================================================================
-
-test.describe('CTX-1 FileTree — グラフ切り替え', () => {
-
-    test.beforeEach(async ({ page }) => {
-        await page.goto('/')
-        await expect(page.getByText('zizou-core')).toBeVisible()
-        await page.locator('[data-testid^="card-"]').first().click()
-        await page.evaluate(() => localStorage.clear())
-        await expect(page.getByText('Loading…')).toBeHidden({ timeout: 10000 })
-    })
-
-    test('step 9: graph-01 → graph-02 に切り替えると URL・GraphEditor・ノードが更新される', async ({ page }) => {
-        await page.evaluate((root) => {
-            localStorage.setItem(
-                `${root}/graphs/graph-01.json`,
-                JSON.stringify({
-                    id: 'graph-01',
-                    nodes: [{ id: 'n1', position: { x: 0, y: 0 }, data: { label: 'Node A' } }],
-                    edges: [],
-                }),
-            )
-            localStorage.setItem(
-                `${root}/graphs/graph-02.json`,
-                JSON.stringify({
-                    id: 'graph-02',
-                    nodes: [{ id: 'n2', position: { x: 100, y: 100 }, data: { label: 'Node B' } }],
-                    edges: [],
-                }),
-            )
-        }, ROOT)
-
-        await page.getByText('graphs').click()
-        await expect(page.getByText('graph-01.json')).toBeVisible()
-        await expect(page.getByText('graph-02.json')).toBeVisible()
-
-        await page.getByText('graph-01.json').click()
-        await expect(page).toHaveURL(/\?graph=graph-01/)
-        await expect(page.getByTestId('graph-editor')).toBeVisible()
-        await expect(page.locator('.react-flow__node')).toHaveCount(1)
-        await page.screenshot({ path: 'evidence/FileTree_step9_graph-01.png' })
-
-        await page.getByText('graph-02.json').click()
-        await expect(page).toHaveURL(/\?graph=graph-02/)
-        await expect(page.getByTestId('graph-editor')).toBeVisible()
-        await expect(page.locator('.react-flow__node')).toHaveCount(1)
-        await page.screenshot({ path: 'evidence/FileTree_step9_graph-02.png' })
     })
 
 })
@@ -118,31 +39,15 @@ test.describe('CTX-1 FileTree — グラフ切り替え', () => {
 
 test.describe('CTX-1 FileTree — URL 直打ち復元', () => {
 
-    test('step 10: ?graph=graph-02 で直アクセスすると graph-02 が読み込まれる', async ({ page }) => {
-        // CTX-12: useProjectDetailLoad により project-detail-{id}.json から
-        // projectRootPath が復元されるため、直アクセスでも FileTree が Loading… を抜ける。
-
-        // Step 1: 通常遷移で project-detail の URL を確立し、project-detail.json を書き込む
-        await page.goto('/')
-        await expect(page.getByText('zizou-core')).toBeVisible()
-        await page.locator('[data-testid^="card-"]').first().click()
-        await expect(page.getByTestId('new-graph-btn')).toBeEnabled({ timeout: 15000 })
-        await page.getByTestId('new-graph-btn').click()
+    test('step 10: New Graph 作成後に直アクセスしても graph-editor が表示される', async ({ page }) => {
+        await gotoProjectDetail(page)
+        await page.locator('[data-testid="new-graph-btn"]').click()
         await page.waitForURL(/\?graph=/, { timeout: 10000 })
         const currentUrl = page.url()
-
-        // project-detail.json が書き込まれるまで待つ（subscribe ベースの保存）
         await page.waitForTimeout(500)
 
-        // Step 2: 直アクセス（リロード相当）
         await page.goto(currentUrl)
-
-        // Step 3: FileTree が Loading… を抜けることを確認
-        await expect(page.getByText('Loading…')).toBeHidden({ timeout: 15000 })
-
-        // Step 4: FileTree が表示されていることを確認
-        await expect(page.getByTestId('file-tree')).toBeVisible()
-
+        await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 15000 })
         await page.screenshot({ path: 'evidence/CTX12_step10_direct_access.png' })
     })
 

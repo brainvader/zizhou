@@ -8,11 +8,24 @@ import { test, expect, type Page } from '@playwright/test'
 // プロジェクト詳細画面に遷移してグラフエディタが ready になるまで待つヘルパー
 async function navigateToEditor(page: Page) {
     await page.goto('/')
-    // ProjectGrid の card-1 をクリック（plugin-fs モックの固定フィクスチャ ID）
-    await page.getByTestId('card-1').click()
-    // グラフエディタが表示されるまで待機
+
+    // isHydrated が true になるまで待機（disabled が外れるまで）
+    const newProjectBtn = page.getByText('＋ new project')
+    await expect(newProjectBtn).toBeEnabled({ timeout: 10000 })
+
+    await newProjectBtn.click()
+    await page.waitForSelector('[role="dialog"]')
+
+    await page.getByPlaceholder('My Awesome App').fill('E2E Test Project')
+    await page.getByRole('button', { name: '作成' }).click()
+
+    // ダイアログが閉じるまで待機
+    await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
+
+    // 作成されたプロジェクトカードをクリック
+    await page.getByRole('link', { name: 'E2E Test Project' }).click()
+
     await page.waitForSelector('[data-testid="graph-editor"]')
-    // ReactFlow のキャンバス要素が描画されるまで待機
     await page.waitForSelector('.react-flow__pane')
 }
 

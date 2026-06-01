@@ -72,6 +72,7 @@ vi.mock('@/store/useProjectDetailStore', () => ({
                 initStatus: 'ready',
                 projectRootPath: '/mock',
                 activeGraphId: null,
+                isDetailHydrated: true,  // ← 追加
                 setInitStatus: vi.fn(),
             })
         ),

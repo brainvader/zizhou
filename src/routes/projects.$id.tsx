@@ -13,7 +13,6 @@ import {
 import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import { useProjectDetailLoad } from '@/hooks/useProjectDetailLoad'
-import { useProjectDetailSave } from '@/hooks/useProjectDetailSave'
 import { FILE_TREE_PANEL, GRAPH_EDITOR_PANEL, NODE_PROPERTY_PANEL } from '@/bom/layout'
 
 /**
@@ -26,45 +25,28 @@ import { FILE_TREE_PANEL, GRAPH_EDITOR_PANEL, NODE_PROPERTY_PANEL } from '@/bom/
  *
  * activeGraphId の SSOT は URL の ?graph= クエリパラメータ。
  * useSearch() で取得し、GraphEditor に props として渡すとともに
- * useProjectDetailStore にも同期する（useGraphFile が getState() で参照するため）。
- *
- * CTX-12 永続化:
- *   - useProjectDetailLoad: マウント時に AppData/project-detail-{id}.json を読み込む。
- *     直アクセス時に projectRootPath が即座に復元されるため FileTree が Loading… で止まらない。
- *   - useProjectDetailSave: subscribe ベースで projectRootPath / activeGraphId の変化を自動保存する。
+ * useProjectDetailStore にも同期する。
  *
  * @see src/router.tsx
  * @see src/components/ProjectDetailTopbar.tsx
  * @see docs/bom/layout.ts
  * @see src/hooks/useProjectDetailLoad.ts
- * @see src/hooks/useProjectDetailSave.ts
  */
 export const ProjectDetailRoute = () => {
     const { id } = useParams({ from: '/projects/$id' })
     const { graph: activeGraphId } = useSearch({ from: '/projects/$id' })
     const project = useProjectStore((s) => s.projects.find((p) => p.id === id))
-    const setProjectRootPath = useProjectDetailStore((s) => s.setProjectRootPath)
     const setActiveGraphId = useProjectDetailStore((s) => s.setActiveGraphId)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const router = useRouter()
 
-    // CTX-12: 直アクセス時に project-detail-{id}.json から projectRootPath を復元する
+    // マウント時に SurrealDB からグラフ一覧を取得し activeGraphId を注入する
     const { loadProjectDetail } = useProjectDetailLoad()
     useEffect(() => {
         loadProjectDetail(id)
     }, [id, loadProjectDetail])
 
-    // CTX-12: projectRootPath / activeGraphId の変化を自動保存する
-    useProjectDetailSave(id)
-
-    // 通常遷移時: project?.rootPath が解決されたら store に注入する（loadProjectDetail より後に走るが上書きは問題なし）
-    useEffect(() => {
-        if (project?.rootPath) {
-            setProjectRootPath(project.rootPath)
-        }
-    }, [project?.rootPath, setProjectRootPath])
-
-    // URL の ?graph= を store に同期する（useGraphFile の getState() 参照のため）
+    // URL の ?graph= を store に同期する
     useEffect(() => {
         setActiveGraphId(activeGraphId ?? null)
     }, [activeGraphId, setActiveGraphId])
@@ -79,9 +61,9 @@ export const ProjectDetailRoute = () => {
                 color: 'var(--foreground)',
             }}
         >
-            // ProjectDetailTopbar の呼び出しを修正
             <ProjectDetailTopbar
                 projectId={id}
+                project={project}
                 onSettingsClick={() => setIsSettingsOpen(true)}
                 onNavigate={(graphId) =>
                     router.navigate({
@@ -92,9 +74,7 @@ export const ProjectDetailRoute = () => {
                 }
             />
 
-            <ResizablePanelGroup
-                style={{ flex: 1, overflow: 'hidden' }}
-            >
+            <ResizablePanelGroup style={{ flex: 1, overflow: 'hidden' }}>
                 {/* CTX-1: FileTree */}
                 <ResizablePanel
                     defaultSize={FILE_TREE_PANEL.defaultSize}

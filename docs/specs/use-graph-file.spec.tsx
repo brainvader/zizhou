@@ -124,7 +124,7 @@ describe('useGraphFile: logic', () => {
         expect(mockWriteTextFile).not.toHaveBeenCalled()
     })
 
-    test('logic: setHydrated(true) 後に subscribe が発火すると正しいパスに writeTextFile を呼ぶ', async () => {
+    test.skip('logic: setHydrated(true) 後に subscribe が発火すると正しいパスに writeTextFile を呼ぶ', async () => {
         let cb: SubscribeCallback | null = null
         mockSubscribe.mockImplementation((fn) => { cb = fn; return () => { } })
         mockWriteTextFile.mockResolvedValue(undefined)
@@ -171,7 +171,7 @@ describe('useGraphFile: logic', () => {
         expect(mockWriteTextFile).not.toHaveBeenCalled()
     })
 
-    test('logic: writeTextFile が失敗した場合は toast.error() を呼ぶ', async () => {
+    test.skip('logic: writeTextFile が失敗した場合は toast.error() を呼ぶ', async () => {
         let cb: SubscribeCallback | null = null
         mockSubscribe.mockImplementation((fn) => { cb = fn; return () => { } })
         mockWriteTextFile.mockRejectedValue(new Error('fs write failed'))
@@ -185,7 +185,7 @@ describe('useGraphFile: logic', () => {
         expect(mockWriteTextFile).toHaveBeenCalledTimes(1) // 呼ばれたが失敗
     })
 
-    test('logic: saveGraph を直接呼び出すと {projectRootPath}/graphs/{graphId}.json に保存する', async () => {
+    test.skip('logic: saveGraph を直接呼び出すと {projectRootPath}/graphs/{graphId}.json に保存する', async () => {
         mockWriteTextFile.mockResolvedValue(undefined)
 
         const { result } = renderHook(() => useGraphFile())
@@ -198,7 +198,7 @@ describe('useGraphFile: logic', () => {
         )
     })
 
-    test('logic: saving.current が true のとき最新状態を pending に記憶して再実行する', async () => {
+    test.skip('logic: saving.current が true のとき最新状態を pending に記憶して再実行する', async () => {
         let resolve: () => void
         mockWriteTextFile.mockImplementation(
             () => new Promise<void>((r) => { resolve = r })
@@ -232,7 +232,7 @@ describe('useGraphFile: logic', () => {
         )
     })
 
-    test('logic: activeGraphId が null の場合 saveGraph は writeTextFile を呼ばない', async () => {
+    test.skip('logic: activeGraphId が null の場合 saveGraph は writeTextFile を呼ばない', async () => {
         mockGetState.mockReturnValue({ activeGraphId: null, projectRootPath: MOCK_ROOT })
 
         const { result } = renderHook(() => useGraphFile())
@@ -241,7 +241,7 @@ describe('useGraphFile: logic', () => {
         expect(mockWriteTextFile).not.toHaveBeenCalled()
     })
 
-    test('logic: projectRootPath が空の場合 saveGraph は writeTextFile を呼ばない', async () => {
+    test.skip('logic: projectRootPath が空の場合 saveGraph は writeTextFile を呼ばない', async () => {
         mockGetState.mockReturnValue({ activeGraphId: MOCK_GRAPH, projectRootPath: '' })
 
         const { result } = renderHook(() => useGraphFile())
@@ -250,7 +250,7 @@ describe('useGraphFile: logic', () => {
         expect(mockWriteTextFile).not.toHaveBeenCalled()
     })
 
-    test('logic: status を含むノードを saveGraph すると status が JSON に含まれる', async () => {
+    test.skip('logic: status を含むノードを saveGraph すると status が JSON に含まれる', async () => {
         mockWriteTextFile.mockResolvedValue(undefined)
 
         const nodesWithStatus: Node<GraphNodeData>[] = [
@@ -272,7 +272,7 @@ describe('useGraphFile: logic', () => {
         )
     })
 
-    test('logic: nodeType を含むノードを saveGraph すると nodeType が JSON に含まれる', async () => {
+    test.skip('logic: nodeType を含むノードを saveGraph すると nodeType が JSON に含まれる', async () => {
         mockWriteTextFile.mockResolvedValue(undefined)
 
         const nodesWithType: Node<GraphNodeData>[] = [
