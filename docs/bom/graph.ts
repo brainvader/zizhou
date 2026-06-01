@@ -49,14 +49,12 @@ export const GraphNodeDataSchema = z.object({
 export type GraphNodeData = z.infer<typeof GraphNodeDataSchema>
 
 // ============================================================
-// CatalogField / CatalogProfile / CatalogEntry       [CTX-9]
-// Node Catalog のエントリ型定義。
-// SurrealDB の node テーブル（グローバルノードライブラリ）に対応する。
-// 1エントリ = 1スキル = 1profile（CTX-9設計決定）。
+// CatalogField / CatalogProfile / CatalogEntry            [CTX-9]
+// ノードカタログのエントリ型。SurrealDB の node_catalog テーブルに対応。
 // ============================================================
 
 export const CatalogFieldSchema = z.object({
-    type: z.enum(['string', 'number', 'boolean', 'enum']),
+    type: z.string(),
     label: z.string(),
     required: z.boolean().optional(),
     default: z.unknown().optional(),
@@ -75,34 +73,35 @@ export const CatalogEntrySchema = z.object({
     service: z.string(),
     provider: z.string(),
     label: z.string(),
-    nodeType: NodeTypeSchema,
+    nodeType: z.string(),
     profile: CatalogProfileSchema,
 })
 export type CatalogEntry = z.infer<typeof CatalogEntrySchema>
 
 // ============================================================
-// NODE_CATALOG                                        [CTX-9]
-// フロントエンドにハードコードされたカタログ定数。
-// CTX-13 で useCatalogSearch の内部実装を SurrealDB クエリに差し替え済み。
-// 将来: SurrealDB の node テーブル（グローバルノードライブラリ）に移行する。
+// NODE_CATALOG
+// フロントエンドのハードコードカタログ（CTX-9 確定済み）。
+// CTX-13 では SurrealDB 側にも INSERT する。
 // ============================================================
 
 export const NODE_CATALOG: CatalogEntry[] = [
-    // ── git ──────────────────────────────────────────────────
+    // ── git ─────────────────────────────────────────────────
     {
         service: 'git', provider: 'local', label: 'Git Status',
         nodeType: 'git',
-        profile: { subcommand: 'status', args: ['status'], fields: {} },
+        profile: {
+            subcommand: 'status',
+            args: ['status'],
+            fields: {},
+        },
     },
     {
-        service: 'git', provider: 'local', label: 'Git Commit',
+        service: 'git', provider: 'local', label: 'Git Diff',
         nodeType: 'git',
         profile: {
-            subcommand: 'commit',
-            args: ['commit', '-m', '{input.message}'],
-            fields: {
-                message: { type: 'string', label: 'Commit Message', required: true },
-            },
+            subcommand: 'diff',
+            args: ['diff'],
+            fields: {},
         },
     },
     {
@@ -110,51 +109,45 @@ export const NODE_CATALOG: CatalogEntry[] = [
         nodeType: 'git',
         profile: {
             subcommand: 'log',
-            args: ['log', '--oneline', '-{input.count}'],
-            fields: {
-                count: { type: 'number', label: 'Lines', default: 10 },
-            },
+            args: ['log', '--oneline', '-20'],
+            fields: {},
         },
     },
-    {
-        service: 'git', provider: 'local', label: 'Git Diff',
-        nodeType: 'git',
-        profile: { subcommand: 'diff', args: ['diff'], fields: {} },
-    },
-    // ── validate ─────────────────────────────────────────────
+    // ── validate ────────────────────────────────────────────
     {
         service: 'validate', provider: 'local', label: 'TypeScript Check',
         nodeType: 'validate',
-        profile: { subcommand: 'tsc', args: ['tsc', '--noEmit'], fields: {} },
-    },
-    {
-        service: 'validate', provider: 'local', label: 'ESLint',
-        nodeType: 'validate',
         profile: {
-            subcommand: 'eslint',
-            args: ['eslint', '{input.target}'],
-            fields: {
-                target: { type: 'string', label: 'Target Path', default: 'src' },
-            },
+            subcommand: 'tsc',
+            args: ['tsc', '--noEmit'],
+            fields: {},
         },
     },
-    // ── analyze ──────────────────────────────────────────────
+    {
+        service: 'validate', provider: 'local', label: 'Lint Check',
+        nodeType: 'validate',
+        profile: {
+            subcommand: 'lint',
+            args: ['eslint', '.'],
+            fields: {},
+        },
+    },
+    // ── analyze ─────────────────────────────────────────────
     {
         service: 'analyze', provider: 'local', label: 'Test Run',
         nodeType: 'analyze',
-        profile: { subcommand: 'vitest', args: ['vitest', 'run'], fields: {} },
+        profile: {
+            subcommand: 'test',
+            args: ['vitest', 'run'],
+            fields: {},
+        },
     },
+    // ── llm ─────────────────────────────────────────────────
     {
-        service: 'analyze', provider: 'local', label: 'Build',
-        nodeType: 'analyze',
-        profile: { subcommand: 'build', args: ['vite', 'build'], fields: {} },
-    },
-    // ── llm ──────────────────────────────────────────────────
-    {
-        service: 'llm', provider: 'claude', label: 'Claude: Summarize',
+        service: 'llm', provider: 'ollama', label: 'Ollama: Prompt',
         nodeType: 'llm',
         profile: {
-            subcommand: 'summarize',
+            subcommand: 'prompt',
             args: [],
             fields: {
                 prompt: { type: 'string', label: 'Prompt', required: true },
@@ -228,6 +221,44 @@ export const GraphFileSchema = z.object({
 export type GraphFile = z.infer<typeof GraphFileSchema>
 
 // ============================================================
+// GraphNodeRecord                                    [CTX-15]
+// SurrealDB の node テーブルのレコード型。
+// graph -[has_node]-> node の関係で管理される。
+// position_x / position_y はフラットに持つ（SurrealDB スキーマに対応）。
+// ============================================================
+
+export const GraphNodeRecordSchema = z.object({
+    id: z.string(),
+    graph_id: z.string(),
+    label: z.string(),
+    node_type: z.string().optional(),
+    status: NodeStatusSchema.optional(),
+    service: z.string().nullable().optional(),
+    provider: z.string().nullable().optional(),
+    input: z.record(z.string(), z.unknown()).optional(),
+    description: z.string().optional(),
+    position_x: z.number(),
+    position_y: z.number(),
+})
+
+export type GraphNodeRecord = z.infer<typeof GraphNodeRecordSchema>
+
+// ============================================================
+// GraphEdgeRecord                                    [CTX-15]
+// SurrealDB の edge テーブルのレコード型。
+// graph -[has_edge]-> edge の関係で管理される。
+// ============================================================
+
+export const GraphEdgeRecordSchema = z.object({
+    id: z.string(),
+    graph_id: z.string(),
+    source: z.string(),
+    target: z.string(),
+})
+
+export type GraphEdgeRecord = z.infer<typeof GraphEdgeRecordSchema>
+
+// ============================================================
 // GraphStore
 // Zustand store の型定義。
 // nodes[], edges[], selectedNodeId の SSOT。
@@ -268,6 +299,40 @@ export type ProjectDetailStore = {
 
     setActiveGraphId: (id: string | null) => void
     setDetailHydrated: (value: boolean) => void
+}
+
+// ============================================================
+// UseGraphLoadOptions / UseGraphLoadReturn           [CTX-15]
+// useGraphLoad hook の型定義。
+// useGraphInit（Tauri fs 依存）を置き換える。
+// ============================================================
+
+export type UseGraphLoadOptions = {
+    /** props DI: 省略時は invoke('load_graph') を使用する */
+    onLoadGraph?: (graphId: string) => Promise<GraphFile>
+    onLoadGraphFn?: (graph: GraphFile) => void
+    onResetGraph?: () => void
+    setHydrated?: (value: boolean) => void
+    activeGraphId?: string | null
+}
+
+export type UseGraphLoadReturn = void
+
+// ============================================================
+// UseGraphSaveOptions / UseGraphSaveReturn           [CTX-15]
+// useGraphSave hook の型定義。
+// useGraphFile（Tauri fs 依存）を置き換える。
+// ============================================================
+
+export type UseGraphSaveOptions = {
+    /** props DI: 省略時は invoke('save_graph') を使用する */
+    onSaveGraph?: (graphId: string, nodes: Node<GraphNodeData>[], edges: Edge[]) => Promise<void>
+    setHydrated?: (value: boolean) => void
+}
+
+export type UseGraphSaveReturn = {
+    setHydrated: (value: boolean) => void
+    saveGraph: (nodes: Node<GraphNodeData>[], edges: Edge[]) => Promise<void>
 }
 
 // ============================================================

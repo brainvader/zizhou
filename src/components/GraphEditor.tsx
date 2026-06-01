@@ -8,42 +8,29 @@
  *
  * [CTX-5] 複数選択:
  * - onSelectionChange で selectedNodeIds[] を store に反映する
- * - Single Guard は store.setSelectedNodeIds() 内に実装済み
  *
  * [CTX-6] Edge Connect:
  * - onConnect で addEdge() を呼び store に反映する
  *
  * [CTX-7] Context Menu:
  * - contextMenu: { type, id, x, y } | null を useState で管理する（ローカル状態）
- * - onNodeContextMenu / onEdgeContextMenu でセットする
- * - onPaneClick で null にクリアする
  * - editingNodeId を useState で管理する（ローカル状態。Zustand には持たない）
- * - NODE_TYPES を useMemo 化し editingNodeId を EditableNode に prop で注入する
- * - Delete Node/Edge は onNodesChange/onEdgesChange(remove) 経由で処理する
- *
- * [CTX-8] Set Node Type:
- * - onSetNodeType は store.updateNodeData() に直結している
  *
  * [CTX-9] Catalog Menu:
  * - キャンバス空白右クリックで CatalogMenu を表示する
- * - CatalogMenu でエントリ選択 → addNodeFromCatalog() でノードを追加する
  *
  * [CTX-10] Export / Import:
  * - キャンバス左上にツールバーボタン（Export / Import）を固定配置する
- * - Export: buildLlmExport() で LlmExportPayload を生成し ExportModal に渡す
- * - Import: ImportModal で JSON 入力 → Zod バリデーション → loadGraph()
  *
- * @context CTX-2/5/6/7/8/9/10/14
+ * [CTX-15] Graph Persist (SurrealDB):
+ * - useGraphInit → useGraphLoad に置き換え（invoke('load_graph') ベース）
+ * - useGraphFile → useGraphSave に置き換え（subscribe + invoke('save_graph')）
+ * - props DI: onLoadGraph / onSaveGraph で差し替え可能
+ *
+ * @context CTX-2/5/6/7/8/9/10/14/15
  * @see docs/bom/graph.ts
- * @see docs/bom/execute.ts
- * @see docs/bom/llm-export.ts
- * @see src/components/nodes/EditableNode.tsx
- * @see src/components/ContextMenu.tsx
- * @see src/components/CatalogMenu.tsx
- * @see src/components/ExportModal.tsx
- * @see src/components/ImportModal.tsx
- * @see src/hooks/useGraphInit.ts
- * @see src/hooks/useGraphFile.ts
+ * @see src/hooks/useGraphLoad.ts
+ * @see src/hooks/useGraphSave.ts
  * @see src/hooks/useNodeExecute.ts
  * @see src/hooks/useGraphExport.ts
  * @see src/hooks/useGraphImport.ts
@@ -69,13 +56,13 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { nanoid } from 'nanoid'
-import { exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
+import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { save } from '@tauri-apps/plugin-dialog'
 import { toast } from 'sonner'
 import { useGraphStore } from '@/store/useGraphStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
-import { useGraphFile } from '@/hooks/useGraphFile'
-import { useGraphInit } from '@/hooks/useGraphInit'
+import { useGraphLoad } from '@/hooks/useGraphLoad'
+import { useGraphSave } from '@/hooks/useGraphSave'
 import { useNodeExecute } from '@/hooks/useNodeExecute'
 import { useGraphExport } from '@/hooks/useGraphExport'
 import { useGraphImport } from '@/hooks/useGraphImport'
@@ -84,11 +71,8 @@ import { ContextMenu } from '@/components/ContextMenu'
 import { CatalogMenu } from '@/components/CatalogMenu'
 import { ExportModal } from '@/components/ExportModal'
 import { ImportModal } from '@/components/ImportModal'
-import type { GraphNodeData, GraphFile, NodeType, CatalogEntry } from '@/bom/graph'
+import type { GraphNodeData, GraphFile } from '@/bom/graph'
 import type { LlmExportPayload, LlmImportPayload } from '@/bom/llm-export'
-
-type ExistsFn = (path: string) => Promise<boolean>
-type ReadTextFileFn = (path: string) => Promise<string>
 
 // [CTX-7] ノード・エッジ用コンテキストメニューのローカル状態型
 type ContextMenuState = {
@@ -108,7 +92,6 @@ type CatalogMenuState = {
 
 export type GraphEditorProps = {
     initStatus?: 'checking' | 'ready'
-    projectRootPath?: string
     activeGraphId?: string | null
     nodes?: Node<GraphNodeData>[]
     edges?: Edge[]
@@ -120,8 +103,9 @@ export type GraphEditorProps = {
     onSetSelectedNodeIds?: (ids: string[]) => void
     // [CTX-6] props DI: 省略時は store.addEdge() を使用する
     onAddEdge?: (connection: Connection) => void
-    onExists?: ExistsFn
-    onReadTextFile?: ReadTextFileFn
+    // [CTX-15] props DI: テスト・Storybook で invoke を差し替える
+    onInvokeLoadGraph?: (graphId: string) => Promise<GraphFile>
+    onInvokeSaveGraph?: (graphId: string, nodes: Node<GraphNodeData>[], edges: Edge[]) => Promise<void>
     setHydrated?: (hydrated: boolean) => void
     // [CTX-10] Export/Import 用プロジェクトID。省略時は ''
     projectId?: string
@@ -130,7 +114,6 @@ export type GraphEditorProps = {
 // [CTX-9] ReactFlow の useReactFlow を使うため内部コンポーネントに分離する
 function GraphEditorInner({
     initStatus: initStatusProp,
-    projectRootPath: projectRootPathProp,
     activeGraphId: activeGraphIdProp,
     nodes: nodesProp,
     edges: edgesProp,
@@ -139,8 +122,8 @@ function GraphEditorInner({
     onResetGraph,
     onSetSelectedNodeIds,
     onAddEdge,
-    onExists = exists,
-    onReadTextFile = readTextFile,
+    onInvokeLoadGraph,
+    onInvokeSaveGraph,
     setHydrated: setHydratedProp,
     projectId: projectIdProp = '',
 }: GraphEditorProps) {
@@ -153,14 +136,26 @@ function GraphEditorInner({
     const storeAddEdge = useGraphStore((s) => s.addEdge)
     const storeAddNodeFromCatalog = useGraphStore((s) => s.addNodeFromCatalog)
     const storeSetSelectedNodeIds = useGraphStore((s) => s.setSelectedNodeIds)
-
-    const isDetailHydrated = useProjectDetailStore((s) => s.isDetailHydrated)
-
-    const { setHydrated: storeSetHydrated } = useGraphFile()
-
     const storeSetNodes = useGraphStore((s) => s.setNodes)
     const storeSetEdges = useGraphStore((s) => s.setEdges)
     const storeUpdateNodeData = useGraphStore((s) => s.updateNodeData)
+
+    const isDetailHydrated = useProjectDetailStore((s) => s.isDetailHydrated)
+
+    // [CTX-15] useGraphSave（useGraphFile の置き換え）
+    const { setHydrated: saveSetHydrated } = useGraphSave({
+        onSaveGraph: onInvokeSaveGraph,
+        setHydrated: setHydratedProp,
+    })
+
+    // [CTX-15] useGraphLoad（useGraphInit の置き換え）
+    useGraphLoad({
+        onLoadGraph: onInvokeLoadGraph,
+        onLoadGraphFn: onLoadGraph,
+        onResetGraph,
+        setHydrated: saveSetHydrated,
+        activeGraphId: activeGraphIdProp,
+    })
 
     useEffect(() => {
         if (nodesProp !== undefined) storeSetNodes(nodesProp)
@@ -176,17 +171,6 @@ function GraphEditorInner({
     const addNode = onAddNode ?? storeAddNode
     const addEdge = onAddEdge ?? storeAddEdge
     const setSelectedNodeIds = onSetSelectedNodeIds ?? storeSetSelectedNodeIds
-
-    // 【修正点】useGraphInit の引数から型エラーとなる 'onSetInitStatus' を削除
-    useGraphInit({
-        projectRootPath: projectRootPathProp,
-        activeGraphId: activeGraphIdProp,
-        onLoadGraph,
-        onResetGraph,
-        onExists,
-        onReadTextFile,
-        setHydrated: setHydratedProp ?? storeSetHydrated,
-    })
 
     // --- [CTX-7] ローカル状態 ---
     const [contextMenu, setContextMenu] = useState<ContextMenuState>(null)
@@ -257,7 +241,7 @@ function GraphEditorInner({
                 execute(props.id, {
                     service: nodeData.service,
                     provider: nodeData.provider,
-                    cwd: projectRootPathProp ?? '',
+                    cwd: '',
                     input: nodeData.input ?? {},
                 })
             }
@@ -276,7 +260,7 @@ function GraphEditorInner({
             editableNode: node,
             default: node,
         }
-    }, [editingNodeId, runningNodeId, execute, projectRootPathProp])
+    }, [editingNodeId, runningNodeId, execute])
 
     // --- Add Node（手動ボタン） ---
     const handleAddNode = useCallback(() => {
@@ -339,50 +323,43 @@ function GraphEditorInner({
         setContextMenu({ type: 'edge', id: edge.id, x: e.clientX, y: e.clientY })
     }, [])
 
-    // --- [CTX-9] Pane 右クリック → カタログメニュー ---
     const handlePaneContextMenu = useCallback((e: MouseEvent | React.MouseEvent) => {
         e.preventDefault()
         setContextMenu(null)
         const flowPos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
-        setCatalogMenu({
-            x: e.clientX,
-            y: e.clientY,
-            flowX: flowPos.x,
-            flowY: flowPos.y,
-        })
+        setCatalogMenu({ x: e.clientX, y: e.clientY, flowX: flowPos.x, flowY: flowPos.y })
     }, [screenToFlowPosition])
 
-    // --- Pane クリック（左クリック）: 両メニューを閉じる ---
     const handlePaneClick = useCallback(() => {
         setContextMenu(null)
         setCatalogMenu(null)
     }, [])
 
-    // --- [CTX-7] メニューアクション ---
+    // --- [CTX-7] Context Menu アクション ---
     const handleDeleteFromMenu = useCallback(() => {
         if (!contextMenu) return
         if (contextMenu.type === 'node') {
-            onNodesChange([{ type: 'remove', id: contextMenu.id }])
+            storeSetNodes(nodes.filter((n) => n.id !== contextMenu.id))
         } else {
-            onEdgesChange([{ type: 'remove', id: contextMenu.id }])
+            storeSetEdges(edges.filter((e) => e.id !== contextMenu.id))
         }
         setContextMenu(null)
-    }, [contextMenu, onNodesChange, onEdgesChange])
+    }, [contextMenu, nodes, edges, storeSetNodes, storeSetEdges])
 
     const handleEditLabelFromMenu = useCallback(() => {
-        if (!contextMenu) return
+        if (!contextMenu || contextMenu.type !== 'node') return
         setEditingNodeId(contextMenu.id)
         setContextMenu(null)
     }, [contextMenu])
 
-    // --- [CTX-8] Set Node Type ---
-    const handleSetNodeType = useCallback((type: NodeType) => {
-        if (!contextMenu) return
-        storeUpdateNodeData(contextMenu.id, { nodeType: type })
+    const handleSetNodeType = useCallback((nodeType: string) => {
+        if (!contextMenu || contextMenu.type !== 'node') return
+        storeUpdateNodeData(contextMenu.id, { nodeType: nodeType as GraphNodeData['nodeType'] })
+        setContextMenu(null)
     }, [contextMenu, storeUpdateNodeData])
 
-    // --- [CTX-9] カタログからノード追加 ---
-    const handleSelectCatalogEntry = useCallback((entry: CatalogEntry) => {
+    // --- [CTX-9] Catalog Menu アクション ---
+    const handleSelectCatalogEntry = useCallback((entry: import('@/bom/graph').CatalogEntry) => {
         if (!catalogMenu) return
         storeAddNodeFromCatalog(entry, { x: catalogMenu.flowX, y: catalogMenu.flowY })
         setCatalogMenu(null)
@@ -391,11 +368,28 @@ function GraphEditorInner({
     return (
         <div
             data-testid="graph-editor"
-            style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0, height: '100%' }}
+            style={{ position: 'relative', width: '100%', height: '100%' }}
         >
-            {/* ツールバー */}
+            {!isReady && (
+                <div
+                    data-testid="graph-editor-loading"
+                    style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}
+                >
+                    <span>Loading…</span>
+                </div>
+            )}
+
             {isReady && (
-                <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10, display: 'flex', gap: 4 }}>
+                <div
+                    data-testid="graph-toolbar"
+                    style={{ position: 'absolute', top: 8, left: 8, zIndex: 10, display: 'flex', gap: 4 }}
+                >
                     <button
                         data-testid="btn-add-node"
                         onClick={handleAddNode}

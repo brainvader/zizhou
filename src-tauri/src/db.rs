@@ -1,9 +1,11 @@
 //! db.rs — SurrealDB セットアップ・スキーマ定義・初期データ INSERT
 //!
 //! @context CTX-13: node_catalog テーブル
-//! @context CTX-SurrealDB-migration: project / graph / node / edge テーブル追加
+//! @context CTX-SurrealDB-migration: project / graph テーブル追加
+//! @context CTX-15: node / edge テーブル追加（グラフ永続化）
 //! @note    kv-surrealkv（RocksDB 永続化）を使用。
 //!          surrealdb 2.6.x (stable) を使用。
+//!          スキーマは SCHEMALESS で統一する（既存 DB との互換性維持）。
 
 use serde::{Deserialize, Serialize};
 use surrealdb::engine::local::SurrealKv;
@@ -43,19 +45,13 @@ pub struct NodeCatalog {
 }
 
 // ============================================================
-// Project / Graph 型定義（フロントの Project / GraphRecord に対応）
+// Project / Graph 型定義
 // ============================================================
+
 #[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Project {
     pub id: Option<surrealdb::sql::Thing>,
-    pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ProjectInput {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -69,11 +65,9 @@ pub struct Graph {
     pub project_id: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct GraphInput {
-    pub name: String,
-    pub project_id: String,
-}
+// ============================================================
+// GraphNode / GraphEdge 型定義                       [CTX-15]
+// ============================================================
 
 // ============================================================
 // DB 初期化
@@ -86,19 +80,7 @@ pub async fn init_db(app_data_dir: std::path::PathBuf) -> Result<Db, surrealdb::
     let db = Surreal::new::<SurrealKv>(db_path).await?;
     db.use_ns("zizhou").use_db("zizhou").await?;
 
-    // スキーマ定義
-    db.query(
-        "DEFINE TABLE node_catalog SCHEMALESS;
-         DEFINE INDEX idx_label   ON node_catalog FIELDS label;
-         DEFINE INDEX idx_service ON node_catalog FIELDS service;
-
-         DEFINE TABLE project SCHEMALESS;
-         DEFINE INDEX idx_project_name ON project FIELDS name;
-
-         DEFINE TABLE graph SCHEMALESS;
-         DEFINE INDEX idx_graph_project ON graph FIELDS project_id;",
-    )
-    .await?;
+    // テーブルは SurrealDB が自動作成するため定義不要（SCHEMALESS がデフォルト）
 
     // node_catalog が空のときだけシードする（再起動で重複しない）
     let count: Option<serde_json::Value> = db
@@ -118,12 +100,13 @@ pub async fn init_db(app_data_dir: std::path::PathBuf) -> Result<Db, surrealdb::
 }
 
 // ============================================================
-// 初期データ
+// 初期データ（node_catalog シード）
 // ============================================================
 
 async fn seed_catalog(db: &Db) -> Result<(), surrealdb::Error> {
+    use std::collections::HashMap;
+
     let entries: Vec<NodeCatalog> = vec![
-        // ── git ──────────────────────────────────────────────
         NodeCatalog {
             service: "git".into(),
             provider: "local".into(),
@@ -132,49 +115,7 @@ async fn seed_catalog(db: &Db) -> Result<(), surrealdb::Error> {
             profile: CatalogProfile {
                 subcommand: "status".into(),
                 args: vec!["status".into()],
-                fields: Default::default(),
-            },
-        },
-        NodeCatalog {
-            service: "git".into(),
-            provider: "local".into(),
-            label: "Git Commit".into(),
-            node_type: "git".into(),
-            profile: CatalogProfile {
-                subcommand: "commit".into(),
-                args: vec!["commit".into(), "-m".into(), "{input.message}".into()],
-                fields: [(
-                    "message".into(),
-                    CatalogField {
-                        field_type: "string".into(),
-                        label: "Commit Message".into(),
-                        required: Some(true),
-                        default: None,
-                        values: None,
-                    },
-                )]
-                .into(),
-            },
-        },
-        NodeCatalog {
-            service: "git".into(),
-            provider: "local".into(),
-            label: "Git Log".into(),
-            node_type: "git".into(),
-            profile: CatalogProfile {
-                subcommand: "log".into(),
-                args: vec!["log".into(), "--oneline".into(), "-{input.count}".into()],
-                fields: [(
-                    "count".into(),
-                    CatalogField {
-                        field_type: "number".into(),
-                        label: "Lines".into(),
-                        required: None,
-                        default: Some(serde_json::json!(10)),
-                        values: None,
-                    },
-                )]
-                .into(),
+                fields: HashMap::new(),
             },
         },
         NodeCatalog {
@@ -185,10 +126,20 @@ async fn seed_catalog(db: &Db) -> Result<(), surrealdb::Error> {
             profile: CatalogProfile {
                 subcommand: "diff".into(),
                 args: vec!["diff".into()],
-                fields: Default::default(),
+                fields: HashMap::new(),
             },
         },
-        // ── validate ─────────────────────────────────────────
+        NodeCatalog {
+            service: "git".into(),
+            provider: "local".into(),
+            label: "Git Log".into(),
+            node_type: "git".into(),
+            profile: CatalogProfile {
+                subcommand: "log".into(),
+                args: vec!["log".into(), "--oneline".into(), "-20".into()],
+                fields: HashMap::new(),
+            },
+        },
         NodeCatalog {
             service: "validate".into(),
             provider: "local".into(),
@@ -197,73 +148,53 @@ async fn seed_catalog(db: &Db) -> Result<(), surrealdb::Error> {
             profile: CatalogProfile {
                 subcommand: "tsc".into(),
                 args: vec!["tsc".into(), "--noEmit".into()],
-                fields: Default::default(),
+                fields: HashMap::new(),
             },
         },
         NodeCatalog {
             service: "validate".into(),
             provider: "local".into(),
-            label: "ESLint".into(),
+            label: "Lint Check".into(),
             node_type: "validate".into(),
             profile: CatalogProfile {
-                subcommand: "eslint".into(),
-                args: vec!["eslint".into(), "{input.target}".into()],
-                fields: [(
-                    "target".into(),
-                    CatalogField {
-                        field_type: "string".into(),
-                        label: "Target Path".into(),
-                        required: None,
-                        default: Some(serde_json::json!("src")),
-                        values: None,
-                    },
-                )]
-                .into(),
+                subcommand: "lint".into(),
+                args: vec!["eslint".into(), ".".into()],
+                fields: HashMap::new(),
             },
         },
-        // ── analyze ──────────────────────────────────────────
         NodeCatalog {
             service: "analyze".into(),
             provider: "local".into(),
             label: "Test Run".into(),
             node_type: "analyze".into(),
             profile: CatalogProfile {
-                subcommand: "vitest".into(),
+                subcommand: "test".into(),
                 args: vec!["vitest".into(), "run".into()],
-                fields: Default::default(),
+                fields: HashMap::new(),
             },
         },
-        NodeCatalog {
-            service: "analyze".into(),
-            provider: "local".into(),
-            label: "Build".into(),
-            node_type: "analyze".into(),
-            profile: CatalogProfile {
-                subcommand: "build".into(),
-                args: vec!["vite".into(), "build".into()],
-                fields: Default::default(),
-            },
-        },
-        // ── llm ──────────────────────────────────────────────
         NodeCatalog {
             service: "llm".into(),
-            provider: "claude".into(),
-            label: "Claude: Summarize".into(),
+            provider: "ollama".into(),
+            label: "Ollama: Prompt".into(),
             node_type: "llm".into(),
             profile: CatalogProfile {
-                subcommand: "summarize".into(),
+                subcommand: "prompt".into(),
                 args: vec![],
-                fields: [(
-                    "prompt".into(),
-                    CatalogField {
-                        field_type: "string".into(),
-                        label: "Prompt".into(),
-                        required: Some(true),
-                        default: None,
-                        values: None,
-                    },
-                )]
-                .into(),
+                fields: {
+                    let mut f = HashMap::new();
+                    f.insert(
+                        "prompt".into(),
+                        CatalogField {
+                            field_type: "string".into(),
+                            label: "Prompt".into(),
+                            required: Some(true),
+                            default: None,
+                            values: None,
+                        },
+                    );
+                    f
+                },
             },
         },
         NodeCatalog {
@@ -274,20 +205,22 @@ async fn seed_catalog(db: &Db) -> Result<(), surrealdb::Error> {
             profile: CatalogProfile {
                 subcommand: "review".into(),
                 args: vec![],
-                fields: [(
-                    "prompt".into(),
-                    CatalogField {
-                        field_type: "string".into(),
-                        label: "Review Prompt".into(),
-                        required: Some(true),
-                        default: None,
-                        values: None,
-                    },
-                )]
-                .into(),
+                fields: {
+                    let mut f = HashMap::new();
+                    f.insert(
+                        "prompt".into(),
+                        CatalogField {
+                            field_type: "string".into(),
+                            label: "Review Prompt".into(),
+                            required: Some(true),
+                            default: None,
+                            values: None,
+                        },
+                    );
+                    f
+                },
             },
         },
-        // ── custom ───────────────────────────────────────────
         NodeCatalog {
             service: "custom".into(),
             provider: "local".into(),
@@ -296,23 +229,30 @@ async fn seed_catalog(db: &Db) -> Result<(), surrealdb::Error> {
             profile: CatalogProfile {
                 subcommand: "shell".into(),
                 args: vec!["{input.command}".into()],
-                fields: [(
-                    "command".into(),
-                    CatalogField {
-                        field_type: "string".into(),
-                        label: "Command".into(),
-                        required: Some(true),
-                        default: None,
-                        values: None,
-                    },
-                )]
-                .into(),
+                fields: {
+                    let mut f = HashMap::new();
+                    f.insert(
+                        "command".into(),
+                        CatalogField {
+                            field_type: "string".into(),
+                            label: "Command".into(),
+                            required: Some(true),
+                            default: None,
+                            values: None,
+                        },
+                    );
+                    f
+                },
             },
         },
     ];
 
     for entry in entries {
-        let _: Option<NodeCatalog> = db.create("node_catalog").content(entry).await?;
+        // serde_json::Value に変換して INSERT（Option<T> の enum シリアライズ問題を回避）
+        let obj = serde_json::to_value(&entry).map_err(|e| {
+            surrealdb::Error::Db(surrealdb::error::Db::Serialization(e.to_string()))
+        })?;
+        let _: Option<serde_json::Value> = db.create("node_catalog").content(obj).await?;
     }
 
     Ok(())
