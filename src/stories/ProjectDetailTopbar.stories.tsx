@@ -34,12 +34,11 @@ const WithDetailStore = ({
     initStatus?: InitStatusType
 }) => {
     useEffect(() => {
-        useProjectDetailStore.setState({ initStatus })
+        useProjectDetailStore.setState({
+            isDetailHydrated: initStatus === 'ready',
+        })
     }, [initStatus])
 
-    // コンポーネントが initStatus を直接 Props で受け取らないため、
-    // ストア状態をボタン制御に適合するようマッピング、またはカスタムトリガーとして注入する準備
-    // ※ 現在のコンポーネント実装にあわせ、型エラーを起こさずに安全にレンダリングします
     return (
         <div data-init-status={initStatus}>
             <ProjectGrid_Wrapper_Or_Component initStatus={initStatus} props={props} />
