@@ -712,7 +712,7 @@
             <!-- ============================================================
                  CTX-1: FILE TREE [ ]
                  責務: プロジェクトのファイルツリーを表示し、グラフファイルの選択・新規作成のエントリーポイントを提供する
-                 注意: graphs/ ディレクトリ配下の .json ファイルのみ選択可能にする
+                 注意: SurrealDB の graph テーブルからグラフ一覧を取得して表示する
                        選択時に activeGraphId を更新し、GraphEditor がグラフを読み込む
             ============================================================ -->
             <nav id="ctx-file-tree">
@@ -746,6 +746,22 @@
                        activeGraphId は SurrealDB embedded で管理する（Tauri fs JSON 廃止）
                        useProjectDetailLoad / useProjectDetailSave は invoke() ベースに置き換える
                        projectRootPath は不要（SurrealDB がプロジェクトデータを管理するため）
+
+                 [CTX-15] Graph Persist (SurrealDB): [ ]
+                       グラフのノード・エッジを SurrealDB に永続化する。
+                       useGraphFile（Tauri fs 依存）を廃止し、以下の invoke に移行する。
+
+                       save_graph:
+                         invoke('save_graph', { graphId, nodes, edges })
+                         → SurrealDB の node / edge テーブルに UPSERT する
+                         → graph -[has_node]-> node / graph -[has_edge]-> edge の RELATE を張る
+                         → useGraphFile の subscribe ベースの自動保存と同等の挙動を維持する
+
+                       load_graph:
+                         invoke('load_graph', { graphId })
+                         → SurrealDB から nodes[] / edges[] を取得して GraphFile 形式で返す
+                         → useGraphInit（Tauri fs 依存）を廃止し useGraphLoad hook に置き換える
+                         → activeGraphId が変化するたびに呼び出す
             ============================================================ -->
             <main id="ctx-graph-editor">
                 <div class="graph-canvas">
@@ -866,6 +882,14 @@
                                                                省略時は何もしない（テスト・Storybook で差し替え可能）
                     [✓][CTX-14][Logic]   GraphEditor Wire    — useNodeExecute を GraphEditor でマウントし、
                                                                nodeTypes の editableNode に onRun を注入する
+
+                    [ ][CTX-15][Feature] Graph Save         — ノード・エッジの変化を invoke('save_graph') で SurrealDB に自動保存する
+                    [ ][CTX-15][Feature] Graph Load         — activeGraphId 変化時に invoke('load_graph') でグラフを読み込む
+                    [ ][CTX-15][Logic]   useGraphLoad       — useGraphInit を置き換える SurrealDB ベースの hook
+                    [ ][CTX-15][Logic]   useGraphSave       — useGraphFile を置き換える SurrealDB ベースの hook（subscribe + invoke）
+                    [ ][CTX-15][Logic]   Rust Commands      — save_graph / load_graph コマンドを lib.rs に追加する
+                                                              node テーブル: { id, graph_id, label, node_type, status, service, provider, input, position_x, position_y }
+                                                              edge テーブル: { id, graph_id, source, target }
                 -->
             </main>
 
