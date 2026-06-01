@@ -747,7 +747,7 @@
                        useProjectDetailLoad / useProjectDetailSave は invoke() ベースに置き換える
                        projectRootPath は不要（SurrealDB がプロジェクトデータを管理するため）
 
-                 [CTX-15] Graph Persist (SurrealDB): [ ]
+                 [CTX-15] Graph Persist (SurrealDB): [✓]
                        グラフのノード・エッジを SurrealDB に永続化する。
                        useGraphFile（Tauri fs 依存）を廃止し、以下の invoke に移行する。
 
@@ -883,11 +883,11 @@
                     [✓][CTX-14][Logic]   GraphEditor Wire    — useNodeExecute を GraphEditor でマウントし、
                                                                nodeTypes の editableNode に onRun を注入する
 
-                    [ ][CTX-15][Feature] Graph Save         — ノード・エッジの変化を invoke('save_graph') で SurrealDB に自動保存する
-                    [ ][CTX-15][Feature] Graph Load         — activeGraphId 変化時に invoke('load_graph') でグラフを読み込む
-                    [ ][CTX-15][Logic]   useGraphLoad       — useGraphInit を置き換える SurrealDB ベースの hook
-                    [ ][CTX-15][Logic]   useGraphSave       — useGraphFile を置き換える SurrealDB ベースの hook（subscribe + invoke）
-                    [ ][CTX-15][Logic]   Rust Commands      — save_graph / load_graph コマンドを lib.rs に追加する
+                    [✓][CTX-15][Feature] Graph Save         — ノード・エッジの変化を invoke('save_graph') で SurrealDB に自動保存する
+                    [✓][CTX-15][Feature] Graph Load         — activeGraphId 変化時に invoke('load_graph') でグラフを読み込む
+                    [✓][CTX-15][Logic]   useGraphLoad       — useGraphInit を置き換える SurrealDB ベースの hook
+                    [✓][CTX-15][Logic]   useGraphSave       — useGraphFile を置き換える SurrealDB ベースの hook（subscribe + invoke）
+                    [✓][CTX-15][Logic]   Rust Commands      — save_graph / load_graph コマンドを lib.rs に追加する
                                                               node テーブル: { id, graph_id, label, node_type, status, service, provider, input, position_x, position_y }
                                                               edge テーブル: { id, graph_id, source, target }
                 -->
