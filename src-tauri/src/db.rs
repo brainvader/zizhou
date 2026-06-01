@@ -5,7 +5,6 @@
 //! @context CTX-15: node / edge テーブル追加（グラフ永続化）
 //! @note    kv-surrealkv（RocksDB 永続化）を使用。
 //!          surrealdb 2.6.x (stable) を使用。
-//!          スキーマは SCHEMALESS で統一する（既存 DB との互換性維持）。
 
 use serde::{Deserialize, Serialize};
 use surrealdb::engine::local::SurrealKv;
@@ -46,28 +45,96 @@ pub struct NodeCatalog {
 
 // ============================================================
 // Project / Graph 型定義
+// id は Thing 型を String にシリアライズする
 // ============================================================
 
-#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Project {
-    pub id: Option<surrealdb::sql::Thing>,
+pub struct ProjectRecord {
+    pub id: surrealdb::sql::Thing,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Graph {
-    pub id: Option<surrealdb::sql::Thing>,
+pub struct ProjectInput {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GraphRecord {
+    pub id: surrealdb::sql::Thing,
+    pub name: String,
+    pub project_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GraphInput {
     pub name: String,
     pub project_id: String,
 }
 
 // ============================================================
-// GraphNode / GraphEdge 型定義                       [CTX-15]
+// Node / Edge 型定義                                  [CTX-15]
 // ============================================================
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NodeRecord {
+    pub id: surrealdb::sql::Thing,
+    pub graph_id: String,
+    pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub position_x: f64,
+    pub position_y: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NodeInput {
+    pub graph_id: String,
+    pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub position_x: f64,
+    pub position_y: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EdgeRecord {
+    pub id: surrealdb::sql::Thing,
+    pub graph_id: String,
+    pub source: String,
+    pub target: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EdgeInput {
+    pub graph_id: String,
+    pub source: String,
+    pub target: String,
+}
 
 // ============================================================
 // DB 初期化
@@ -79,8 +146,6 @@ pub async fn init_db(app_data_dir: std::path::PathBuf) -> Result<Db, surrealdb::
     let db_path = app_data_dir.join("zizhou.db");
     let db = Surreal::new::<SurrealKv>(db_path).await?;
     db.use_ns("zizhou").use_db("zizhou").await?;
-
-    // テーブルは SurrealDB が自動作成するため定義不要（SCHEMALESS がデフォルト）
 
     // node_catalog が空のときだけシードする（再起動で重複しない）
     let count: Option<serde_json::Value> = db
@@ -248,11 +313,7 @@ async fn seed_catalog(db: &Db) -> Result<(), surrealdb::Error> {
     ];
 
     for entry in entries {
-        // serde_json::Value に変換して INSERT（Option<T> の enum シリアライズ問題を回避）
-        let obj = serde_json::to_value(&entry).map_err(|e| {
-            surrealdb::Error::Db(surrealdb::error::Db::Serialization(e.to_string()))
-        })?;
-        let _: Option<serde_json::Value> = db.create("node_catalog").content(obj).await?;
+        let _: Option<NodeCatalog> = db.create("node_catalog").content(entry).await?;
     }
 
     Ok(())
