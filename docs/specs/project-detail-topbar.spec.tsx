@@ -32,7 +32,7 @@ vi.mock('sonner', () => ({
 }))
 
 vi.mock('@/store/useProjectDetailStore', () => ({
-    useProjectDetailStore: vi.fn(() => undefined),
+    useProjectDetailStore: vi.fn(() => true), // isDetailHydrated = true
 }))
 
 vi.mock('@/store/useProjectStore', () => ({
