@@ -107,6 +107,7 @@ type CatalogMenuState = {
 } | null
 
 export type GraphEditorProps = {
+    initStatus?: 'checking' | 'ready'
     projectRootPath?: string
     activeGraphId?: string | null
     nodes?: Node<GraphNodeData>[]
