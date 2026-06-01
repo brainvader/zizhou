@@ -129,6 +129,7 @@ export type GraphEditorProps = {
 
 // [CTX-9] ReactFlow の useReactFlow を使うため内部コンポーネントに分離する
 function GraphEditorInner({
+    initStatus: initStatusProp,
     projectRootPath: projectRootPathProp,
     activeGraphId: activeGraphIdProp,
     nodes: nodesProp,
@@ -169,7 +170,7 @@ function GraphEditorInner({
         if (edgesProp !== undefined) storeSetEdges(edgesProp)
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-    const isReady = isDetailHydrated
+    const isReady = initStatusProp !== undefined ? initStatusProp === 'ready' : isDetailHydrated
     const nodes = storeNodes
     const edges = storeEdges
     const addNode = onAddNode ?? storeAddNode
