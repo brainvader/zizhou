@@ -9,6 +9,8 @@
  * create_project:   インメモリに project を追加して返す
  * list_graphs:      インメモリの graphs[] を返す
  * create_graph:     インメモリに graph を追加して返す
+ * save_graph:       インメモリの nodes/edges を graph_id でキーに保存する [CTX-15]
+ * load_graph:       インメモリの nodes/edges を GraphFile 形式で返す [CTX-15]
  */
 import { NODE_CATALOG } from '@/bom/graph'
 import type { CatalogEntry } from '@/bom/graph'
@@ -19,8 +21,31 @@ import type { ExecuteResponse } from '@/bom/execute'
 type MockProject = { id: string; name: string; description?: string }
 type MockGraph = { id: string; name: string; project_id: string }
 
+type MockNode = {
+    id: string
+    label: string
+    node_type?: string | null
+    status?: string | null
+    service?: string | null
+    provider?: string | null
+    input?: Record<string, unknown> | null
+    description?: string | null
+    position_x: number
+    position_y: number
+}
+
+type MockEdge = {
+    id: string
+    source: string
+    target: string
+}
+
 const _projects: MockProject[] = []
 const _graphs: MockGraph[] = []
+
+// graph_id → { nodes, edges } のインメモリグラフストア
+const _graphData: Map<string, { nodes: MockNode[]; edges: MockEdge[] }> = new Map()
+
 let _idCounter = 1
 
 // ── invoke モック ─────────────────────────────────────────────────────────
@@ -84,6 +109,45 @@ export async function invoke<T>(
             }
             _graphs.push(graph)
             return graph as unknown as T
+        }
+
+        // ── CTX-15: Graph Persist ────────────────────────────────────────
+
+        case 'save_graph': {
+            const graphId = args?.graphId as string
+            const nodes = (args?.nodes as MockNode[]) ?? []
+            const edges = (args?.edges as MockEdge[]) ?? []
+            _graphData.set(graphId, { nodes, edges })
+            return undefined as unknown as T
+        }
+
+        case 'load_graph': {
+            const graphId = args?.graphId as string
+            const stored = _graphData.get(graphId) ?? { nodes: [], edges: [] }
+
+            // MockNode → GraphFile node 形式に変換
+            const nodes = stored.nodes.map((n) => ({
+                id: n.id,
+                type: 'editableNode',
+                position: { x: n.position_x, y: n.position_y },
+                data: {
+                    label: n.label,
+                    ...(n.node_type != null ? { nodeType: n.node_type } : {}),
+                    ...(n.status != null ? { status: n.status } : {}),
+                    ...(n.service !== undefined ? { service: n.service } : {}),
+                    ...(n.provider !== undefined ? { provider: n.provider } : {}),
+                    ...(n.input != null ? { input: n.input } : {}),
+                    ...(n.description != null ? { description: n.description } : {}),
+                },
+            }))
+
+            const edges = stored.edges.map((e) => ({
+                id: e.id,
+                source: e.source,
+                target: e.target,
+            }))
+
+            return { id: graphId, nodes, edges } as unknown as T
         }
 
         default:

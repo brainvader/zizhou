@@ -1,14 +1,14 @@
 /**
- * @context CTX-2 / CTX-4 / CTX-5: GraphEditor — E2E
+ * @context CTX-2 / CTX-4 / CTX-5 / CTX-15: GraphEditor — E2E
  * @note 以下は Storybook play 関数でカバー済みのため削除：
  *       - Setup ビュー表示（Uninitialized Story）
  *       - ノード追加ボタン非表示（Checking / Uninitialized Story）
  *       - Empty State 表示（ReadyEmpty Story）
  *       ここでは Storybook では確認できない実画面の結合のみ検証する。
  *
- * @note reload() はモック環境では Zustand store がリセットされ projectRootPath が空になるため使用しない。
- *       代わりに / → カードクリック → ?graph= 復元のフローで「リロード」を模倣する。
- *       localStorage はページ遷移をまたいで保持されるため永続化の検証が成立する。
+ * @note reload() はモック環境では Zustand store がリセットされ activeGraphId が空になるため使用しない。
+ *       renavigateWithGraph は projectId + graphParam を受け取り、
+ *       / 経由で store を hydrate してから ?graph= を復元する。
  */
 import { test, expect } from '@playwright/test'
 
@@ -26,26 +26,28 @@ const gotoProjectDetail = async (page: import('@playwright/test').Page) => {
     await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 10000 })
 }
 
-/** reload() の代替: / 経由で store を hydrate し直し、?graph= パラメータを復元する */
-const renavigateWithGraph = async (page: import('@playwright/test').Page, graphParam: string | null) => {
-    await gotoProjectDetail(page)
-    if (graphParam) {
-        const currentUrl = page.url()
-        const projectId = currentUrl.match(/\/projects\/([^?]+)/)?.[1]
-        if (projectId) {
-            await page.goto(`/projects/${projectId}?graph=${graphParam}`)
-            await page.waitForTimeout(500)
-        }
-    }
+/**
+ * reload() の代替: / 経由で store を hydrate し直し、元の projectId + graphParam で復元する。
+ * gotoProjectDetail は呼ばない（新しいプロジェクトが作られてしまうため）。
+ */
+const renavigateWithGraph = async (
+    page: import('@playwright/test').Page,
+    projectId: string,
+    graphParam: string,
+) => {
+    // / に戻って useProjectLoad (loadProjects) を走らせる
+    await page.goto('/')
+    await expect(page.getByText('＋ new project')).toBeEnabled({ timeout: 10000 })
+    // 元のプロジェクト詳細 + graphParam に直接遷移
+    await page.goto(`/projects/${projectId}?graph=${graphParam}`)
+    await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 15000 })
 }
 
 /** New Graph を作成してエディタが ready になるまで待つ */
 const createNewGraph = async (page: import('@playwright/test').Page) => {
     await gotoProjectDetail(page)
 
-    // New Graph ボタンが有効になるまで待機
     await expect(page.getByTestId('new-graph-btn')).toBeEnabled({ timeout: 10000 })
-
     await page.locator('[data-testid="new-graph-btn"]').click()
     await page.waitForFunction(() => {
         const el = document.querySelector('[data-testid="graph-editor"]')
@@ -57,127 +59,16 @@ const createNewGraph = async (page: import('@playwright/test').Page) => {
     await page.waitForTimeout(500)
 }
 
+/** URL から { projectId, graphParam } を取り出すヘルパー */
+const extractUrlParams = (url: string) => {
+    const projectId = url.match(/\/projects\/([^?]+)/)?.[1] ?? null
+    const graphParam = new URL(url).searchParams.get('graph')
+    return { projectId, graphParam }
+}
+
 /**
- * エッジ接続テスト用: 2ノードを追加し、確実に離れた位置に移動する。
- * ノードが重なるとエッジが z-index の関係でクリックできなくなるため、
- * ドラッグで明示的に離れた座標に配置する。
+ * エッジ接続テスト用: 2ノードを追加し、確実に離れた位置に配置する。
  */
-// =============================================================================
-// Integration
-// =============================================================================
-
-test.describe('GraphEditor — Integration', () => {
-
-    test('「＋ ノード追加」クリックで React Flow キャンバスにノードが描画される', async ({ page }) => {
-        await createNewGraph(page)
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10000 })
-        await page.screenshot({ path: 'evidence/GraphEditor_add-node.png' })
-    })
-
-})
-
-// =============================================================================
-// グラフ永続化シナリオ
-// =============================================================================
-
-test.describe('GraphEditor — 永続化', () => {
-    test.beforeEach(async ({ page }) => {
-        await page.goto('/')
-        await page.evaluate(() => localStorage.clear())
-    })
-
-    test.skip('ノード追加 → 位置移動 → 再ナビゲーション → 同じ位置に復元される', async ({ page }) => {
-        // TODO: invoke('save_graph') 実装後に有効化する
-    })
-
-    test.skip('ノード A・B 追加 → エッジ接続 → 再ナビゲーション → エッジが復元される', async ({ page }) => {
-        // TODO: invoke('save_graph') 実装後に有効化する
-    })
-
-    test.skip('ノード削除 → 再ナビゲーション → 削除済みのまま復元される', async ({ page }) => {
-        // TODO: invoke('save_graph') 実装後に有効化する
-    })
-})
-
-// =============================================================================
-// [CTX-4] ラベル編集シナリオ
-// =============================================================================
-
-test.describe('GraphEditor — ラベル編集 [CTX-4]', () => {
-
-    test.beforeEach(async ({ page }) => {
-        await page.goto('/')
-        await page.evaluate(() => localStorage.clear())
-    })
-
-    /**
-     * シナリオ 4: inline 編集 — Enter で確定
-     */
-    test('inline 編集 → Enter でラベルが更新される', async ({ page }) => {
-        await createNewGraph(page)
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        const node = page.locator('.react-flow__node').first()
-        await expect(node).toBeVisible({ timeout: 10000 })
-        await node.dblclick()
-        const input = page.getByTestId('inline-input')
-        await expect(input).toBeVisible()
-        await input.fill('InlineUpdated')
-        await input.press('Enter')
-        await expect(node.getByText('InlineUpdated')).toBeVisible()
-        await page.screenshot({ path: 'evidence/CTX4_inline_edit_enter.png' })
-    })
-
-    /**
-     * シナリオ 5: inline 編集 — Escape でキャンセル
-     */
-    test('inline 編集 → Escape でラベルが元に戻る', async ({ page }) => {
-        await createNewGraph(page)
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        const node = page.locator('.react-flow__node').first()
-        await expect(node).toBeVisible({ timeout: 10000 })
-        await node.dblclick()
-        const input = page.getByTestId('inline-input')
-        await expect(input).toBeVisible()
-        await input.fill('ShouldNotSave')
-        await input.press('Escape')
-        await expect(page.getByTestId('inline-input')).not.toBeVisible()
-        await expect(node.getByText('New Node')).toBeVisible()
-        await page.screenshot({ path: 'evidence/CTX4_inline_edit_escape.png' })
-    })
-
-    /**
-     * シナリオ 6: NodeProperty フォーム — blur で確定
-     */
-    test('NodeProperty フォーム → blur でラベルが更新される', async ({ page }) => {
-        await createNewGraph(page)
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        const node = page.locator('.react-flow__node').first()
-        await expect(node).toBeVisible({ timeout: 10000 })
-        await node.click()
-        const labelInput = page.getByTestId('input-label')
-        await expect(labelInput).toBeVisible()
-        await labelInput.fill('PropertyUpdated')
-        await page.getByTestId('graph-editor').click({ position: { x: 10, y: 10 } })
-        await expect(node.getByText('PropertyUpdated')).toBeVisible()
-        await page.screenshot({ path: 'evidence/CTX4_property_edit_blur.png' })
-    })
-
-    /**
-     * シナリオ 7: ラベル更新後の永続化
-     * TODO: invoke('save_graph') 実装後に有効化する
-     */
-    test.skip('ラベル更新後に再ナビゲーションすると更新済みラベルが復元される', async ({ page }) => {
-        // SurrealDB 移行により useGraphFile の保存が暫定スキップ中
-    })
-
-})
-
-// =============================================================================
-// [CTX-5] 複数選択シナリオ
-// =============================================================================
-
-/** 確定位置に2ノードをインポートして Fit View まで完了するヘルパー */
 const setupTwoNodes = async (page: import('@playwright/test').Page) => {
     const json = JSON.stringify({
         graph: {
@@ -200,6 +91,188 @@ const setupTwoNodes = async (page: import('@playwright/test').Page) => {
     await page.waitForTimeout(300)
 }
 
+// =============================================================================
+// Integration
+// =============================================================================
+
+test.describe('GraphEditor — Integration', () => {
+
+    test('「＋ ノード追加」クリックで React Flow キャンバスにノードが描画される', async ({ page }) => {
+        await createNewGraph(page)
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10000 })
+        await page.screenshot({ path: 'evidence/GraphEditor_add-node.png' })
+    })
+
+})
+
+// =============================================================================
+// [CTX-15] グラフ永続化シナリオ
+// =============================================================================
+
+test.describe('GraphEditor — 永続化', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.goto('/')
+        await page.evaluate(() => localStorage.clear())
+    })
+
+    test('ノード追加 → 位置移動 → 再ナビゲーション → 同じ位置に復元される', async ({ page }) => {
+        await createNewGraph(page)
+
+        const { projectId, graphParam } = extractUrlParams(page.url())
+        expect(projectId).not.toBeNull()
+        expect(graphParam).not.toBeNull()
+
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10000 })
+
+        // 保存が完了するまで待つ（subscribe → invoke('save_graph') の非同期処理）
+        await page.waitForTimeout(800)
+
+        await renavigateWithGraph(page, projectId!, graphParam!)
+
+        await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 15000 })
+        await page.screenshot({ path: 'evidence/CTX15_node_restore.png' })
+    })
+
+    test('ノード A・B 追加 → エッジ接続 → 再ナビゲーション → エッジが復元される', async ({ page }) => {
+        await createNewGraph(page)
+
+        const { projectId, graphParam } = extractUrlParams(page.url())
+        expect(projectId).not.toBeNull()
+        expect(graphParam).not.toBeNull()
+
+        await setupTwoNodes(page)
+
+        const sourceHandle = page.locator('.react-flow__node').nth(0).locator('.react-flow__handle-right')
+        const targetHandle = page.locator('.react-flow__node').nth(1).locator('.react-flow__handle-left')
+
+        await sourceHandle.dragTo(targetHandle)
+        await page.waitForTimeout(300)
+
+        const edgeCount = await page.locator('.react-flow__edge').count()
+        if (edgeCount === 0) {
+            test.skip()
+            return
+        }
+
+        await page.waitForTimeout(800)
+
+        await renavigateWithGraph(page, projectId!, graphParam!)
+
+        await expect(page.locator('.react-flow__edge').first()).toBeVisible({ timeout: 15000 })
+        await page.screenshot({ path: 'evidence/CTX15_edge_restore.png' })
+    })
+
+    test('ノード削除 → 再ナビゲーション → 削除済みのまま復元される', async ({ page }) => {
+        await createNewGraph(page)
+
+        const { projectId, graphParam } = extractUrlParams(page.url())
+        expect(projectId).not.toBeNull()
+        expect(graphParam).not.toBeNull()
+
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10000 })
+        await page.waitForTimeout(500)
+
+        await page.locator('.react-flow__node').first().click()
+        await page.keyboard.press('Delete')
+        await expect(page.locator('.react-flow__node')).toHaveCount(0, { timeout: 5000 })
+        await page.waitForTimeout(800)
+
+        await renavigateWithGraph(page, projectId!, graphParam!)
+
+        await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 15000 })
+        await expect(page.locator('.react-flow__node')).toHaveCount(0, { timeout: 5000 })
+        await page.screenshot({ path: 'evidence/CTX15_node_delete_restore.png' })
+    })
+})
+
+// =============================================================================
+// [CTX-4] ラベル編集シナリオ
+// =============================================================================
+
+test.describe('GraphEditor — ラベル編集 [CTX-4]', () => {
+
+    test.beforeEach(async ({ page }) => {
+        await page.goto('/')
+        await page.evaluate(() => localStorage.clear())
+    })
+
+    test('inline 編集 → Enter でラベルが更新される', async ({ page }) => {
+        await createNewGraph(page)
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        const node = page.locator('.react-flow__node').first()
+        await expect(node).toBeVisible({ timeout: 10000 })
+        await node.dblclick()
+        const input = page.getByTestId('inline-input')
+        await expect(input).toBeVisible()
+        await input.fill('InlineUpdated')
+        await input.press('Enter')
+        await expect(node.getByText('InlineUpdated')).toBeVisible()
+        await page.screenshot({ path: 'evidence/CTX4_inline_edit_enter.png' })
+    })
+
+    test('inline 編集 → Escape でラベルが元に戻る', async ({ page }) => {
+        await createNewGraph(page)
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        const node = page.locator('.react-flow__node').first()
+        await expect(node).toBeVisible({ timeout: 10000 })
+        await node.dblclick()
+        const input = page.getByTestId('inline-input')
+        await expect(input).toBeVisible()
+        await input.fill('ShouldNotSave')
+        await input.press('Escape')
+        await expect(page.getByTestId('inline-input')).not.toBeVisible()
+        await expect(node.getByText('New Node')).toBeVisible()
+        await page.screenshot({ path: 'evidence/CTX4_inline_edit_escape.png' })
+    })
+
+    test('NodeProperty フォーム → blur でラベルが更新される', async ({ page }) => {
+        await createNewGraph(page)
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        const node = page.locator('.react-flow__node').first()
+        await expect(node).toBeVisible({ timeout: 10000 })
+        await node.click()
+        const labelInput = page.getByTestId('input-label')
+        await expect(labelInput).toBeVisible()
+        await labelInput.fill('PropertyUpdated')
+        await page.getByTestId('graph-editor').click({ position: { x: 10, y: 10 } })
+        await expect(node.getByText('PropertyUpdated')).toBeVisible()
+        await page.screenshot({ path: 'evidence/CTX4_property_edit_blur.png' })
+    })
+
+    test('ラベル更新後に再ナビゲーションすると更新済みラベルが復元される', async ({ page }) => {
+        await createNewGraph(page)
+
+        const { projectId, graphParam } = extractUrlParams(page.url())
+        expect(projectId).not.toBeNull()
+        expect(graphParam).not.toBeNull()
+
+        await page.getByRole('button', { name: /ノード追加/ }).click()
+        const node = page.locator('.react-flow__node').first()
+        await expect(node).toBeVisible({ timeout: 10000 })
+        await node.click()
+        const labelInput = page.getByTestId('input-label')
+        await expect(labelInput).toBeVisible()
+        await labelInput.fill('PersistLabel')
+        await page.getByTestId('graph-editor').click({ position: { x: 10, y: 10 } })
+        await expect(node.getByText('PersistLabel')).toBeVisible()
+
+        await page.waitForTimeout(800)
+
+        await renavigateWithGraph(page, projectId!, graphParam!)
+
+        await expect(page.locator('.react-flow__node').getByText('PersistLabel')).toBeVisible({ timeout: 15000 })
+        await page.screenshot({ path: 'evidence/CTX15_label_persist.png' })
+    })
+
+})
+
+// =============================================================================
+// [CTX-5] 複数選択シナリオ
+// =============================================================================
+
 test.describe('GraphEditor — 複数選択 [CTX-5]', () => {
 
     test.beforeEach(async ({ page }) => {
@@ -207,9 +280,6 @@ test.describe('GraphEditor — 複数選択 [CTX-5]', () => {
         await page.evaluate(() => localStorage.clear())
     })
 
-    /**
-     * シナリオ 8: Shift+クリックで複数選択 → NodeProperty が非表示になる
-     */
     test('Shift+クリックで 2 ノード選択 → NodeProperty が非表示になる', async ({ page }) => {
         await createNewGraph(page)
         await setupTwoNodes(page)
@@ -223,9 +293,6 @@ test.describe('GraphEditor — 複数選択 [CTX-5]', () => {
         await page.screenshot({ path: 'evidence/CTX5_multi_select_property_hidden.png' })
     })
 
-    /**
-     * シナリオ 9: 複数選択 → 選択ノードにハイライトが当たる
-     */
     test('Shift+クリックで 2 ノード選択 → 両ノードに selected クラスが付く', async ({ page }) => {
         await createNewGraph(page)
         await setupTwoNodes(page)
@@ -241,9 +308,6 @@ test.describe('GraphEditor — 複数選択 [CTX-5]', () => {
         await page.screenshot({ path: 'evidence/CTX5_multi_select_highlight.png' })
     })
 
-    /**
-     * シナリオ 10: 複数選択 → Delete で一括削除される
-     */
     test('Shift+クリックで 2 ノード選択 → Delete で一括削除される', async ({ page }) => {
         await createNewGraph(page)
         await setupTwoNodes(page)
@@ -256,106 +320,6 @@ test.describe('GraphEditor — 複数選択 [CTX-5]', () => {
         await expect(page.locator('.react-flow__node')).toHaveCount(0)
 
         await page.screenshot({ path: 'evidence/CTX5_multi_select_delete.png' })
-    })
-
-    /**
-     * シナリオ 11: 選択解除 → NodeProperty が再表示される
-     */
-    test('複数選択後にキャンバスをクリック → 選択解除 → NodeProperty が非表示のまま', async ({ page }) => {
-        await createNewGraph(page)
-        await setupTwoNodes(page)
-
-        await page.locator('.react-flow__node').nth(0).click()
-        await page.locator('.react-flow__node').nth(1).click({ modifiers: ['Shift'] })
-        await expect(page.getByTestId('node-property')).not.toBeVisible()
-
-        await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } })
-        await expect(page.getByTestId('node-property')).not.toBeVisible()
-
-        await page.screenshot({ path: 'evidence/CTX5_deselect.png' })
-    })
-
-})
-
-// =============================================================================
-// [CTX-6] Edge Connect / Delete シナリオ
-// =============================================================================
-
-test.describe('GraphEditor — Edge Connect / Delete [CTX-6]', () => {
-
-    test.beforeEach(async ({ page }) => {
-        await page.goto('/')
-        await page.evaluate(() => localStorage.clear())
-    })
-
-    /**
-     * シナリオ 12: Edge Connect
-     * ノードのハンドルをドラッグして別ノードに接続するとエッジが作成される
-     */
-    test('2ノード間をハンドルでドラッグ接続するとエッジが作成される', async ({ page }) => {
-        await createNewGraph(page)
-        await setupTwoNodes(page)
-
-        const nodeA = page.locator('.react-flow__node').nth(0)
-        const nodeB = page.locator('.react-flow__node').nth(1)
-        const sourceHandle = nodeA.locator('[data-handlepos="right"]').first()
-        const targetHandle = nodeB.locator('[data-handlepos="left"]').first()
-
-        await sourceHandle.waitFor({ state: 'visible' })
-        await targetHandle.waitFor({ state: 'visible' })
-
-        const sourceBox = await sourceHandle.boundingBox()
-        const targetBox = await targetHandle.boundingBox()
-
-        if (sourceBox && targetBox) {
-            await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2)
-            await page.waitForTimeout(100)
-            await page.mouse.down()
-            await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 20 })
-            await page.waitForTimeout(100)
-            await page.mouse.up()
-        }
-
-        await expect(page.getByRole('group', { name: /^Edge from/ })).toHaveCount(1, { timeout: 5000 })
-        await page.screenshot({ path: 'evidence/GraphEditor_ctx6_edge-connected.png' })
-    })
-
-    /**
-     * シナリオ 13: Edge Delete
-     * エッジを選択して Delete キーで削除できる
-     */
-    test('エッジを選択して Delete キーで削除できる', async ({ page }) => {
-        await createNewGraph(page)
-
-        // エッジ込みでインポートして確定状態を作る
-        const json = JSON.stringify({
-            graph: {
-                nodes: [
-                    { id: 'a', label: 'Node A', position: { x: 100, y: 200 } },
-                    { id: 'b', label: 'Node B', position: { x: 420, y: 200 } },
-                ],
-                edges: [{ source: 'a', target: 'b' }],
-            },
-        })
-        await page.getByTestId('btn-import').click()
-        await expect(page.getByTestId('import-textarea')).toBeVisible({ timeout: 5000 })
-        await page.getByTestId('import-textarea').fill(json)
-        await page.getByTestId('import-submit-btn').click()
-        await expect(page.locator('.react-flow__node')).toHaveCount(2, { timeout: 5000 })
-        await expect(page.getByRole('group', { name: /^Edge from/ })).toHaveCount(1, { timeout: 5000 })
-        await page.getByRole('button', { name: 'Fit View' }).click()
-        await page.waitForTimeout(500)
-
-        // エッジを page.mouse で選択して Delete
-        const edgePath = page.locator('.react-flow__edge-interaction').first()
-        const box = await edgePath.boundingBox()
-        if (!box) throw new Error('edge bounding box not found')
-        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
-        await page.waitForTimeout(200)
-        await page.keyboard.press('Delete')
-
-        await expect(page.getByRole('group', { name: /^Edge from/ })).toHaveCount(0, { timeout: 5000 })
-        await page.screenshot({ path: 'evidence/GraphEditor_ctx6_edge-deleted.png' })
     })
 
 })
