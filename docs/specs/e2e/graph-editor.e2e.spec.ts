@@ -55,6 +55,10 @@ const createNewGraph = async (page: import('@playwright/test').Page) => {
 
     await expect(page.getByTestId('new-graph-btn')).toBeEnabled({ timeout: 10000 })
     await page.locator('[data-testid="new-graph-btn"]').click()
+
+    // FileTree がグラフを認識するまで待つ
+    await expect(page.locator('[data-testid^="graph-item-"]')).toHaveCount(1, { timeout: 10000 })
+
     await page.waitForFunction(() => {
         const el = document.querySelector('[data-testid="graph-editor"]')
         if (!el) return false
