@@ -579,5 +579,28 @@
             [✓][Logic]   Direct Navigation    — /projects/:id に直接アクセスしても ProjectGrid に戻った後プロジェクトが表示される
         -->
 
+        <!-- ============================================================
+            CTX-16: PROJECT ROOT PATH [ ]
+            責務: プロジェクトと対象ソフトウェアリポジトリのファイルパスを紐付ける
+
+            背景:
+              SurrealDB 移行時に projectRootPath を削除したが、
+              ノード実行（CTX-14 execute_node）は git/test 等を CLI で実行するため
+              対象リポジトリの cwd が必須。Project レコードに root_path を持たせる。
+
+            横断する変更:
+              - SurrealDB: project テーブルに root_path: String カラム追加
+              - Rust:      create_project に rootPath 引数追加 / list_projects のレスポンスに含める
+              - Frontend:  Project 型に rootPath: string 追加（docs/bom/project.ts）
+              - UI:        New Project Dialog にディレクトリ選択ボタン追加（Tauri dialog.open）
+              - 実行:      execute_node 呼び出し時に project.root_path を cwd として渡す
+
+            [ ][Feature] Directory Picker  — New Project Dialog で dialog.open({ directory: true }) を呼びパスを取得する
+            [ ][Feature] Path Display      — プロジェクト詳細の Topbar に root_path を表示する
+            [ ][Logic]   Schema Migration  — project テーブルに root_path カラムを追加
+            [ ][Logic]   Validation        — root_path は必須。空文字や存在しないパスは弾く
+            [ ][Logic]   Cwd Injection     — execute_node が activeProject.root_path を cwd として受け取る
+        ============================================================ -->
+
     </body>
 </html>

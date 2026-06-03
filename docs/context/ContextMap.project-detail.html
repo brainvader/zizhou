@@ -875,6 +875,7 @@
                     [✓][CTX-14][Feature] Status Transition   — 実行開始で status が doing になり、完了で done になる
                     [✓][CTX-14][Feature] Error Toast         — 実行失敗時に sonner toast.error() でエラーを表示する
                     [✓][CTX-14][Logic]   useNodeExecute      — invoke('execute_node', { service, provider, cwd, input }) を呼ぶ hook
+                                                               cwd は activeProject.root_path から取得する（projects.html CTX-16 参照）
                                                                開始: updateNodeData({ status: 'doing' })
                                                                成功: updateNodeData({ status: 'done' })
                                                                失敗: updateNodeData({ status: 'todo' }) + toast.error()
