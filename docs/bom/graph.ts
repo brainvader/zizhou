@@ -113,6 +113,17 @@ export const NODE_CATALOG: CatalogEntry[] = [
             fields: {},
         },
     },
+    {
+        service: 'git', provider: 'local', label: 'Git Commit',
+        nodeType: 'git',
+        profile: {
+            subcommand: 'commit',
+            args: ['commit', '-m', '{input.message}'],
+            fields: {
+                message: { type: 'string', label: 'Commit Message', required: true },
+            },
+        },
+    },
     // ── validate ────────────────────────────────────────────
     {
         service: 'validate', provider: 'local', label: 'TypeScript Check',
@@ -350,4 +361,32 @@ export type UseCatalogSearchReturn = {
     results: CatalogEntry[]
     loading: boolean
     error: string | null
+}
+
+// ============================================================
+// GraphListItem                                      [CTX-1]
+// invoke('list_graphs') のレスポンス型。
+// SSOT: docs/bom/graph.ts（useProjectDetailLoad.ts から移動）
+// ============================================================
+
+export type GraphListItem = {
+    id: string
+    name: string
+}
+
+// ============================================================
+// FileTreeProps                                      [CTX-1]
+// FileTree コンポーネントの props 型定義。
+// Tauri fs 依存を廃止し、invoke('list_graphs') ベースに移行。
+// ============================================================
+
+export type FileTreeProps = {
+    /** 対象プロジェクト ID */
+    projectId?: string
+    /** 現在選択中のグラフ ID（省略時は store から取得） */
+    activeGraphId?: string | null
+    /** グラフ選択時のナビゲーションハンドラ（省略時は useRouter にフォールバック） */
+    onNavigate?: (graphId: string) => void
+    /** props DI: 省略時は invoke('list_graphs') を使用 */
+    onListGraphs?: (projectId: string) => Promise<GraphListItem[]>
 }

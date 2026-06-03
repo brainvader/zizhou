@@ -1,14 +1,14 @@
 /**
  * Slot 1: 発注用ヘッダー
- * @context CTX-1 / FileTree — ロジック検証
+ * @context CTX-1 / FileTree — ロジック検証（SurrealDB移行後）
  * @bom docs/bom/graph.ts
  * @story
- * 1. onReadDir で返したツリーのルートディレクトリ名が表示される
- * 2. 初期状態では子ノードは非表示
- * 3. ディレクトリをクリックすると展開される
- * 4. 展開済みディレクトリを再クリックすると折りたたまれる
- * 5. graphs/ 配下の .json ファイルをクリックすると onNavigate が graphId で呼ばれる
- * 6. graphs/ 配下以外のファイルをクリックしても onNavigate は呼ばれない
+ * 1. onListGraphs で返したグラフ名が表示される
+ * 2. ローディング中は「Loading…」が表示される
+ * 3. グラフが存在しない場合は「No graphs」が表示される
+ * 4. グラフをクリックすると onNavigate が graphId で呼ばれる
+ * 5. activeGraphId に一致するグラフはハイライトされる
+ * 6. onListGraphs が失敗した場合はエラー状態になる
  * @output src/components/FileTree.tsx
  */
 
@@ -17,101 +17,66 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { FileTree } from '@/components/FileTree'
 
-// store フォールバックを無効化（props DI で完結させる）
 vi.mock('@/store/useProjectDetailStore', () => ({
-    useProjectDetailStore: vi.fn(() => undefined),
+    useProjectDetailStore: vi.fn(() => null),
 }))
 
-// useRouter のフォールバックを無効化（onNavigate props DI で完結させる）
 vi.mock('@tanstack/react-router', () => ({
     useRouter: vi.fn(() => ({ navigate: vi.fn() })),
 }))
 
-const mockNavigate = vi.fn()
-const mockJoin = async (...paths: string[]) => paths.join('/')
-const mockReadDir = vi.fn()
+vi.mock('sonner', () => ({
+    toast: { error: vi.fn() },
+}))
 
-const setup = () =>
+const mockNavigate = vi.fn()
+
+const mockGraphs = [
+    { id: 'graph-01', name: 'main' },
+    { id: 'graph-02', name: 'feature-x' },
+]
+
+const setup = (overrides: Partial<React.ComponentProps<typeof FileTree>> = {}) =>
     render(
         <FileTree
-            projectRootPath="/mock/project"
             projectId="proj-001"
-            onJoin={mockJoin}
-            onReadDir={mockReadDir}
             onNavigate={mockNavigate}
+            onListGraphs={vi.fn().mockResolvedValue(mockGraphs)}
+            {...overrides}
         />
     )
 
 beforeEach(() => {
     vi.clearAllMocks()
-    mockReadDir.mockImplementation(async (path: string) => {
-        if (path === '/mock/project') return [
-            { name: 'graphs', isDirectory: true, isSymlink: false },
-            { name: 'src', isDirectory: true, isSymlink: false },
-            { name: 'README.md', isDirectory: false, isSymlink: false },
-        ]
-        if (path === '/mock/project/graphs') return [
-            { name: 'graph-01.json', isDirectory: false, isSymlink: false },
-        ]
-        if (path === '/mock/project/src') return [
-            { name: 'main.ts', isDirectory: false, isSymlink: false },
-        ]
-        return []
-    })
 })
 
-describe('FileTree: Directory Tree', () => {
-    it('ルートディレクトリ名が表示される', async () => {
+describe('FileTree: Graph List', () => {
+    it('グラフ名が表示される', async () => {
         setup()
-        await waitFor(() => expect(screen.getByText('graphs')).toBeInTheDocument())
-        expect(screen.getByText('src')).toBeInTheDocument()
+        await waitFor(() => expect(screen.getByText('main')).toBeInTheDocument())
+        expect(screen.getByText('feature-x')).toBeInTheDocument()
     })
 
-    it('初期状態では子ノードは非表示', async () => {
-        setup()
-        await waitFor(() => expect(screen.getByText('src')).toBeInTheDocument())
-        expect(screen.queryByText('main.ts')).not.toBeInTheDocument()
+    it('グラフが存在しない場合は「No graphs」が表示される', async () => {
+        setup({ onListGraphs: vi.fn().mockResolvedValue([]) })
+        await waitFor(() => expect(screen.getByText('No graphs')).toBeInTheDocument())
     })
 
-    it('ディレクトリをクリックすると展開される', async () => {
+    it('グラフをクリックすると onNavigate が graphId で呼ばれる', async () => {
         setup()
-        await waitFor(() => expect(screen.getByText('src')).toBeInTheDocument())
-        await userEvent.click(screen.getByText('src'))
-        expect(screen.getByText('main.ts')).toBeInTheDocument()
-    })
-
-    it('展開済みディレクトリを再クリックすると子ノードが非表示になる', async () => {
-        setup()
-        await waitFor(() => expect(screen.getByText('src')).toBeInTheDocument())
-        await userEvent.click(screen.getByText('src'))
-        expect(screen.getByText('main.ts')).toBeInTheDocument()
-        await userEvent.click(screen.getByText('src'))
-        expect(screen.queryByText('main.ts')).not.toBeInTheDocument()
-    })
-})
-
-describe('FileTree: File Select', () => {
-    it('graphs/ 配下の .json をクリックすると onNavigate が graphId で呼ばれる', async () => {
-        setup()
-        await waitFor(() => expect(screen.getByText('graphs')).toBeInTheDocument())
-        await userEvent.click(screen.getByText('graphs'))
-        await userEvent.click(screen.getByText('graph-01.json'))
+        await waitFor(() => expect(screen.getByText('main')).toBeInTheDocument())
+        await userEvent.click(screen.getByText('main'))
         expect(mockNavigate).toHaveBeenCalledWith('graph-01')
-        expect(mockNavigate).toHaveBeenCalledTimes(1)
     })
 
-    it('graphs/ 配下以外のファイルをクリックしても onNavigate は呼ばれない', async () => {
-        setup()
-        await waitFor(() => expect(screen.getByText('README.md')).toBeInTheDocument())
-        await userEvent.click(screen.getByText('README.md'))
-        expect(mockNavigate).not.toHaveBeenCalled()
+    it('activeGraphId に一致するグラフは選択スタイルになる', async () => {
+        setup({ activeGraphId: 'graph-01' })
+        await waitFor(() => expect(screen.getByTestId('graph-item-graph-01')).toBeInTheDocument())
+        expect(screen.getByTestId('graph-item-graph-01').className).toContain('bg-[--muted]')
     })
 
-    it('src/ 配下のファイルをクリックしても onNavigate は呼ばれない', async () => {
-        setup()
-        await waitFor(() => expect(screen.getByText('src')).toBeInTheDocument())
-        await userEvent.click(screen.getByText('src'))
-        await userEvent.click(screen.getByText('main.ts'))
-        expect(mockNavigate).not.toHaveBeenCalled()
+    it('onListGraphs が失敗した場合はエラーが表示される', async () => {
+        setup({ onListGraphs: vi.fn().mockRejectedValue(new Error('db error')) })
+        await waitFor(() => expect(screen.getByText('Failed to load graphs')).toBeInTheDocument())
     })
 })

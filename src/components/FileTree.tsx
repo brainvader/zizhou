@@ -1,164 +1,24 @@
 import { useEffect, useState, useCallback } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { useRouter } from '@tanstack/react-router'
-import { readDir, watch } from '@tauri-apps/plugin-fs'
-import { join } from '@tauri-apps/api/path'
-import { ChevronRight, ChevronDown, FileText, Folder, FolderOpen } from 'lucide-react'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
+import { toast } from 'sonner'
+import type { GraphListItem } from '@/bom/graph'
+
+const defaultListGraphs = (projectId: string): Promise<GraphListItem[]> =>
+    invoke<GraphListItem[]>('list_graphs', { projectId })
 
 // ============================================================
 // Types
 // ============================================================
 
-// 【修正点】@/bom/graph からエクスポートされていないため、ローカルで型を定義してエラーを解消
-export type FileTreeNode = {
-    name: string
-    path: string
-    isDir: boolean
-    children?: FileTreeNode[]
-}
-
-type ReadDirFn = (path: string) => Promise<{ name: string; isDirectory: boolean; isSymlink: boolean }[]>
-type JoinFn = (...paths: string[]) => Promise<string>
-type NavigateFn = (graphId: string) => void
+type ListGraphsFn = (projectId: string) => Promise<GraphListItem[]>
 
 export type FileTreeProps = {
-    projectRootPath?: string
     projectId?: string
-    /** graphs/*.json 選択時のナビゲーション（省略時は router.navigate にフォールバック） */
-    onNavigate?: NavigateFn
-    onReadDir?: ReadDirFn
-    onJoin?: JoinFn
-}
-
-// ============================================================
-// Utilities
-// ============================================================
-
-const loadTree = async (
-    dirPath: string,
-    onReadDir: ReadDirFn,
-    onJoin: JoinFn,
-): Promise<FileTreeNode[]> => {
-    const entries = await onReadDir(dirPath)
-
-    const nodes = await Promise.all(
-        entries.map(async (entry): Promise<FileTreeNode> => {
-            const entryPath = await onJoin(dirPath, entry.name)
-
-            if (entry.isDirectory && !entry.isSymlink) {
-                const children = await loadTree(entryPath, onReadDir, onJoin)
-                return { name: entry.name, path: entryPath, isDir: true, children }
-            }
-
-            return { name: entry.name, path: entryPath, isDir: false }
-        })
-    )
-
-    // 【修正点】FileTreeNode 型が決定されたため、ここの node, a, b の implicit any エラーも自動的に解決されます
-    return nodes
-        .filter((node) => node.name !== '')
-        .sort((a, b) => {
-            if (a.isDir !== b.isDir) return a.isDir ? -1 : 1
-            return a.name.localeCompare(b.name)
-        })
-}
-
-const isGraphJson = (path: string): boolean =>
-    /[\\/]graphs[\\/][^/\\]+\.json$/.test(path)
-
-const toGraphId = (path: string): string =>
-    path.split(/[\\/]/).pop()?.replace(/\.json$/, '') ?? ''
-
-// ============================================================
-// TreeItem
-// ============================================================
-
-type TreeItemProps = {
-    node: FileTreeNode
-    depth: number
-    selectedPath: string | null
-    expandedDirs: Set<string>
-    onToggleDir: (path: string) => void
-    onSelectFile: (path: string) => void
-}
-
-const TreeItem = ({
-    node,
-    depth,
-    selectedPath,
-    expandedDirs,
-    onToggleDir,
-    onSelectFile,
-}: TreeItemProps) => {
-    const isExpanded = expandedDirs.has(node.path)
-    const isSelected = selectedPath === node.path
-    const indentPx = depth * 12
-
-    if (node.isDir) {
-        return (
-            <>
-                <div
-                    role="button"
-                    tabIndex={0}
-                    className={[
-                        'flex items-center gap-1.5 px-2 py-0.75 rounded-sm cursor-pointer select-none',
-                        'text-[11px] font-light text-[--foreground] hover:bg-[--muted]',
-                        'transition-colors duration-100',
-                    ].join(' ')}
-                    style={{ paddingLeft: `${8 + indentPx}px` }}
-                    onClick={() => onToggleDir(node.path)}
-                    onKeyDown={(e) => e.key === 'Enter' && onToggleDir(node.path)}
-                >
-                    <span className="shrink-0 w-3 h-3 text-[--muted-foreground]">
-                        {isExpanded
-                            ? <ChevronDown size={12} />
-                            : <ChevronRight size={12} />}
-                    </span>
-                    <span className="shrink-0 w-3.5 h-3.5">
-                        {isExpanded
-                            ? <FolderOpen size={14} className="text-[--primary]" />
-                            : <Folder size={14} className="text-[--muted-foreground]" />}
-                    </span>
-                    <span className="truncate">{node.name}</span>
-                </div>
-                {/* 【修正点】child の implicit any エラーもこれで解消されます */}
-                {isExpanded && node.children?.map((child) => (
-                    <TreeItem
-                        key={child.path}
-                        node={child}
-                        depth={depth + 1}
-                        selectedPath={selectedPath}
-                        expandedDirs={expandedDirs}
-                        onToggleDir={onToggleDir}
-                        onSelectFile={onSelectFile}
-                    />
-                ))}
-            </>
-        )
-    }
-
-    return (
-        <div
-            role="button"
-            tabIndex={0}
-            className={[
-                'flex items-center gap-1.5 px-2 py-0.75 rounded-sm cursor-pointer select-none',
-                'text-[11px] font-light transition-colors duration-100',
-                isSelected
-                    ? 'bg-[--muted] text-[--foreground]'
-                    : 'text-[--muted-foreground] hover:text-[--foreground] hover:bg-[--muted]',
-            ].join(' ')}
-            style={{ paddingLeft: `${8 + indentPx}px` }}
-            onClick={() => onSelectFile(node.path)}
-            onKeyDown={(e) => e.key === 'Enter' && onSelectFile(node.path)}
-        >
-            <span className="shrink-0 w-3 h-3" />
-            <span className="shrink-0 w-3.5 h-3.5">
-                <FileText size={14} className={isSelected ? 'text-[--foreground]' : 'text-[--muted-foreground]'} />
-            </span>
-            <span className="truncate">{node.name}</span>
-        </div>
-    )
+    activeGraphId?: string | null
+    onNavigate?: (graphId: string) => void
+    onListGraphs?: ListGraphsFn
 }
 
 // ============================================================
@@ -167,106 +27,61 @@ const TreeItem = ({
 
 /**
  * @context  CTX-1 / FileTree
- * @bom      docs/bom/graph.ts (FileTreeNode, ProjectDetailStore)
+ * @bom      docs/bom/graph.ts
  *
- * projectRootPath を useProjectDetailStore から取得し、
- * マウント時に onReadDir を再帰呼び出しでツリーを構築する。
- * graphs/ 配下の .json 選択時は onNavigate を呼ぶ。
+ * SurrealDB移行後の実装。invoke('list_graphs') でグラフ一覧を取得し表示する。
+ * Tauri fs（readDir/join）依存を完全に廃止。
  *
- * props DI: onReadDir / onJoin / projectRootPath / projectId / onNavigate を props で受け取る。
- * 省略時は Tauri fs 実装・useRouter にフォールバックする。
+ * props DI: onListGraphs / onNavigate を props で受け取る。
+ * 省略時は invoke / useRouter にフォールバック。
  */
 export const FileTree = ({
-    projectRootPath: rootPathProp,
     projectId: projectIdProp,
+    activeGraphId: activeGraphIdProp,
     onNavigate,
-    onReadDir = readDir as unknown as ReadDirFn,
-    onJoin = join,
+    onListGraphs = defaultListGraphs,
 }: FileTreeProps = {}) => {
     const router = useRouter()
+    const storeActiveGraphId = useProjectDetailStore((s) => s.activeGraphId)
 
-    // 【修正点】ProjectDetailStore から projectRootPath が取得できないエラーを型安全に回避。
-    // ストア側での名称変更（例: rootPath など）や、未定義の場合のフォールバック処理を行います。
-    const storeRootPath = useProjectDetailStore((s: any) => s.projectRootPath ?? s.rootPath ?? s.path)
+    const activeGraphId = activeGraphIdProp ?? storeActiveGraphId
 
-    const projectRootPath = rootPathProp ?? storeRootPath
-
-    const navigate = onNavigate ?? ((graphId: string) => {
-        router.navigate({
-            to: '/projects/$id',
-            params: { id: projectIdProp ?? '' },
-            search: { graph: graphId },
-        })
-    })
-
-    const [tree, setTree] = useState<FileTreeNode[]>([])
-    const [selectedPath, setSelectedPath] = useState<string | null>(null)
-    const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set())
+    const [graphs, setGraphs] = useState<GraphListItem[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
+    const navigate = useCallback(
+        (graphId: string) => {
+            if (onNavigate) {
+                onNavigate(graphId)
+            } else {
+                router.navigate({
+                    to: '/projects/$id',
+                    params: { id: projectIdProp ?? '' },
+                    search: { graph: graphId },
+                })
+            }
+        },
+        [onNavigate, router, projectIdProp],
+    )
+
     useEffect(() => {
-        if (!projectRootPath) return
-
-        let cancelled = false
-        let unwatch: (() => void) | null = null
-
-        const refresh = () => {
-            if (cancelled) return
-            setIsLoading(true)
-            setError(null)
-
-            loadTree(projectRootPath, onReadDir, onJoin)
-                .then((nodes) => {
-                    if (!cancelled) {
-                        setTree(nodes)
-                        setIsLoading(false)
-                    }
-                })
-                .catch((err) => {
-                    if (!cancelled) {
-                        setError(String(err))
-                        setIsLoading(false)
-                    }
-                })
+        if (!projectIdProp) {
+            setIsLoading(false)
+            return
         }
 
-        // 初回ロード
-        refresh()
+        setIsLoading(true)
+        setError(null)
 
-        // ファイルシステム監視
-        watch(projectRootPath, () => refresh(), { recursive: true })
-            .then((unwatchFn) => {
-                if (cancelled) {
-                    unwatchFn()
-                } else {
-                    unwatch = unwatchFn
-                }
+        onListGraphs(projectIdProp)
+            .then(setGraphs)
+            .catch(() => {
+                toast.error('グラフ一覧の取得に失敗しました')
+                setError('Failed to load graphs')
             })
-            .catch((err) => {
-                console.error('watch error:', err)
-            })
-
-        return () => {
-            cancelled = true
-            unwatch?.()
-        }
-    }, [projectRootPath, onReadDir, onJoin])
-
-    const handleToggleDir = useCallback((path: string) => {
-        setExpandedDirs((prev) => {
-            const next = new Set(prev)
-            next.has(path) ? next.delete(path) : next.add(path)
-            return next
-        })
-    }, [])
-
-    const handleSelectFile = useCallback((path: string) => {
-        setSelectedPath(path)
-        if (isGraphJson(path)) {
-            navigate(toGraphId(path))
-        }
-    }, [navigate])
+            .finally(() => setIsLoading(false))
+    }, [projectIdProp, activeGraphId, onListGraphs])
 
     return (
         <nav
@@ -275,7 +90,7 @@ export const FileTree = ({
         >
             <div className="flex items-center px-3 h-9 shrink-0 border-b border-[--border]">
                 <span className="text-[10px] font-mono tracking-widest uppercase text-[--muted-foreground]">
-                    Files
+                    Graphs
                 </span>
             </div>
 
@@ -286,17 +101,33 @@ export const FileTree = ({
                 {error && (
                     <p className="px-3 py-2 text-xs text-[--primary]">{error}</p>
                 )}
-                {!isLoading && !error && tree.map((node) => (
-                    <TreeItem
-                        key={node.path}
-                        node={node}
-                        depth={0}
-                        selectedPath={selectedPath}
-                        expandedDirs={expandedDirs}
-                        onToggleDir={handleToggleDir}
-                        onSelectFile={handleSelectFile}
-                    />
-                ))}
+                {!isLoading && !error && graphs.length === 0 && (
+                    <p className="px-3 py-2 text-xs text-[--muted-foreground]">No graphs</p>
+                )}
+                {!isLoading &&
+                    !error &&
+                    graphs.map((g) => {
+                        const isSelected = g.id === activeGraphId
+                        return (
+                            <div
+                                key={g.id}
+                                role="button"
+                                tabIndex={0}
+                                data-testid={`graph-item-${g.id}`}
+                                className={[
+                                    'flex items-center gap-1.5 px-3 py-1 rounded-sm cursor-pointer select-none',
+                                    'text-[11px] font-light transition-colors duration-100',
+                                    isSelected
+                                        ? 'bg-[--muted] text-[--foreground]'
+                                        : 'text-[--muted-foreground] hover:text-[--foreground] hover:bg-[--muted]',
+                                ].join(' ')}
+                                onClick={() => navigate(g.id)}
+                                onKeyDown={(e) => e.key === 'Enter' && navigate(g.id)}
+                            >
+                                <span className="truncate">{g.name}</span>
+                            </div>
+                        )
+                    })}
             </div>
         </nav>
     )

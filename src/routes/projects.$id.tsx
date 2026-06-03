@@ -81,7 +81,7 @@ export const ProjectDetailRoute = () => {
                     minSize={FILE_TREE_PANEL.minSize}
                     maxSize={FILE_TREE_PANEL.maxSize}
                 >
-                    <FileTree projectId={id} />
+                    <FileTree projectId={id} activeGraphId={activeGraphId ?? null} />
                 </ResizablePanel>
 
                 <ResizableHandle />

@@ -25,7 +25,6 @@ const meta: Meta<typeof GraphEditor> = {
     ],
     args: {
         onAddNode: fn(),
-        onExists: async () => true,
         setHydrated: () => { },
     },
 }
@@ -55,7 +54,6 @@ const mockEdges: Edge[] = [
 export const ReadyEmpty: Story = {
     args: {
         initStatus: 'ready',
-        projectRootPath: '/mock/project',
         activeGraphId: null,
         nodes: [],
         edges: [],
@@ -69,11 +67,10 @@ export const ReadyEmpty: Story = {
 export const ReadyWithNodes: Story = {
     args: {
         initStatus: 'ready',
-        projectRootPath: '/mock/project',
         activeGraphId: 'graph-01',
         nodes: mockNodes,
         edges: mockEdges,
-        onReadTextFile: async () => JSON.stringify({
+        onInvokeLoadGraph: async () => ({
             id: 'graph-01',
             nodes: mockNodes,
             edges: mockEdges,
@@ -89,7 +86,6 @@ export const ReadyWithNodes: Story = {
 export const ClickAddNode: Story = {
     args: {
         initStatus: 'ready',
-        projectRootPath: '/mock/project',
         nodes: [],
         edges: [],
         onAddNode: fn(),
@@ -104,7 +100,6 @@ export const ClickAddNode: Story = {
 export const EdgeConnect: Story = {
     args: {
         initStatus: 'ready',
-        projectRootPath: '/mock/project',
         activeGraphId: 'graph-01',
         nodes: [
             { id: 'n1', type: 'editableNode', position: { x: 100, y: 150 }, data: { label: 'Node A' } },
@@ -113,7 +108,7 @@ export const EdgeConnect: Story = {
         edges: [
             { id: 'e1', source: 'n1', target: 'n2' },
         ],
-        onReadTextFile: async () => JSON.stringify({
+        onInvokeLoadGraph: async () => ({
             id: 'graph-01',
             nodes: [
                 { id: 'n1', type: 'editableNode', position: { x: 100, y: 150 }, data: { label: 'Node A' } },

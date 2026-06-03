@@ -150,6 +150,12 @@ export async function invoke<T>(
             return { id: graphId, nodes, edges } as unknown as T
         }
 
+        case 'list_graphs': {
+            const { projectId } = args as { projectId: string }
+            const graphs = _graphs.filter((g) => g.project_id === projectId)
+            return graphs.map((g) => ({ id: g.id, name: g.name })) as unknown as T
+        }
+
         default:
             throw new Error(`[mock] invoke: unknown command "${command}"`)
     }
