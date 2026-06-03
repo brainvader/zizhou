@@ -206,6 +206,30 @@ async fn seed_catalog(db: &Db) -> Result<(), surrealdb::Error> {
             },
         },
         NodeCatalog {
+            service: "git".into(),
+            provider: "local".into(),
+            label: "Git Commit".into(),
+            node_type: "git".into(),
+            profile: CatalogProfile {
+                subcommand: "commit".into(),
+                args: vec!["commit".into(), "-m".into(), "{input.message}".into()],
+                fields: {
+                    let mut f = HashMap::new();
+                    f.insert(
+                        "message".into(),
+                        CatalogField {
+                            field_type: "string".into(),
+                            label: "Commit Message".into(),
+                            required: Some(true),
+                            default: None,
+                            values: None,
+                        },
+                    );
+                    f
+                },
+            },
+        },
+        NodeCatalog {
             service: "validate".into(),
             provider: "local".into(),
             label: "TypeScript Check".into(),

@@ -113,6 +113,17 @@ export const NODE_CATALOG: CatalogEntry[] = [
             fields: {},
         },
     },
+    {
+        service: 'git', provider: 'local', label: 'Git Commit',
+        nodeType: 'git',
+        profile: {
+            subcommand: 'commit',
+            args: ['commit', '-m', '{input.message}'],
+            fields: {
+                message: { type: 'string', label: 'Commit Message', required: true },
+            },
+        },
+    },
     // ── validate ────────────────────────────────────────────
     {
         service: 'validate', provider: 'local', label: 'TypeScript Check',
