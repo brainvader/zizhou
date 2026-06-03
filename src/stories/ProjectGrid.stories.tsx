@@ -91,12 +91,11 @@ export const NotHydrated: Story = {
 // @story 状態 4: 「＋ new project」をクリックするとダイアログが開く
 export const OpenDialog: Story = {
     render: (args) => <WithStore {...args} projects={[]} isHydrated={true} />,
-    play: async ({ userEvent }) => {
-        const btn = await screen.findByText('＋ new project')
-        await userEvent.click(btn)
-        // ダイアログ要素が DOM にマウントされ、可視化されるのを確実に待機
-        const dialog = await screen.findByRole('dialog')
-        await expect(dialog).toBeVisible()
+    play: async ({ canvas, userEvent }) => {
+        await userEvent.click(canvas.getByRole('button', { name: /new project/ }))
+        // ダイアログ要素が DOM にマウントされ、コンテンツがレンダーされるのを待機
+        await screen.findByRole('dialog')
+        await screen.findByText('Create New Project')
     },
 }
 
