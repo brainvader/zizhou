@@ -50,8 +50,8 @@ const {
     }
 })
 
-vi.mock('@/store/useGraphStore', () => ({
-    useGraphStore: vi.fn((selector: (s: any) => any) =>
+vi.mock('@/store/useGraphStore', () => {
+    const useGraphStore: any = vi.fn((selector: (s: any) => any) =>
         selector({
             nodes: mockNodes,
             edges: mockEdges,
@@ -62,8 +62,10 @@ vi.mock('@/store/useGraphStore', () => ({
             setSelectedNodeId: vi.fn(),
             setSelectedNodeIds: mockSetSelectedNodeIds,
         })
-    ),
-}))
+    )
+    useGraphStore.subscribe = vi.fn(() => () => { })
+    return { useGraphStore }
+})
 
 vi.mock('@/store/useProjectDetailStore', () => ({
     useProjectDetailStore: Object.assign(
