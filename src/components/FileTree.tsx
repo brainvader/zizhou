@@ -5,6 +5,9 @@ import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import { toast } from 'sonner'
 import type { GraphListItem } from '@/bom/graph'
 
+const defaultListGraphs = (projectId: string): Promise<GraphListItem[]> =>
+    invoke<GraphListItem[]>('list_graphs', { projectId })
+
 // ============================================================
 // Types
 // ============================================================
@@ -36,8 +39,7 @@ export const FileTree = ({
     projectId: projectIdProp,
     activeGraphId: activeGraphIdProp,
     onNavigate,
-    onListGraphs = (projectId: string) =>
-        invoke<GraphListItem[]>('list_graphs', { projectId }),
+    onListGraphs = defaultListGraphs,
 }: FileTreeProps = {}) => {
     const router = useRouter()
     const storeActiveGraphId = useProjectDetailStore((s) => s.activeGraphId)
@@ -79,7 +81,7 @@ export const FileTree = ({
                 setError('Failed to load graphs')
             })
             .finally(() => setIsLoading(false))
-    }, [projectIdProp, onListGraphs])
+    }, [projectIdProp, activeGraphId, onListGraphs])
 
     return (
         <nav

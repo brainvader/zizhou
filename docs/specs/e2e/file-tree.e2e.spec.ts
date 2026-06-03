@@ -8,6 +8,9 @@
 import { test, expect } from '@playwright/test'
 
 const gotoProjectDetail = async (page: import('@playwright/test').Page) => {
+    page.on('console', (msg) => console.log(`[browser ${msg.type()}]`, msg.text()))
+    page.on('pageerror', (err) => console.log('[page error]', err.message))
+
     await page.goto('/')
     const newProjectBtn = page.getByText('＋ new project')
     await expect(newProjectBtn).toBeEnabled({ timeout: 10000 })
@@ -16,8 +19,15 @@ const gotoProjectDetail = async (page: import('@playwright/test').Page) => {
     await page.getByPlaceholder('My Awesome App').fill('E2E Test Project')
     await page.getByRole('button', { name: '作成' }).click()
     await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
-    await page.getByRole('link', { name: 'E2E Test Project' }).click()
-    await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 10000 })
+
+    const card = page.getByRole('link', { name: /E2E Test Project/ })
+    await expect(card).toBeVisible({ timeout: 10000 })
+
+    const href = await card.getAttribute('href')
+    if (!href) throw new Error('href missing')
+    await page.goto(href)
+
+    await expect(page.getByTestId('file-tree')).toBeVisible({ timeout: 10000 })
 }
 
 test.describe('CTX-1 FileTree — Visual Story', () => {
@@ -41,12 +51,20 @@ test.describe('CTX-1 FileTree — URL 直打ち復元', () => {
 
     test('step 10: New Graph 作成後に直アクセスしても graph-editor が表示される', async ({ page }) => {
         await gotoProjectDetail(page)
+
+        console.log('[test] clicking new-graph-btn')
         await page.locator('[data-testid="new-graph-btn"]').click()
+
+        console.log('[test] waiting for ?graph=')
         await page.waitForURL(/\?graph=/, { timeout: 10000 })
         const currentUrl = page.url()
+        console.log('[test] currentUrl:', currentUrl)
         await page.waitForTimeout(500)
 
+        console.log('[test] goto direct URL')
         await page.goto(currentUrl)
+        console.log('[test] URL after goto:', page.url())
+
         await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 15000 })
         await page.screenshot({ path: 'evidence/CTX12_step10_direct_access.png' })
     })
