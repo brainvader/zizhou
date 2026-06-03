@@ -152,8 +152,8 @@ export async function invoke<T>(
 
         case 'list_graphs': {
             const { projectId } = args as { projectId: string }
-            const graphs = db.graphs.filter((g: any) => g.project_id === projectId)
-            return graphs.map((g: any) => ({ id: g.id, name: g.name }))
+            const graphs = _graphs.filter((g) => g.project_id === projectId)
+            return graphs.map((g) => ({ id: g.id, name: g.name })) as unknown as T
         }
 
         default:
