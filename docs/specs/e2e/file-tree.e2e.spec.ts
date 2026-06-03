@@ -84,7 +84,7 @@ test.describe('CTX-1 FileTree — グラフ切り替え', () => {
         const graphId = firstId?.replace('graph-item-', '') ?? ''
 
         await items.first().click()
-        await expect(page).toHaveURL(new RegExp(`graph=${graphId}`))
+        await expect(page).toHaveURL(new RegExp(`graph=${encodeURIComponent(graphId)}`))
         await page.screenshot({ path: 'evidence/CTX1_step3_graph_switch.png' })
     })
 })
