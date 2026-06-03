@@ -353,6 +353,17 @@ export type UseCatalogSearchReturn = {
 }
 
 // ============================================================
+// GraphListItem                                      [CTX-1]
+// invoke('list_graphs') のレスポンス型。
+// SSOT: docs/bom/graph.ts（useProjectDetailLoad.ts から移動）
+// ============================================================
+
+export type GraphListItem = {
+    id: string
+    name: string
+}
+
+// ============================================================
 // FileTreeProps                                      [CTX-1]
 // FileTree コンポーネントの props 型定義。
 // Tauri fs 依存を廃止し、invoke('list_graphs') ベースに移行。

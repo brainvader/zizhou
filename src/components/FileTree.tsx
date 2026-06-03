@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { useRouter } from '@tanstack/react-router'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import { toast } from 'sonner'
-import type { GraphListItem } from '@/hooks/useProjectDetailLoad'
+import type { GraphListItem } from '@/bom/graph'
 
 // ============================================================
 // Types

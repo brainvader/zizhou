@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
+import { GraphListItem } from '@/bom/graph'
 
 // ============================================================
 // 精密な型定義 (SSOT: Single Source of Truth)
@@ -8,11 +9,6 @@ import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 
 export type UseProjectDetailLoadReturn = {
     loadProjectDetail: (projectId: string) => Promise<void>
-}
-
-export type GraphListItem = {
-    id: string
-    name: string
 }
 
 type ListGraphsFn = (projectId: string) => Promise<GraphListItem[]>
