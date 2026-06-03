@@ -52,3 +52,21 @@ test.describe('CTX-1 FileTree — URL 直打ち復元', () => {
     })
 
 })
+
+test.describe('CTX-1 FileTree — グラフ切り替え', () => {
+    test('step 3: グラフをクリックすると ?graph= が更新される', async ({ page }) => {
+        await gotoProjectDetail(page)
+        // New Graph でもう1つ作成
+        await page.locator('[data-testid="new-graph-btn"]').click()
+        await page.waitForURL(/\?graph=/, { timeout: 10000 })
+
+        // file-tree のグラフ一覧から最初のグラフをクリック
+        const items = page.locator('[data-testid^="graph-item-"]')
+        const firstId = await items.first().getAttribute('data-testid')
+        const graphId = firstId?.replace('graph-item-', '') ?? ''
+
+        await items.first().click()
+        await expect(page).toHaveURL(new RegExp(`graph=${graphId}`))
+        await page.screenshot({ path: 'evidence/CTX1_step3_graph_switch.png' })
+    })
+})

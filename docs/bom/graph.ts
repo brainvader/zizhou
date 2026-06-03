@@ -351,3 +351,20 @@ export type UseCatalogSearchReturn = {
     loading: boolean
     error: string | null
 }
+
+// ============================================================
+// FileTreeProps                                      [CTX-1]
+// FileTree コンポーネントの props 型定義。
+// Tauri fs 依存を廃止し、invoke('list_graphs') ベースに移行。
+// ============================================================
+
+export type FileTreeProps = {
+    /** 対象プロジェクト ID */
+    projectId?: string
+    /** 現在選択中のグラフ ID（省略時は store から取得） */
+    activeGraphId?: string | null
+    /** グラフ選択時のナビゲーションハンドラ（省略時は useRouter にフォールバック） */
+    onNavigate?: (graphId: string) => void
+    /** props DI: 省略時は invoke('list_graphs') を使用 */
+    onListGraphs?: (projectId: string) => Promise<GraphListItem[]>
+}
