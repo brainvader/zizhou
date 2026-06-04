@@ -36,7 +36,7 @@
  * @see src/hooks/useGraphImport.ts
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
     ReactFlow,
     ReactFlowProvider,
@@ -61,6 +61,7 @@ import { save } from '@tauri-apps/plugin-dialog'
 import { toast } from 'sonner'
 import { useGraphStore } from '@/store/useGraphStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
+import { useProjectStore } from '@/store/useProjectStore'
 import { useGraphLoad } from '@/hooks/useGraphLoad'
 import { useGraphSave } from '@/hooks/useGraphSave'
 import { useNodeExecute } from '@/hooks/useNodeExecute'
@@ -141,6 +142,9 @@ function GraphEditorInner({
     const storeUpdateNodeData = useGraphStore((s) => s.updateNodeData)
 
     const isDetailHydrated = useProjectDetailStore((s) => s.isDetailHydrated)
+    // [CTX-16] activeProject の rootPath を cwd として使用する
+    const activeProject = useProjectStore((s) => s.projects.find((p) => p.id === projectIdProp))
+    const rootPath = activeProject?.rootPath ?? ''
 
     // [CTX-15] useGraphSave（useGraphFile の置き換え）
     const { setHydrated: saveSetHydrated } = useGraphSave({
@@ -233,6 +237,10 @@ function GraphEditorInner({
     }, [importGraph])
 
     // --- [CTX-7/14] NODE_TYPES: editingNodeId / onRun を EditableNode に注入するため useMemo 化 ---
+    // [CTX-16] rootPath を ref で保持して useMemo の依存から外す（React Flow node remount 防止）
+    const rootPathRef = useRef(rootPath)
+    useEffect(() => { rootPathRef.current = rootPath }, [rootPath])
+
     const nodeTypes = useMemo(() => {
         const node = (props: React.ComponentProps<typeof EditableNode>) => {
             const nodeData = props.data
@@ -241,7 +249,7 @@ function GraphEditorInner({
                 execute(props.id, {
                     service: nodeData.service,
                     provider: nodeData.provider,
-                    cwd: '',
+                    cwd: rootPathRef.current,
                     input: nodeData.input ?? {},
                 })
             }
