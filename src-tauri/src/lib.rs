@@ -108,6 +108,7 @@ async fn list_projects(db: State<'_, Db>) -> Result<Vec<serde_json::Value>, Stri
             let mut obj = serde_json::json!({
                 "id": thing_to_string(&r.id),
                 "name": r.name,
+                "rootPath": r.root_path,
             });
             if let Some(d) = r.description {
                 obj["description"] = d.into();
@@ -122,11 +123,13 @@ async fn list_projects(db: State<'_, Db>) -> Result<Vec<serde_json::Value>, Stri
 async fn create_project(
     name: String,
     description: Option<String>,
+    root_path: String,
     db: State<'_, Db>,
 ) -> Result<serde_json::Value, String> {
     let input = ProjectInput {
         name,
         description: description.filter(|s| !s.is_empty()),
+        root_path,
     };
     let created: Option<ProjectRecord> = db
         .create("project")
@@ -137,6 +140,7 @@ async fn create_project(
     let mut obj = serde_json::json!({
         "id": thing_to_string(&r.id),
         "name": r.name,
+        "rootPath": r.root_path,
     });
     if let Some(d) = r.description {
         obj["description"] = d.into();
