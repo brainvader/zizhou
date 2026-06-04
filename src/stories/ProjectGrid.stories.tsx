@@ -67,8 +67,8 @@ export const WithProjectList: Story = {
         <WithStore
             {...args}
             projects={[
-                { id: '1', name: '地蔵 Core', description: 'コアシステム' },
-                { id: '2', name: 'Zizou Web', description: 'Webフロント' },
+                { id: '1', name: '地蔵 Core', description: 'コアシステム', rootPath: '/projects/zizhou' },
+                { id: '2', name: 'Zizou Web', description: 'Webフロント', rootPath: '/projects/zizou-web' },
             ]}
             isHydrated={true}
         />
@@ -118,12 +118,13 @@ export const ValidationError: Story = {
         // バリデーションエラーテキストの表出を確実に追尾
         const errorMsg = await screen.findByText('name は必須です')
         await expect(errorMsg).toBeVisible()
+        await expect(await screen.findByText('root path は必須です')).toBeVisible()
     },
 }
 
 // @story 状態 6: フォームに入力して「作成」をクリックするとダイアログが閉じる
 export const SubmitSuccess: Story = {
-    render: (args) => <WithStore {...args} projects={[]} isHydrated={true} onCreateProject={async (name, description) => ({ id: 'new-id', name, description })} />,
+    render: (args) => <WithStore {...args} projects={[]} isHydrated={true} onCreateProject={async (name: string, description?: string, rootPath?: string) => ({ id: 'new-id', name, description, rootPath: rootPath ?? '' })} />,
     play: async ({ userEvent }) => {
         const newProjectBtn = await screen.findByText('＋ new project')
         await userEvent.click(newProjectBtn)
@@ -133,6 +134,9 @@ export const SubmitSuccess: Story = {
 
         const descInput = screen.getByPlaceholderText('このプロジェクトの説明（任意）')
         await userEvent.type(descInput, 'グラフベースの管理OS。')
+
+        const rootPathInput = screen.getByPlaceholderText('/Users/user/projects/my-app')
+        await userEvent.type(rootPathInput, '/projects/zizhou')
 
         const submitBtn = screen.getByRole('button', { name: '作成' })
         await userEvent.click(submitBtn)
