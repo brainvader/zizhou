@@ -30,3 +30,6 @@ storybook-static
 
 # Vitest Unite Test Covarage
 coverage/
+
+# git patch
+*.patch
