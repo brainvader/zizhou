@@ -707,7 +707,7 @@
 
 
         <!-- ============================================================
-            CTX-19: FILE SYSTEM TREE [✓]
+            CTX-19: FILE SYSTEM TREE [ ]
             責務: プロジェクトの rootPath 配下のファイル構造を左パネルに表示する
 
             背景:
@@ -756,41 +756,91 @@
                    rootPath を /Users/user/projects/zizou-core に合わせてテストする。
               Storybook / Vitest: onReadDir props DI で差し替える。
 
-            [✓][Feature] Fs Tree Display   — rootPath 配下のディレクトリ/ファイルをツリー表示する
-            [✓][Feature] Expand/Collapse   — ディレクトリクリックで展開/折りたたみ（遅延ロード）
-            [✓][Feature] Empty Root State  — rootPath が空のとき「root path が未設定です」を表示する
-            [✓][Feature] Loading State     — 読み込み中は Loading… を表示する
-            [✓][Feature] Error State       — readDir 失敗時はエラーメッセージを表示する
-            [✓][Logic]   readDir DI        — onReadDir props で Tauri fs を差し替え可能にする
-            [✓][Logic]   Lazy Load         — 子エントリは展開時に遅延ロードする（初期は1階層のみ）
-            [✓][Logic]   Remove Graph List — list_graphs / GraphListItem 依存を完全削除する
+            [ ][Feature] Fs Tree Display   — rootPath 配下のディレクトリ/ファイルをツリー表示する
+            [ ][Feature] Expand/Collapse   — ディレクトリクリックで展開/折りたたみ（遅延ロード）
+            [ ][Feature] Empty Root State  — rootPath が空のとき「root path が未設定です」を表示する
+            [ ][Feature] Loading State     — 読み込み中は Loading… を表示する
+            [ ][Feature] Error State       — readDir 失敗時はエラーメッセージを表示する
+            [ ][Logic]   readDir DI        — onReadDir props で Tauri fs を差し替え可能にする
+            [ ][Logic]   Lazy Load         — 子エントリは展開時に遅延ロードする（初期は1階層のみ）
+            [ ][Logic]   Remove Graph List — list_graphs / GraphListItem 依存を完全削除する
         ============================================================ -->
 
 
         <!-- ============================================================
-            CTX-20 〜 CTX-23: 構想段階（未着手）
+            CTX-20: PROJECT STRUCTURE GRAPH [ ]
+            責務: プロジェクトのファイル間依存関係をグラフとして可視化する
 
-            CTX-20: GRAPH INTEGRITY TESTS
+            背景:
+              LLMチャットで生成したコードをFileTreeに追加し、
+              Zizouが静的解析してグラフに登録する。
+              1プロジェクト = 1構造グラフ。
+
+            データモデル:
+              graph テーブルに kind: 'workflow' | 'structure' を追加
+              node  テーブルに file_path: string / analyzed: 'fresh' | 'stale' | 'pending' を追加
+              edge  テーブルに kind: 'imports' | 'renders' を追加
+
+            VCS抽象化:
+              変更ファイル検知は VcsProvider trait で抽象化し初期実装は Git。
+              将来 Mercurial / Fossil 等への差し替えを可能にする。
+              フロント側も GetChangedFilesFn として Props DI で差し替え可能にする。
+
+            Tauri コマンド:
+              get_structure_graph(project_id)
+                → kind='structure' のグラフを返す（なければ作成）
+              analyze_file(project_id, file_path)
+                → 単一ファイルを tree-sitter で解析し node / edge を UPSERT
+              analyze_project(project_id)
+                → rootPath 配下の全ファイルを一括解析
+              get_changed_files(root_path)
+                → VcsProvider 経由で変更ファイル一覧を返す（初期実装: git diff --name-only HEAD）
+
+            フロントエンド:
+              FileTree でファイルクリック → analyze_file を呼び出してノード登録
+              グラフ表示時に get_changed_files で stale ノードをハイライト
+              ノードクリック → FileTree で該当ファイルをハイライト（双方向ナビゲーション）
+              「再解析」ボタン（個別）/ 「全体を再解析」ボタン（一括）
+
+            スコープ外（将来の CTX）:
+              ファイル保存時のリアルタイム自動解析（notify クレート）
+              データフローシミュレーション
+              型情報の解決（TSコンパイラAPI）
+
+            [ ][Logic]   DB Schema          — graph/node/edge テーブルに kind / file_path / analyzed フィールドを追加
+            [ ][Logic]   VcsProvider        — trait で VCS 操作を抽象化し Git 実装を追加する
+            [ ][Logic]   get_changed_files  — git diff --name-only HEAD で変更ファイル一覧を返す
+            [ ][Logic]   get_structure_graph — project に紐づく structure グラフを取得（なければ作成）
+            [ ][Logic]   analyze_file       — tree-sitter で imports を抽出し node / edge を UPSERT する
+            [ ][Logic]   analyze_project    — rootPath 配下の全ファイルを一括解析する
+            [ ][Feature] Stale Highlight    — 変更ファイルに対応するノードを stale としてハイライト表示する
+            [ ][Feature] Reanalyze Button   — 個別ノードの「再解析」ボタンで analyze_file を呼び出す
+            [ ][Feature] Reanalyze All      — 「全体を再解析」ボタンで analyze_project を呼び出す
+            [ ][Feature] File↔Node Sync     — FileTree のファイルクリックとグラフノードを双方向でハイライトする
+        ============================================================ -->
+
+
+        <!-- ============================================================
+            CTX-21 〜 CTX-24: 構想段階（未着手）
+
+            CTX-21: GRAPH INTEGRITY TESTS
               責務: ContextMap グラフの参照整合性をテストで保証する
-              例:    integrity/file-paths.spec.ts, integrity/edges.spec.ts,
-                     integrity/signatures.spec.ts ほか
-              関連: CTX-17 (グラフモデル), CTX-18 (シグニチャ抽出)
+              関連: CTX-20 (プロジェクト構造グラフ)
 
-            CTX-21: STATIC SIMULATION
+            CTX-22: STATIC SIMULATION
               責務: 型レベルでデータがグラフを流れるかを検証する
-              手段: signature の入力型 / 出力型をエッジ越しに突合
-              関連: CTX-17, CTX-18
+              手段: エッジの payload 型を突合して不一致をハイライト
+              関連: CTX-20
 
-            CTX-22: DYNAMIC SIMULATION
+            CTX-23: DYNAMIC SIMULATION
               責務: テストデータを入口ノードから流して実行経路を確認する
               手段: グラフをトポロジカルソートして execute_node を順番に呼ぶ
               関連: CTX-14 (execute_node)
 
-            CTX-23: EXECUTION PATH VISUALIZATION
+            CTX-24: EXECUTION PATH VISUALIZATION
               責務: 動的シミュレーションの実行経路をグラフ上に可視化する
-              手段: ノード status (pending/running/success/failed) を色分け
-                    + エッジ上にデータ形状を表示
-              関連: CTX-22
+              手段: ノード status を色分け + Animated SVG Edge でデータの流れをアニメーション
+              関連: CTX-23
         ============================================================ -->
 
     </body>
