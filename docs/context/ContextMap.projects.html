@@ -602,5 +602,105 @@
             [ ][Logic]   Cwd Injection     — execute_node が activeProject.root_path を cwd として受け取る
         ============================================================ -->
 
+
+        <!-- ============================================================
+            CTX-17: CONTEXT MAP AS GRAPH [ ]
+            責務: ContextMap を HTML 散在記述から、ノード/エッジを持つグラフ表現に移行する
+
+            コンセプト:
+              - メイングラフ: 機能・呼び出し・データフローの依存関係グラフ（粒度: Feature / Logic 単位）
+              - コンテクスト: ノードを束ねる論理的グループ（フィルタ）。閉じれば独立可能性を示唆
+              - モックアップ: 単なる HTML ファイル。グラフ上では1ノードとして参照される
+
+            設計軸（直交する2軸でフィルタリング）:
+              - layer:        ui / logic / data / infra — ノードの単一属性
+              - context_ids:  ノードが所属するコンテクストの集合（多重所属可）
+
+            ノードのフィールド:
+              - id, label
+              - kind:           feature / logic / mockup / bom / test
+              - file_path:      リポジトリ相対パス
+              - signature:      関数シグニチャ / 型定義（言語タグ付き JSON）
+              - doc:            簡潔な説明（旧 ContextMap.html の Feature/Logic 説明文に相当）
+              - layer
+              - context_ids[]
+              - test_file_path: このノードを検証するテストファイル
+
+            エッジのフィールド:
+              - source, target
+              - kind:           呼び出す（制御フロー） / データを渡す（データフロー）
+                                / 依存する（静的依存） / 実装する（抽象→具象）
+              - needs_review:   参照先のシグニチャが変化したとき自動で true（CTX-18 連携）
+
+            [ ][Logic]   Schema Definition    — node / edge テーブルを CTX-15 のスキーマから拡張
+            [ ][Logic]   Index Design         — context_ids 配列含有検索のためのインデックス
+                                                 SELECT * FROM node WHERE 'ctx-x' IN context_ids 形式
+            [ ][Feature] Graph Rendering      — React Flow で ContextMap グラフを描画
+            [ ][Feature] Layer Filter         — layer 軸でノードを絞り込む
+            [ ][Feature] Context Filter       — context_ids 軸でノードを絞り込む
+            [ ][Feature] Mockup Reference     — mockup ノードクリックで HTML ファイルを開く
+            [ ][Feature] needs_review Visual  — needs_review=true のエッジを赤くハイライト
+        ============================================================ -->
+
+
+        <!-- ============================================================
+            CTX-18: STATIC ANALYSIS LAYER [ ]
+            責務: ソースファイルから決定論的にシグニチャ・シンボルを抽出し、
+                  CTX-17 のノードメタデータに反映する
+
+            手段:
+              - tree-sitter (Rust ネイティブ) をメイン: TS / Rust / Python の grammar 公式提供
+              - 必要なら TS compiler バッチ実行で型解決まで補完（フェーズ2以降）
+              - LSP は使わない（メタデータは DB に保存して使い回す、ライブ通信不要）
+
+            ファーストパス方針:
+              tree-sitter で「関数名・引数名・型名（文字列レベル）」を抽出するのみ。
+              型解決（UserDTO → 実際の型定義への解決等）は次フェーズ。
+              文字列レベル抽出だけでもグラフ上のメタデータとして十分有用。
+
+            更新タイミング:
+              - ファイル保存時: notify クレート（推奨: notify-debouncer-mini）で監視
+                                + 1-2秒デバウンス → 該当ファイル再解析
+              - 明示トリガ:     pnpm sync-signatures で全件再解析（CI でも実行）
+
+            影響可視化:
+              シグニチャ変化時、参照しているエッジに needs_review = true をセット。
+              フロントで赤いエッジとして表示。
+
+            [ ][Logic]   tree-sitter Setup     — Rust 側に tree-sitter + grammars を導入
+            [ ][Logic]   extract_signatures    — Tauri command: 単一ファイルからシグニチャ抽出
+            [ ][Logic]   File Watcher          — notify-debouncer-mini でファイル変更検知
+            [ ][Logic]   Sync Command          — pnpm sync-signatures で全件再解析
+            [ ][Logic]   Edge needs_review     — シグニチャ差分検知時にエッジへフラグを立てる
+            [ ][Feature] Multi-language        — TS / Rust / Python に対応する言語別パーサ層
+        ============================================================ -->
+
+
+        <!-- ============================================================
+            CTX-19 〜 CTX-22: 構想段階（未着手）
+
+            CTX-19: GRAPH INTEGRITY TESTS
+              責務: ContextMap グラフの参照整合性をテストで保証する
+              例:    integrity/file-paths.spec.ts, integrity/edges.spec.ts,
+                     integrity/signatures.spec.ts ほか
+              関連: CTX-17 (グラフモデル), CTX-18 (シグニチャ抽出)
+
+            CTX-20: STATIC SIMULATION
+              責務: 型レベルでデータがグラフを流れるかを検証する
+              手段: signature の入力型 / 出力型をエッジ越しに突合
+              関連: CTX-17, CTX-18
+
+            CTX-21: DYNAMIC SIMULATION
+              責務: テストデータを入口ノードから流して実行経路を確認する
+              手段: グラフをトポロジカルソートして execute_node を順番に呼ぶ
+              関連: CTX-14 (execute_node)
+
+            CTX-22: EXECUTION PATH VISUALIZATION
+              責務: 動的シミュレーションの実行経路をグラフ上に可視化する
+              手段: ノード status (pending/running/success/failed) を色分け
+                    + エッジ上にデータ形状を表示
+              関連: CTX-21
+        ============================================================ -->
+
     </body>
 </html>
