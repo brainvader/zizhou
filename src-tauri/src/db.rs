@@ -54,6 +54,7 @@ pub struct ProjectRecord {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    pub root_path: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -61,6 +62,7 @@ pub struct ProjectInput {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    pub root_path: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -160,6 +162,10 @@ pub async fn init_db(app_data_dir: std::path::PathBuf) -> Result<Db, surrealdb::
     if is_empty {
         seed_catalog(&db).await?;
     }
+
+    // [CTX-16] 既存レコードに root_path がない場合は空文字で補完
+    db.query("UPDATE project SET root_path = '' WHERE root_path IS NONE")
+        .await?;
 
     Ok(db)
 }
