@@ -4,6 +4,7 @@
 //! @context CTX-14: execute_node コマンド
 //! @context CTX-SurrealDB-migration: list_projects / create_project / list_graphs / create_graph コマンド追加
 //! @context CTX-15: save_graph / load_graph コマンド追加
+//! @context CTX-19: list_fs_tree コマンド追加
 
 mod db;
 
@@ -29,6 +30,73 @@ pub struct ExecuteResponse {
     pub success: bool,
     pub output: Option<serde_json::Value>,
     pub error: Option<ExecuteError>,
+}
+// ============================================================
+// list_fs_tree 用の型定義                             [CTX-19]
+// ============================================================
+
+#[derive(Debug, Serialize)]
+pub struct FsNode {
+    pub name: String,
+    pub path: String,
+    pub kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub children: Option<Vec<FsNode>>,
+}
+
+const FS_EXCLUDES: &[&str] = &["node_modules", ".git", "target", ".next", "dist"];
+
+fn read_dir_recursive(
+    path: &std::path::Path,
+    root: &std::path::Path,
+    max_depth: u32,
+) -> Vec<FsNode> {
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return vec![];
+    };
+    let mut nodes: Vec<FsNode> = entries
+        .flatten()
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            if FS_EXCLUDES.contains(&name.as_str()) {
+                return None;
+            }
+            let full = e.path();
+            let rel = full.strip_prefix(root).unwrap_or(&full);
+            let path_str = rel.to_string_lossy().replace('\\', "/");
+            let is_dir = full.is_dir();
+            let children = if is_dir && max_depth > 0 {
+                Some(read_dir_recursive(&full, root, max_depth - 1))
+            } else if is_dir {
+                Some(vec![])
+            } else {
+                None
+            };
+            Some(FsNode {
+                name,
+                path: path_str,
+                kind: if is_dir { "dir".into() } else { "file".into() },
+                children,
+            })
+        })
+        .collect();
+    nodes.sort_by(|a, b| {
+        let ak = if a.kind == "dir" { 0 } else { 1 };
+        let bk = if b.kind == "dir" { 0 } else { 1 };
+        ak.cmp(&bk).then(a.name.cmp(&b.name))
+    });
+    nodes
+}
+
+/// プロジェクトの rootPath 以下のファイルツリーを返す。
+/// 深度上限 5、node_modules / .git / target / dist / .next を除外する。
+#[tauri::command]
+fn list_fs_tree(root_path: String) -> Result<Vec<FsNode>, String> {
+    let root = std::path::Path::new(&root_path);
+    if !root.is_dir() {
+        return Err(format!("not a directory: {root_path}"));
+    }
+    Ok(read_dir_recursive(root, root, 5))
 }
 
 // ============================================================
@@ -485,6 +553,7 @@ pub fn run() {
             create_graph,
             save_graph,
             load_graph,
+            list_fs_tree,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

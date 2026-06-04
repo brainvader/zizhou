@@ -1,24 +1,106 @@
-import { useEffect, useState, useCallback } from 'react'
-import { invoke } from '@tauri-apps/api/core'
-import { useRouter } from '@tanstack/react-router'
-import { useProjectDetailStore } from '@/store/useProjectDetailStore'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { readDir } from '@tauri-apps/plugin-fs'
 import { toast } from 'sonner'
-import type { GraphListItem } from '@/bom/graph'
-
-const defaultListGraphs = (projectId: string): Promise<GraphListItem[]> =>
-    invoke<GraphListItem[]>('list_graphs', { projectId })
+import type { FsEntry, ReadDirFn, FileTreeProps } from '@/bom/file-tree'
 
 // ============================================================
-// Types
+// デフォルト実装
 // ============================================================
 
-type ListGraphsFn = (projectId: string) => Promise<GraphListItem[]>
+/**
+ * @tauri-apps/plugin-fs の readDir をラップする。
+ * path: 絶対パス。返す FsEntry の path も絶対パスにする。
+ */
+const defaultReadDir: ReadDirFn = async (path: string): Promise<FsEntry[]> => {
+    const entries = await readDir(path)
+    return entries.map((e) => ({
+        name: e.name ?? '',
+        path: `${path}/${e.name ?? ''}`,
+        isDirectory: e.isDirectory ?? false,
+    }))
+}
 
-export type FileTreeProps = {
-    projectId?: string
-    activeGraphId?: string | null
-    onNavigate?: (graphId: string) => void
-    onListGraphs?: ListGraphsFn
+// ============================================================
+// FsEntryNode — 1エントリを再帰描画するサブコンポーネント
+// ============================================================
+
+type FsEntryNodeProps = {
+    entry: FsEntry
+    depth: number
+    onReadDir: ReadDirFn
+}
+
+const FsEntryNode = ({ entry, depth, onReadDir }: FsEntryNodeProps) => {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const [children, setChildren] = useState<FsEntry[] | null>(null)
+    const [isLoading, setIsLoading] = useState(false)
+
+    // onReadDir は毎レンダーで参照が変わりうるので ref で保持
+    const onReadDirRef = useRef(onReadDir)
+    useEffect(() => { onReadDirRef.current = onReadDir }, [onReadDir])
+
+    const handleClick = useCallback(async () => {
+        if (!entry.isDirectory) return
+
+        if (isExpanded) {
+            setIsExpanded(false)
+            return
+        }
+
+        if (children === null) {
+            setIsLoading(true)
+            try {
+                // entry.path は絶対パス
+                const result = await onReadDirRef.current(entry.path)
+                setChildren(result)
+            } catch {
+                toast.error('ディレクトリの読み込みに失敗しました')
+                setChildren([])
+            } finally {
+                setIsLoading(false)
+            }
+        }
+
+        setIsExpanded(true)
+    }, [entry.isDirectory, entry.path, isExpanded, children])
+
+    const indent = depth * 12
+
+    return (
+        <>
+            <div
+                role="button"
+                tabIndex={0}
+                data-testid={`fs-entry-${entry.name}`}
+                style={{ paddingLeft: `${12 + indent}px` }}
+                className={[
+                    'flex items-center gap-1.5 py-1 pr-3 rounded-sm select-none',
+                    'text-[11px] font-light transition-colors duration-100',
+                    entry.isDirectory
+                        ? 'cursor-pointer text-[--foreground] hover:bg-[--muted]'
+                        : 'cursor-default text-[--muted-foreground]',
+                ].join(' ')}
+                onClick={handleClick}
+                onKeyDown={(e) => e.key === 'Enter' && handleClick()}
+            >
+                <span className="text-[10px] w-3 text-center shrink-0">
+                    {entry.isDirectory
+                        ? isLoading ? '…' : isExpanded ? '▼' : '▶'
+                        : '◦'}
+                </span>
+                <span className="truncate">{entry.name}</span>
+            </div>
+
+            {entry.isDirectory && isExpanded && children?.map((child) => (
+                <FsEntryNode
+                    key={child.path}
+                    entry={child}
+                    depth={depth + 1}
+                    onReadDir={onReadDir}
+                />
+            ))}
+        </>
+    )
 }
 
 // ============================================================
@@ -26,62 +108,42 @@ export type FileTreeProps = {
 // ============================================================
 
 /**
- * @context  CTX-1 / FileTree
- * @bom      docs/bom/graph.ts
+ * @context  CTX-19 / FileTree
+ * @bom      docs/bom/file-tree.ts
  *
- * SurrealDB移行後の実装。invoke('list_graphs') でグラフ一覧を取得し表示する。
- * Tauri fs（readDir/join）依存を完全に廃止。
+ * プロジェクトの rootPath 以下のファイルシステムツリーを表示する。
+ * ディレクトリは展開時に遅延ロード（初期は1階層のみ取得）。
+ * グラフ選択機能は持たない。
  *
- * props DI: onListGraphs / onNavigate を props で受け取る。
- * 省略時は invoke / useRouter にフォールバック。
+ * props DI: onReadDir を props で受け取る。
+ * 省略時は @tauri-apps/plugin-fs の readDir にフォールバック。
  */
 export const FileTree = ({
-    projectId: projectIdProp,
-    activeGraphId: activeGraphIdProp,
-    onNavigate,
-    onListGraphs = defaultListGraphs,
+    rootPath,
+    onReadDir = defaultReadDir,
 }: FileTreeProps = {}) => {
-    const router = useRouter()
-    const storeActiveGraphId = useProjectDetailStore((s) => s.activeGraphId)
-
-    const activeGraphId = activeGraphIdProp ?? storeActiveGraphId
-
-    const [graphs, setGraphs] = useState<GraphListItem[]>([])
-    const [isLoading, setIsLoading] = useState(true)
+    const [entries, setEntries] = useState<FsEntry[]>([])
+    const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    const navigate = useCallback(
-        (graphId: string) => {
-            if (onNavigate) {
-                onNavigate(graphId)
-            } else {
-                router.navigate({
-                    to: '/projects/$id',
-                    params: { id: projectIdProp ?? '' },
-                    search: { graph: graphId },
-                })
-            }
-        },
-        [onNavigate, router, projectIdProp],
-    )
+    // onReadDir の参照変化で再フェッチしないよう ref で保持
+    const onReadDirRef = useRef(onReadDir)
+    useEffect(() => { onReadDirRef.current = onReadDir }, [onReadDir])
 
     useEffect(() => {
-        if (!projectIdProp) {
-            setIsLoading(false)
-            return
-        }
+        if (!rootPath) return
 
         setIsLoading(true)
         setError(null)
 
-        onListGraphs(projectIdProp)
-            .then(setGraphs)
+        onReadDirRef.current(rootPath)
+            .then(setEntries)
             .catch(() => {
-                toast.error('グラフ一覧の取得に失敗しました')
-                setError('Failed to load graphs')
+                toast.error('ファイルツリーの読み込みに失敗しました')
+                setError('Failed to load directory')
             })
             .finally(() => setIsLoading(false))
-    }, [projectIdProp, activeGraphId, onListGraphs])
+    }, [rootPath])
 
     return (
         <nav
@@ -90,44 +152,30 @@ export const FileTree = ({
         >
             <div className="flex items-center px-3 h-9 shrink-0 border-b border-[--border]">
                 <span className="text-[10px] font-mono tracking-widest uppercase text-[--muted-foreground]">
-                    Graphs
+                    Explorer
                 </span>
             </div>
 
             <div className="flex-1 overflow-y-auto py-1">
-                {isLoading && (
+                {!rootPath && (
+                    <p className="px-3 py-2 text-xs text-[--muted-foreground]">
+                        root path が未設定です
+                    </p>
+                )}
+                {rootPath && isLoading && (
                     <p className="px-3 py-2 text-xs text-[--muted-foreground]">Loading…</p>
                 )}
-                {error && (
+                {rootPath && error && (
                     <p className="px-3 py-2 text-xs text-[--primary]">{error}</p>
                 )}
-                {!isLoading && !error && graphs.length === 0 && (
-                    <p className="px-3 py-2 text-xs text-[--muted-foreground]">No graphs</p>
-                )}
-                {!isLoading &&
-                    !error &&
-                    graphs.map((g) => {
-                        const isSelected = g.id === activeGraphId
-                        return (
-                            <div
-                                key={g.id}
-                                role="button"
-                                tabIndex={0}
-                                data-testid={`graph-item-${g.id}`}
-                                className={[
-                                    'flex items-center gap-1.5 px-3 py-1 rounded-sm cursor-pointer select-none',
-                                    'text-[11px] font-light transition-colors duration-100',
-                                    isSelected
-                                        ? 'bg-[--muted] text-[--foreground]'
-                                        : 'text-[--muted-foreground] hover:text-[--foreground] hover:bg-[--muted]',
-                                ].join(' ')}
-                                onClick={() => navigate(g.id)}
-                                onKeyDown={(e) => e.key === 'Enter' && navigate(g.id)}
-                            >
-                                <span className="truncate">{g.name}</span>
-                            </div>
-                        )
-                    })}
+                {rootPath && !isLoading && !error && entries.map((entry) => (
+                    <FsEntryNode
+                        key={entry.path}
+                        entry={entry}
+                        depth={0}
+                        onReadDir={onReadDir}
+                    />
+                ))}
             </div>
         </nav>
     )
