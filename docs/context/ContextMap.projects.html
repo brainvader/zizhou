@@ -707,7 +707,68 @@
 
 
         <!-- ============================================================
-            CTX-19 〜 CTX-22: 構想段階（未着手）
+            CTX-19: FILE SYSTEM TREE [✓]
+            責務: プロジェクトの rootPath 配下のファイル構造を左パネルに表示する
+
+            背景:
+              現在の FileTree コンポーネントはグラフ一覧（list_graphs）を表示しているが、
+              プロジェクトのファイル構造表示に完全置き換える。
+              CTX-16 で rootPath が確定したことで実装可能になった。
+              グラフ一覧の UI は将来的に GraphEditor 側で対応（CTX-TBD）。
+
+            現状の FileTree の責務（削除対象）:
+              - invoke('list_graphs') でグラフ一覧を取得・表示
+              - グラフクリックで ?graph= URL を更新
+              - onListGraphs / onNavigate props DI
+
+            新しい FileTree の責務:
+              - Tauri @tauri-apps/plugin-fs の readDir で rootPath を読む
+              - ディレクトリ / ファイルをツリー形式で表示
+              - ディレクトリは展開 / 折りたたみ可能（ローカル状態で管理）
+              - 子エントリは展開時に遅延ロード（初期表示は1階層のみ）
+              - rootPath が空のとき「root path が未設定です」を表示
+              - readDir 失敗時はエラーメッセージを表示
+              - props DI: onReadDir を受け取り省略時は Tauri fs にフォールバック
+
+            型定義（docs/bom/file-tree.ts 新規作成）:
+              FsEntry     { name: string; path: string; isDirectory: boolean; children?: FsEntry[] }
+              ReadDirFn   (path: string) => Promise<FsEntry[]>
+              FileTreeProps {
+                rootPath?: string
+                onReadDir?: ReadDirFn
+              }
+
+            削除:
+              FileTree から GraphListItem / list_graphs / onListGraphs / onNavigate を削除
+              useProjectDetailStore への依存を削除
+
+            影響ファイル:
+              src/components/FileTree.tsx              — 完全書き直し
+              docs/bom/file-tree.ts                   — 新規作成
+              src/stories/FileTree.stories.tsx         — 完全書き直し
+              docs/specs/unit/FileTree.spec.tsx        — 完全書き直し（グラフ検証を削除）
+              docs/specs/e2e/file-tree.e2e.spec.ts    — E2E 更新（グラフ一覧検証を削除）
+              src/__mocks__/plugin-fs.ts               — readDir モック確認（既存実装あり）
+
+            モック戦略:
+              E2E: src/__mocks__/plugin-fs.ts の readDir が既に
+                   /Users/user/projects/zizou-core 配下の固定フィクスチャを返す実装あり。
+                   rootPath を /Users/user/projects/zizou-core に合わせてテストする。
+              Storybook / Vitest: onReadDir props DI で差し替える。
+
+            [✓][Feature] Fs Tree Display   — rootPath 配下のディレクトリ/ファイルをツリー表示する
+            [✓][Feature] Expand/Collapse   — ディレクトリクリックで展開/折りたたみ（遅延ロード）
+            [✓][Feature] Empty Root State  — rootPath が空のとき「root path が未設定です」を表示する
+            [✓][Feature] Loading State     — 読み込み中は Loading… を表示する
+            [✓][Feature] Error State       — readDir 失敗時はエラーメッセージを表示する
+            [✓][Logic]   readDir DI        — onReadDir props で Tauri fs を差し替え可能にする
+            [✓][Logic]   Lazy Load         — 子エントリは展開時に遅延ロードする（初期は1階層のみ）
+            [✓][Logic]   Remove Graph List — list_graphs / GraphListItem 依存を完全削除する
+        ============================================================ -->
+
+
+        <!-- ============================================================
+            CTX-20 〜 CTX-23: 構想段階（未着手）
 
             CTX-20: GRAPH INTEGRITY TESTS
               責務: ContextMap グラフの参照整合性をテストで保証する
@@ -729,7 +790,7 @@
               責務: 動的シミュレーションの実行経路をグラフ上に可視化する
               手段: ノード status (pending/running/success/failed) を色分け
                     + エッジ上にデータ形状を表示
-              関連: CTX-21
+              関連: CTX-22
         ============================================================ -->
 
     </body>

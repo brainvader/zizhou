@@ -1,17 +1,20 @@
 /**
- * @context CTX-1 / FileTree
- * @bom docs/bom/graph.ts (FileTreeProps, GraphListItem)
+ * @context CTX-19 / FileTree
+ * @bom     docs/bom/file-tree.ts
  * @story
- * 1. グラフ一覧が表示される
- * 2. グラフが存在しない場合は「No graphs」が表示される
- * 3. ローディング中は「Loading…」が表示される
- * 4. エラー時はエラーメッセージが表示される
- * 5. activeGraphId に一致するグラフはハイライトされる
- * 6. グラフをクリックすると onNavigate が呼ばれる
+ * 1. rootPath 配下のディレクトリ・ファイルがツリー表示される
+ * 2. ディレクトリをクリックすると子エントリが遅延ロードされ展開される
+ * 3. 展開済みディレクトリを再クリックすると折りたたまれる
+ * 4. rootPath が未設定のとき「root path が未設定です」が表示される
+ * 5. ローディング中は「Loading…」が表示される
+ * 6. readDir 失敗時はエラーメッセージが表示される
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, fn, userEvent } from 'storybook/test'
+import { expect, userEvent } from 'storybook/test'
 import { FileTree } from '@/components/FileTree'
+import type { FsEntry } from '@/bom/file-tree'
+
+const ROOT = '/Users/user/projects/zizou-core'
 
 const meta: Meta<typeof FileTree> = {
     component: FileTree,
@@ -25,78 +28,96 @@ const meta: Meta<typeof FileTree> = {
         ),
     ],
     args: {
-        projectId: 'proj-001',
-        onNavigate: fn(),
+        rootPath: ROOT,
     },
 }
 export default meta
 type Story = StoryObj<typeof FileTree>
 
-const mockGraphs = [
-    { id: 'graph-01', name: 'main' },
-    { id: 'graph-02', name: 'feature-x' },
-]
+// ── フィクスチャ（絶対パスをキーにする）────────────────────────────────
 
-// @story 状態 1: 通常表示
+const FIXTURE: Record<string, FsEntry[]> = {
+    [ROOT]: [
+        { name: 'src', path: `${ROOT}/src`, isDirectory: true },
+        { name: 'src-tauri', path: `${ROOT}/src-tauri`, isDirectory: true },
+        { name: 'package.json', path: `${ROOT}/package.json`, isDirectory: false },
+        { name: 'README.md', path: `${ROOT}/README.md`, isDirectory: false },
+    ],
+    [`${ROOT}/src`]: [
+        { name: 'components', path: `${ROOT}/src/components`, isDirectory: true },
+        { name: 'hooks', path: `${ROOT}/src/hooks`, isDirectory: true },
+        { name: 'main.tsx', path: `${ROOT}/src/main.tsx`, isDirectory: false },
+    ],
+}
+
+const mockReadDir = async (path: string): Promise<FsEntry[]> =>
+    FIXTURE[path] ?? []
+
+// ── @story 1: 通常表示 ──────────────────────────────────────────────────
+
 export const Default: Story = {
-    args: {
-        onListGraphs: async () => mockGraphs,
-    },
+    args: { onReadDir: mockReadDir },
     play: async ({ canvas }) => {
-        await expect(canvas.findByText('main')).resolves.toBeVisible()
-        await expect(canvas.getByText('feature-x')).toBeVisible()
+        await expect(canvas.findByText('src')).resolves.toBeVisible()
+        await expect(canvas.getByText('src-tauri')).toBeVisible()
+        await expect(canvas.getByText('package.json')).toBeVisible()
+        await expect(canvas.getByText('README.md')).toBeVisible()
     },
 }
 
-// @story 状態 2: グラフなし
-export const Empty: Story = {
-    args: {
-        onListGraphs: async () => [],
-    },
+// ── @story 2: ディレクトリ展開（遅延ロード） ────────────────────────────
+
+export const DirExpand: Story = {
+    args: { onReadDir: mockReadDir },
     play: async ({ canvas }) => {
-        await expect(canvas.findByText('No graphs')).resolves.toBeVisible()
+        const srcDir = await canvas.findByText('src')
+        expect(canvas.queryByText('components')).toBeNull()
+
+        await userEvent.click(srcDir)
+        await expect(canvas.findByText('components')).resolves.toBeVisible()
+        await expect(canvas.getByText('hooks')).toBeVisible()
+        await expect(canvas.getByText('main.tsx')).toBeVisible()
     },
 }
 
-// @story 状態 3: ローディング中
+// ── @story 3: 折りたたみ ─────────────────────────────────────────────
+
+export const DirCollapse: Story = {
+    args: { onReadDir: mockReadDir },
+    play: async ({ canvas }) => {
+        const srcDir = await canvas.findByText('src')
+
+        await userEvent.click(srcDir)
+        await expect(canvas.findByText('components')).resolves.toBeVisible()
+
+        await userEvent.click(srcDir)
+        expect(canvas.queryByText('components')).toBeNull()
+    },
+}
+
+// ── @story 4: rootPath 未設定 ────────────────────────────────────────
+
+export const NoRootPath: Story = {
+    args: { rootPath: undefined },
+    play: async ({ canvas }) => {
+        await expect(canvas.findByText('root path が未設定です')).resolves.toBeVisible()
+    },
+}
+
+// ── @story 5: ローディング中 ─────────────────────────────────────────
+
 export const Loading: Story = {
-    args: {
-        onListGraphs: () => new Promise(() => { }),
-    },
+    args: { onReadDir: () => new Promise(() => { }) },
     play: async ({ canvas }) => {
         await expect(canvas.getByText('Loading…')).toBeVisible()
     },
 }
 
-// @story 状態 4: エラー
+// ── @story 6: エラー ────────────────────────────────────────────────
+
 export const LoadError: Story = {
-    args: {
-        onListGraphs: async () => { throw new Error('db error') },
-    },
+    args: { onReadDir: async () => { throw new Error('fs error') } },
     play: async ({ canvas }) => {
-        await expect(canvas.findByText('Failed to load graphs')).resolves.toBeVisible()
-    },
-}
-
-// @story 状態 5: アクティブグラフあり
-export const WithActiveGraph: Story = {
-    args: {
-        onListGraphs: async () => mockGraphs,
-        activeGraphId: 'graph-01',
-    },
-    play: async ({ canvas }) => {
-        const item = await canvas.findByTestId('graph-item-graph-01')
-        await expect(item).toBeVisible()
-    },
-}
-
-// @story 状態 6: クリックで onNavigate が呼ばれる
-export const ClickNavigate: Story = {
-    args: {
-        onListGraphs: async () => mockGraphs,
-    },
-    play: async ({ canvas, args }) => {
-        await userEvent.click(await canvas.findByText('main'))
-        await expect(args.onNavigate).toHaveBeenCalledWith('graph-01')
+        await expect(canvas.findByText('Failed to load directory')).resolves.toBeVisible()
     },
 }

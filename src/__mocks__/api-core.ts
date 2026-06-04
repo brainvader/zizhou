@@ -11,6 +11,7 @@
  * create_graph:     インメモリに graph を追加して返す
  * save_graph:       インメモリの nodes/edges を graph_id でキーに保存する [CTX-15]
  * load_graph:       インメモリの nodes/edges を GraphFile 形式で返す [CTX-15]
+ * list_fs_tree:     固定フィクスチャのファイルツリーを返す [CTX-19]
  */
 import { NODE_CATALOG } from '@/bom/graph'
 import type { CatalogEntry } from '@/bom/graph'
