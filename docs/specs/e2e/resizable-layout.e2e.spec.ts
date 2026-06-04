@@ -19,6 +19,7 @@ test.describe('ResizableLayout: Integration', () => {
         await newProjectBtn.click()
         await page.waitForSelector('[role="dialog"]')
         await page.getByPlaceholder('My Awesome App').fill('E2E Test Project')
+        await page.getByPlaceholder('/Users/user/projects/my-app').fill('/tmp/e2e-test')
         await page.getByRole('button', { name: '作成' }).click()
         await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
 
