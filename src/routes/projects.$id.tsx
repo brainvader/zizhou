@@ -91,7 +91,7 @@ export const ProjectDetailRoute = () => {
                     defaultSize={GRAPH_EDITOR_PANEL.defaultSize}
                     minSize={GRAPH_EDITOR_PANEL.minSize}
                 >
-                    <GraphEditor activeGraphId={activeGraphId ?? null} />
+                    <GraphEditor projectId={id} activeGraphId={activeGraphId ?? null} />
                 </ResizablePanel>
 
                 <ResizableHandle />

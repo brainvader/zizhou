@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
 import { useGraphStore } from '@/store/useGraphStore'
+import { useProjectStore } from '@/store/useProjectStore'
 import type { ExecuteRequest, ExecuteResponse, UseNodeExecuteOptions, UseNodeExecuteReturn } from '@/bom/execute'
 
 /**
@@ -32,8 +33,15 @@ export function useNodeExecute({
 }: UseNodeExecuteOptions = {}): UseNodeExecuteReturn {
     const [runningNodeId, setRunningNodeId] = useState<string | null>(null)
     const updateNodeData = useGraphStore((s) => s.updateNodeData)
+    const projects = useProjectStore((s) => s.projects)
 
     const execute = async (nodeId: string, req: ExecuteRequest): Promise<void> => {
+        // [CTX-16] cwd が空のとき早期リターン
+        if (!req.cwd || req.cwd.trim() === '') {
+            toast.error('root path が未設定です。プロジェクト設定から root path を指定してください。')
+            return
+        }
+
         setRunningNodeId(nodeId)
         updateNodeData(nodeId, { status: 'doing' })
 

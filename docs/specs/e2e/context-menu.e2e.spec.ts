@@ -20,6 +20,7 @@ const gotoProjectDetail = async (page: import('@playwright/test').Page) => {
     await newProjectBtn.click()
     await page.waitForSelector('[role="dialog"]')
     await page.getByPlaceholder('My Awesome App').fill('E2E Test Project')
+    await page.getByPlaceholder('/Users/user/projects/my-app').fill('/tmp/e2e-test')
     await page.getByRole('button', { name: '作成' }).click()
     await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
 
@@ -117,7 +118,10 @@ test.describe('ContextMenu — Node [CTX-7]', () => {
         await node.click({ button: 'right' })
         await expect(page.getByTestId('context-menu')).toBeVisible()
 
-        await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } })
+        const pane = page.locator('.react-flow__pane')
+        const box = await pane.boundingBox()
+        if (!box) throw new Error('pane not found')
+        await page.mouse.click(box.x + box.width - 10, box.y + 10)
 
         await expect(page.getByTestId('context-menu')).not.toBeVisible()
 
