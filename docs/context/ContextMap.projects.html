@@ -8,53 +8,26 @@
             STACK
             runtime:  Tauri 2
             frontend: React 18 + TypeScript
-            bundler:  Vite
-            styling:  Tailwind CSS v4 + shadcn/ui
             router:   TanStack Router（routing の SSOT）
-            state:    Zustand（projects[] の SSOT）
-            persist:  SurrealDB embedded（Rust IPC 経由、RocksDB で永続化）
-            toast:    sonner
-            icons:    lucide-react
-            testing:  Vitest + RTL + Storybook + Playwright
+            state:    Zustand
+            db:       SurrealDB embedded (kv-surrealkv)
+            testing:  Vitest + RTL + Playwright + Storybook
             package:  pnpm
         ============================================================ -->
 
         <!-- ============================================================
-             PHILOSOPHY — Zizou の運用思想
-
-             Zizou は人間とエージェントの合意形成プラットフォームである。
-             エージェント主導でも人間主導でもなく、両者が同じグラフを共有し
-             作業の定義・分担・実行について合意する場を提供する。
-
-             ノード = 単一スキル（変換処理の最小単位）
-               入力を受け取り変換を行い出力を返す処理単位。
-               実行主体は問わない（CLI / API / LLM エージェント / 人間）。
-
-             グラフ = 複合スキル（スキルの入れ子構造）
-               複数のノードを繋いだワークフロー全体が1つのスキルを構成する。
-               グラフ自体も1つのスキルとして別グラフから参照できる（入れ子）。
-
-             3者の役割:
-               人間        — グラフを設計・承認することで意図とルールを定義する
-               エージェント — グラフを読んで自分の担当ノードを把握し実行する
-               ソフトウェア — ノードの定義に従い CLI/API を実行する
-        ============================================================ -->
-
-        <!-- ============================================================
             GLOBAL STORE
-            アプリ全体で共有すべき状態。
+            複数のコンテキストをまたいで共有すべき状態のみを定義する。
             routing は TanStack Router に委譲するため持たない。
-            永続化は SurrealDB embedded (Rust IPC) で管理する。
-            projects テーブルに CRUD する。フロントエンドは invoke() 経由でのみアクセスする。
         ============================================================ -->
         <script id="global-store" type="application/json">
             {
                 "projects": [
-                    { "id": "1", "name": "地蔵 Core",      "description": "グラフベースのプロジェクト管理OS。" },
-                    { "id": "2", "name": "Graph Renderer", "description": "ノード・エッジの依存関係を可視化するビューエンジン。" },
-                    { "id": "3", "name": "HITL Gate",      "description": "Human-in-the-loop の承認フロー制御モジュール。" },
-                    { "id": "4", "name": "Spec Extractor", "description": "実装完了時にコードと同期した仕様書を自動生成する。" },
-                    { "id": "5", "name": "Auth Module",    "description": "Tauriキーチェーン連携によるローカルファースト認証。" }
+                    { "id": "project:abc01", "name": "地蔵 Core",       "description": "グラフベースのプロジェクト管理OS。",                           "rootPath": "/Users/user/projects/zizhou" },
+                    { "id": "project:abc02", "name": "Graph Renderer",  "description": "ノード・エッジの依存関係を可視化するビューエンジン。",           "rootPath": "/Users/user/projects/graph-renderer" },
+                    { "id": "project:abc03", "name": "HITL Gate",       "description": "Human-in-the-loop の承認フロー制御モジュール。",               "rootPath": "/Users/user/projects/hitl-gate" },
+                    { "id": "project:abc04", "name": "Spec Extractor",  "description": "実装完了時にコードと同期した仕様書を自動生成する。",             "rootPath": "/Users/user/projects/spec-extractor" },
+                    { "id": "project:abc05", "name": "Auth Module",     "description": "Tauriキーチェーン連携によるローカルファースト認証。",           "rootPath": "/Users/user/projects/auth-module" }
                 ]
             }
         </script>
@@ -63,8 +36,8 @@
         <script data-context="ctx-project-grid" class="local-state" type="application/json">
             {
                 "isNewProjectDialogOpen": false,
-                "form": { "name": "", "description": "" },
-                "errors": { "name": null }
+                "form": { "name": "", "description": "", "rootPath": "" },
+                "errors": { "name": null, "rootPath": null }
             }
         </script>
 
@@ -303,24 +276,28 @@
                 border: 1px solid var(--border);
                 border-radius: var(--radius);
                 padding: 16px 18px;
-                height: 100px;
+                height: 96px;
                 cursor: pointer;
-                transition: all 0.18s;
+                transition: all 0.15s;
                 display: flex;
                 flex-direction: column;
-                justify-content: center;
-                gap: 6px;
+                gap: 4px;
             }
 
             .card:hover {
                 background: var(--card-hover);
-                border-color: #3a3f4a;
-                box-shadow: 0 2px 12px #00000040;
+                border-color: #2e333d;
+            }
+
+            .card.new {
+                border-style: dashed;
+                align-items: center;
+                justify-content: center;
             }
 
             .card-title {
                 font-size: 13px;
-                font-weight: 600;
+                font-weight: 500;
                 color: var(--foreground);
             }
 
@@ -328,57 +305,40 @@
                 font-size: 11px;
                 color: var(--muted-foreground);
                 line-height: 1.5;
-                display: -webkit-box;
-                -webkit-line-clamp: 2;
-                line-clamp: 2;
-                -webkit-box-orient: vertical;
+            }
+
+            /* [CTX-16] root_path バッジ（カード下部） */
+            .card-root-path {
+                font-family: var(--font-mono);
+                font-size: 9px;
+                color: #454a52;
+                letter-spacing: 0.05em;
+                margin-top: auto;
                 overflow: hidden;
-            }
-
-            .card.new {
-                border-style: dashed;
-                border-color: #2e333d;
-                background: transparent;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .card.new:hover {
-                border-color: #454b59;
-                background: var(--accent);
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
 
             .new-text {
-                font-size: 12px;
+                font-size: 11px;
                 color: var(--muted-foreground);
                 letter-spacing: 0.05em;
             }
 
+            /* dialog */
             .dialog-overlay {
                 position: fixed;
                 inset: 0;
-                background: #00000080;
+                background: #00000066;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                z-index: 50;
-            }
-
-            .dialog {
-                background: var(--card);
-                border: 1px solid var(--border);
-                border-radius: calc(var(--radius) * 1.5);
-                padding: 24px;
-                width: 400px;
-                display: flex;
-                flex-direction: column;
-                gap: 20px;
-                box-shadow: 0 8px 32px #00000080;
             }
 
             .dialog-title {
-                font-size: 15px;
+                font-size: 14px;
                 font-weight: 600;
+                color: var(--foreground);
                 letter-spacing: 0.02em;
             }
 
@@ -457,56 +417,62 @@
         </header>
 
         <!-- ============================================================
-            CTX-2: PROJECT-GRID [ ]
+            CTX-2: PROJECT-GRID [✓]
             責務: SurrealDB の projects テーブルを一覧表示・新規作成のエントリーポイント
             注意: クリックで /projects/:id へ遷移（routing を更新）
         ============================================================ -->
         <main id="ctx-project-grid">
 
             <div class="grid">
+                <!-- [CTX-16] rootPath をカード下部に表示するモックアップ -->
                 <div class="card">
                     <div class="card-title">地蔵 Core</div>
                     <div class="card-description">グラフベースのプロジェクト管理OS。</div>
+                    <div class="card-root-path">~/projects/zizhou</div>
                 </div>
                 <div class="card">
                     <div class="card-title">Graph Renderer</div>
                     <div class="card-description">ノード・エッジの依存関係を可視化するビューエンジン。</div>
+                    <div class="card-root-path">~/projects/graph-renderer</div>
                 </div>
                 <div class="card">
                     <div class="card-title">HITL Gate</div>
                     <div class="card-description">Human-in-the-loop の承認フロー制御モジュール。</div>
+                    <div class="card-root-path">~/projects/hitl-gate</div>
                 </div>
                 <div class="card">
                     <div class="card-title">Spec Extractor</div>
                     <div class="card-description">実装完了時にコードと同期した仕様書を自動生成する。</div>
+                    <div class="card-root-path">~/projects/spec-extractor</div>
                 </div>
                 <div class="card">
                     <div class="card-title">Auth Module</div>
                     <div class="card-description">Tauriキーチェーン連携によるローカルファースト認証。</div>
+                    <div class="card-root-path">~/projects/auth-module</div>
                 </div>
                 <div class="card new"><span class="new-text">＋ new project</span></div>
             </div>
 
             <!--
-                [ ][Feature] Project List     — SurrealDB から取得した projects[] をカードグリッドで表示する
+                [✓][Feature] Project List     — SurrealDB から取得した projects[] をカードグリッドで表示する
                 [✓][Feature] Open Project     — カードを TanStack Router の <Link to="/projects/$id"> でラップして遷移する
-                [ ][Feature] New Project Card — 破線カードクリックで shadcn Dialog を開き name・description を入力して作成する
-                [ ][Logic]   Empty State      — projects[] が空のとき破線カードのみを表示する
+                [✓][Feature] New Project Card — 破線カードクリックで shadcn Dialog を開き name・description・rootPath を入力して作成する
+                [✓][Logic]   Empty State      — projects[] が空のとき破線カードのみを表示する
                 [✓][Logic]   Routing          — TanStack Router に委譲。Zustand に currentPath は持たない
-                [ ][Logic]   Load             — 起動時に invoke('list_projects') で SurrealDB から projects[] を取得する
+                [✓][Logic]   Load             — 起動時に invoke('list_projects') で SurrealDB から projects[] を取得する
             -->
         </main>
 
         <!-- ============================================================
-            CTX-3: NEW PROJECT DIALOG [ ]
+            CTX-3: NEW PROJECT DIALOG [✓]
             責務: プロジェクトの新規作成フォーム
             トリガー: 破線カード（＋ new project）クリック
-            使用コンポーネント: shadcn Dialog / Input / Button
+            使用コンポーネント: shadcn Dialog / Input / Button / RootPathInput [CTX-16]
             注意: </body> 直前に配置（position:fixed のため）
         ============================================================ -->
         <div class="dialog-overlay">
-            <dialog id="ctx-new-project-dialog" class="dialog" open
-                style="all:unset; display:flex; flex-direction:column; gap:20px; background:#13161a; border:1px solid #242830; border-radius:9px; padding:24px; width:400px; box-shadow:0 8px 32px #00000080;">
+            <dialog id="ctx-new-project-dialog"
+                style="all:unset; display:flex; flex-direction:column; gap:20px; background:#13161a; border:1px solid #242830; border-radius:9px; padding:24px; width:420px; box-shadow:0 8px 32px #00000080;">
 
                 <div class="dialog-title">New Project</div>
 
@@ -521,17 +487,34 @@
                     <input class="dialog-input" type="text" placeholder="このプロジェクトの説明（任意）" />
                 </div>
 
+                <!-- [CTX-16] root path フィールド：フォルダアイコンボタン付きテキスト入力 -->
+                <div class="dialog-field">
+                    <label class="dialog-label">root path *</label>
+                    <div style="display:flex; gap:6px;">
+                        <input class="dialog-input" style="flex:1;" type="text"
+                            placeholder="/Users/user/projects/my-app" />
+                        <button class="btn-outline" style="white-space:nowrap; padding:0 12px; font-size:14px;"
+                            title="フォルダを選択">
+                            📁
+                        </button>
+                    </div>
+                    <span class="dialog-error">root path は必須です</span>
+                </div>
+
                 <div class="dialog-footer">
                     <button class="btn-outline">キャンセル</button>
                     <button class="btn btn-primary">作成</button>
                 </div>
 
                 <!--
-                    [ ][Feature] Create Project — name・description を入力して「作成」で projects[] に追加する
-                    [ ][Feature] Cancel         — 「キャンセル」または overlay クリックでダイアログを閉じる
-                    [ ][Logic]   Validation     — name が空のとき「作成」ボタンを押すとエラーを表示し送信しない（Zod）
-                    [ ][Logic]   Submit         — invoke('create_project', { name, description }) で SurrealDB の project テーブルに INSERT し、Zustand の projects[] を更新してダイアログを閉じる
-                    [ ][Logic]   ID生成         — id は SurrealDB が自動生成する（nanoid 不要）
+                    [✓][Feature] Create Project    — name・description・rootPath を入力して「作成」で projects[] に追加する
+                    [✓][Feature] Cancel            — 「キャンセル」または overlay クリックでダイアログを閉じる
+                    [✓][Feature] Directory Picker  — 📁 ボタンクリックで @tauri-apps/plugin-dialog の open({ directory: true }) を呼び、
+                                                     取得したパスを rootPath フィールドに反映する [CTX-16]
+                    [✓][Logic]   Validation        — name / rootPath が空のとき「作成」ボタンを押すとエラーを表示し送信しない（Zod）
+                    [✓][Logic]   Submit            — invoke('create_project', { name, description, rootPath }) で SurrealDB の project テーブルに INSERT し、
+                                                     Zustand の projects[] を更新してダイアログを閉じる
+                    [✓][Logic]   ID生成            — id は SurrealDB が自動生成する（nanoid 不要）
                 -->
             </dialog>
         </div>
@@ -588,18 +571,65 @@
               ノード実行（CTX-14 execute_node）は git/test 等を CLI で実行するため
               対象リポジトリの cwd が必須。Project レコードに root_path を持たせる。
 
+            マイグレーション戦略:
+              SurrealDB embedded は ALTER TABLE / migration runner がないため、
+              init_db() 内で以下のパッチを一度だけ実行する:
+                UPDATE project SET root_path = "" WHERE root_path IS NONE;
+              既存レコードは root_path = "" になる。
+              root_path が空文字のプロジェクトは execute_node 呼び出し時にフロントで弾く。
+
+            型配置:
+              層              フィールド名    型
+              ─────────────────────────────────────────────────
+              SurrealDB       root_path       string
+              Rust struct     root_path       String   (non-optional)
+              IPC JSON        "rootPath"      string   (json! マクロで変換)
+              TypeScript      rootPath        string
+              Zod Form        rootPath        string   min(1) 必須
+
             横断する変更:
               - SurrealDB: project テーブルに root_path: String カラム追加
-              - Rust:      create_project に rootPath 引数追加 / list_projects のレスポンスに含める
-              - Frontend:  Project 型に rootPath: string 追加（docs/bom/project.ts）
-              - UI:        New Project Dialog にディレクトリ選択ボタン追加（Tauri dialog.open）
-              - 実行:      execute_node 呼び出し時に project.root_path を cwd として渡す
+                           + init_db() に既存レコードパッチを追加
+              - Rust:      ProjectRecord / ProjectInput に root_path: String を追加
+                           create_project に root_path 引数追加
+                           list_projects / create_project の json! に "rootPath" を追加
+              - Frontend:  ProjectSchema / NewProjectFormSchema に rootPath を追加（docs/bom/project.ts）
+              - Component: src/components/RootPathInput.tsx — フォルダ選択ボタン付き入力コンポーネント
+                           props DI: onOpenDirectory?: () => Promise<string | null>
+              - UI:        ProjectGrid の NewProjectDialog に RootPathInput を組み込む
+              - Store:     Zustand の Project 型に rootPath を追加（ProjectSchema 派生のため自動追従）
+              - 実行:      useNodeExecute が activeProject.rootPath を cwd として渡す
+                           rootPath が空文字のとき execute を呼び出し前に toast.error で弾く
 
-            [ ][Feature] Directory Picker  — New Project Dialog で dialog.open({ directory: true }) を呼びパスを取得する
-            [ ][Feature] Path Display      — プロジェクト詳細の Topbar に root_path を表示する
-            [ ][Logic]   Schema Migration  — project テーブルに root_path カラムを追加
-            [ ][Logic]   Validation        — root_path は必須。空文字や存在しないパスは弾く
-            [ ][Logic]   Cwd Injection     — execute_node が activeProject.root_path を cwd として受け取る
+            影響ファイル:
+              src-tauri/src/db.rs              — ProjectRecord / ProjectInput
+              src-tauri/src/lib.rs             — create_project / list_projects / execute_node (cwd)
+              docs/bom/project.ts              — ProjectSchema / NewProjectFormSchema
+              src/components/RootPathInput.tsx — 新規作成
+              src/components/ProjectGrid.tsx   — NewProjectDialog に rootPath フィールド追加
+              src/hooks/useNodeExecute.ts      — rootPath 空文字ガード追加
+              docs/specs/                      — Vitest / Storybook / E2E spec 追加
+
+            [ ][Feature] Directory Picker  — New Project Dialog で RootPathInput の 📁 ボタンをクリックすると
+                                             @tauri-apps/plugin-dialog の open({ directory: true }) が呼ばれ、
+                                             選択したパスが rootPath フィールドに反映される
+            [ ][Feature] Path Display      — ProjectGrid のカード下部に rootPath を短縮表示（~/... 形式）する
+            [ ][Logic]   Schema Migration  — init_db() 内で
+                                             "UPDATE project SET root_path = '' WHERE root_path IS NONE"
+                                             を実行し、既存レコードに root_path = "" を補完する
+            [ ][Logic]   Rust Types        — ProjectRecord.root_path: String（non-optional）
+                                             ProjectInput.root_path: String
+                                             list_projects / create_project の json! に "rootPath" キーを追加
+            [ ][Logic]   Validation        — NewProjectFormSchema で rootPath: z.string().min(1) を必須化
+                                             rootPath が空文字のとき作成ボタンを押すとエラーを表示し送信しない
+            [ ][Logic]   Cwd Injection     — useNodeExecute の execute() 呼び出し前に
+                                             activeProject.rootPath が空文字なら toast.error("root path が未設定です") で早期リターン
+                                             invoke('execute_node', { ..., cwd: activeProject.rootPath }) として渡す
+
+            関連ファイル（spec）:
+              docs/specs/unit/root-path-input.spec.tsx — RootPathInput Vitest
+              src/stories/RootPathInput.stories.tsx    — Storybook
+              docs/specs/e2e/project-root-path.e2e.spec.ts — Playwright E2E
         ============================================================ -->
 
 
