@@ -18,7 +18,7 @@ import type { ExecuteResponse } from '@/bom/execute'
 
 // ── インメモリストア ──────────────────────────────────────────────────────
 
-type MockProject = { id: string; name: string; description?: string }
+type MockProject = { id: string; name: string; description?: string; rootPath: string }
 type MockGraph = { id: string; name: string; project_id: string }
 
 type MockNode = {
@@ -84,9 +84,11 @@ export async function invoke<T>(
         case 'create_project': {
             const name = args?.name as string
             const description = args?.description as string | undefined
+            const rootPath = (args?.rootPath as string) ?? ''
             const project: MockProject = {
                 id: `project:mock-${_idCounter++}`,
                 name,
+                rootPath,
                 ...(description ? { description } : {}),
             }
             _projects.push(project)

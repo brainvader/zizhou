@@ -39,7 +39,7 @@ test.describe('CTX-16 PROJECT ROOT PATH — Integration', () => {
     /**
      * rootPath を入力してプロジェクトを作成できる
      */
-    test.skip('rootPath を入力してプロジェクトを作成できる', async ({ page }) => {
+    test('rootPath を入力してプロジェクトを作成できる', async ({ page }) => {
         await createProjectWithRootPath(page, PROJECT_NAME, ROOT_PATH)
 
         await expect(page.getByRole('link', { name: PROJECT_NAME })).toBeVisible()
@@ -50,7 +50,7 @@ test.describe('CTX-16 PROJECT ROOT PATH — Integration', () => {
     /**
      * rootPath が空のまま作成ボタンを押すとバリデーションエラーが表示される
      */
-    test.skip('rootPath が空のときバリデーションエラーが表示される', async ({ page }) => {
+    test('rootPath が空のときバリデーションエラーが表示される', async ({ page }) => {
         const newProjectBtn = page.getByText('＋ new project')
         await expect(newProjectBtn).toBeEnabled({ timeout: 10000 })
         await newProjectBtn.click()
@@ -70,14 +70,14 @@ test.describe('CTX-16 PROJECT ROOT PATH — Integration', () => {
     /**
      * 作成したプロジェクトのカードに rootPath が短縮表示される
      */
-    test.skip('プロジェクトカードに rootPath が表示される', async ({ page }) => {
+    test('プロジェクトカードに rootPath が表示される', async ({ page }) => {
         await createProjectWithRootPath(page, PROJECT_NAME, ROOT_PATH)
 
         const card = page.getByRole('link', { name: PROJECT_NAME })
         await expect(card).toBeVisible()
 
         // rootPath の短縮表示（~/... 形式 or フルパス）が含まれる
-        await expect(card.getByTestId('card-root-path')).toBeVisible()
+        await expect(card.getByTestId('card-root-path')).toHaveText(ROOT_PATH)
 
         await page.screenshot({ path: 'evidence/ctx16_card_root_path.png', fullPage: true })
     })
