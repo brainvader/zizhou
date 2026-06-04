@@ -709,23 +709,23 @@
         <!-- ============================================================
             CTX-19 〜 CTX-22: 構想段階（未着手）
 
-            CTX-19: GRAPH INTEGRITY TESTS
+            CTX-20: GRAPH INTEGRITY TESTS
               責務: ContextMap グラフの参照整合性をテストで保証する
               例:    integrity/file-paths.spec.ts, integrity/edges.spec.ts,
                      integrity/signatures.spec.ts ほか
               関連: CTX-17 (グラフモデル), CTX-18 (シグニチャ抽出)
 
-            CTX-20: STATIC SIMULATION
+            CTX-21: STATIC SIMULATION
               責務: 型レベルでデータがグラフを流れるかを検証する
               手段: signature の入力型 / 出力型をエッジ越しに突合
               関連: CTX-17, CTX-18
 
-            CTX-21: DYNAMIC SIMULATION
+            CTX-22: DYNAMIC SIMULATION
               責務: テストデータを入口ノードから流して実行経路を確認する
               手段: グラフをトポロジカルソートして execute_node を順番に呼ぶ
               関連: CTX-14 (execute_node)
 
-            CTX-22: EXECUTION PATH VISUALIZATION
+            CTX-23: EXECUTION PATH VISUALIZATION
               責務: 動的シミュレーションの実行経路をグラフ上に可視化する
               手段: ノード status (pending/running/success/failed) を色分け
                     + エッジ上にデータ形状を表示
