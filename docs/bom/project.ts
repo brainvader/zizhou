@@ -10,6 +10,7 @@ export const ProjectSchema = z.object({
     id: z.string(),
     name: z.string().min(1, 'name は必須です').max(50),
     description: z.string().max(200).optional(),
+    rootPath: z.string().min(1, 'root path は必須です'),
 })
 
 export type Project = z.infer<typeof ProjectSchema>
@@ -23,6 +24,7 @@ export type Project = z.infer<typeof ProjectSchema>
 export const NewProjectFormSchema = z.object({
     name: z.string().min(1, 'name は必須です'),
     description: z.string().max(200).optional(),
+    rootPath: z.string().min(1, 'root path は必須です'),
 })
 
 export type NewProjectForm = z.infer<typeof NewProjectFormSchema>
@@ -61,7 +63,7 @@ export type UseProjectLoadReturn = {
 // UseProjectSaveReturn
 // useProjectSave hook の戻り値型。
 // New Project ダイアログの作成ボタン押下時に呼び出す。
-// invoke('create_project', { name, description }) で SurrealDB に INSERT する。
+// invoke('create_project', { name, description, rootPath }) で SurrealDB に INSERT する。
 // ============================================================
 
 export type UseProjectSaveReturn = {
