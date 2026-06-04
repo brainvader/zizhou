@@ -15,6 +15,7 @@ const createProject = async (page: import('@playwright/test').Page, name: string
     await newProjectBtn.click()
     await expect(page.getByRole('dialog')).toBeVisible()
     await page.getByPlaceholder('My Awesome App').fill(name)
+    await page.getByPlaceholder('/Users/user/projects/my-app').fill('/tmp/e2e-test')
     await page.getByRole('button', { name: '作成' }).click()
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 })
 }
