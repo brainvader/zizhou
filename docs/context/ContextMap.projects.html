@@ -563,7 +563,7 @@
         -->
 
         <!-- ============================================================
-            CTX-16: PROJECT ROOT PATH [ ]
+            CTX-16: PROJECT ROOT PATH [✓]
             責務: プロジェクトと対象ソフトウェアリポジトリのファイルパスを紐付ける
 
             背景:
@@ -610,19 +610,19 @@
               src/hooks/useNodeExecute.ts      — rootPath 空文字ガード追加
               docs/specs/                      — Vitest / Storybook / E2E spec 追加
 
-            [ ][Feature] Directory Picker  — New Project Dialog で RootPathInput の 📁 ボタンをクリックすると
+            [✓][Feature] Directory Picker  — New Project Dialog で RootPathInput の 📁 ボタンをクリックすると
                                              @tauri-apps/plugin-dialog の open({ directory: true }) が呼ばれ、
                                              選択したパスが rootPath フィールドに反映される
-            [ ][Feature] Path Display      — ProjectGrid のカード下部に rootPath を短縮表示（~/... 形式）する
-            [ ][Logic]   Schema Migration  — init_db() 内で
+            [✓][Feature] Path Display      — ProjectGrid のカード下部に rootPath を短縮表示（~/... 形式）する
+            [✓][Logic]   Schema Migration  — init_db() 内で
                                              "UPDATE project SET root_path = '' WHERE root_path IS NONE"
                                              を実行し、既存レコードに root_path = "" を補完する
-            [ ][Logic]   Rust Types        — ProjectRecord.root_path: String（non-optional）
+            [✓][Logic]   Rust Types        — ProjectRecord.root_path: String（non-optional）
                                              ProjectInput.root_path: String
                                              list_projects / create_project の json! に "rootPath" キーを追加
-            [ ][Logic]   Validation        — NewProjectFormSchema で rootPath: z.string().min(1) を必須化
+            [✓][Logic]   Validation        — NewProjectFormSchema で rootPath: z.string().min(1) を必須化
                                              rootPath が空文字のとき作成ボタンを押すとエラーを表示し送信しない
-            [ ][Logic]   Cwd Injection     — useNodeExecute の execute() 呼び出し前に
+            [✓][Logic]   Cwd Injection     — useNodeExecute の execute() 呼び出し前に
                                              activeProject.rootPath が空文字なら toast.error("root path が未設定です") で早期リターン
                                              invoke('execute_node', { ..., cwd: activeProject.rootPath }) として渡す
 
