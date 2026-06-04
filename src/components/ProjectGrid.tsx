@@ -15,11 +15,12 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { RootPathInput } from '@/components/RootPathInput'
 
-const INITIAL_FORM: NewProjectForm = { name: '', description: '' }
-const INITIAL_ERRORS = { name: null as string | null, description: null as string | null }
+const INITIAL_FORM: NewProjectForm = { name: '', description: '', rootPath: '' }
+const INITIAL_ERRORS = { name: null as string | null, description: null as string | null, rootPath: null as string | null }
 
-type CreateProjectFn = (name: string, description?: string) => Promise<Project>
+type CreateProjectFn = (name: string, description?: string, rootPath?: string) => Promise<Project>
 type StubLinkProps = { to: string; params?: Record<string, string>; search?: Record<string, unknown>; children: React.ReactNode; className?: string; 'data-testid'?: string }
 
 type ProjectGridProps = {
@@ -54,6 +55,7 @@ export function ProjectGrid({ onCreateProject, LinkComponent }: ProjectGridProps
             setErrors({
                 name: fieldErrors.name?.[0] ?? null,
                 description: fieldErrors.description?.[0] ?? null,
+                rootPath: fieldErrors.rootPath?.[0] ?? null,
             })
             return // ✨【修正】バリデーションエラー時はここで処理を中断させる
         }
@@ -61,8 +63,8 @@ export function ProjectGrid({ onCreateProject, LinkComponent }: ProjectGridProps
         try {
             const createFn =
                 onCreateProject ??
-                (async (name, desc) => invoke<Project>('create_project', { name, description: desc }))
-            const newProj = await createFn(form.name, form.description)
+                (async (name, desc, path) => invoke<Project>('create_project', { name, description: desc, rootPath: path }))
+            const newProj = await createFn(form.name, form.description, form.rootPath)
 
             useProjectStore.setState((state) => ({
                 projects: [...state.projects, newProj],
@@ -93,6 +95,12 @@ export function ProjectGrid({ onCreateProject, LinkComponent }: ProjectGridProps
                                 {project.description}
                             </p>
                         )}
+                        <p
+                            data-testid="card-root-path"
+                            className="font-mono text-[9px] text-muted-foreground/50 mt-auto truncate"
+                        >
+                            {project.rootPath}
+                        </p>
                     </CustomLink>
                 ))}
 
@@ -148,6 +156,12 @@ export function ProjectGrid({ onCreateProject, LinkComponent }: ProjectGridProps
                                     <span className="font-mono text-xs text-destructive">{errors.description}</span>
                                 )}
                             </div>
+
+                            <RootPathInput
+                                value={form.rootPath}
+                                onChange={(v) => setForm((f) => ({ ...f, rootPath: v }))}
+                                error={errors.rootPath}
+                            />
                         </div>
 
                         <DialogFooter>
