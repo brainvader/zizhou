@@ -252,7 +252,11 @@ async fn create_graph(
     name: String,
     db: State<'_, Db>,
 ) -> Result<serde_json::Value, String> {
-    let input = GraphInput { name, project_id };
+    let input = GraphInput {
+        name,
+        project_id,
+        kind: None,
+    };
     let created: Option<GraphRecord> = db
         .create("graph")
         .content(input)
@@ -301,6 +305,8 @@ async fn save_graph(
             description: node.description,
             position_x: node.position_x,
             position_y: node.position_y,
+            file_path: None,
+            analyzed: None,
         };
         let _: Option<NodeRecord> = db
             .create("node")
@@ -315,6 +321,7 @@ async fn save_graph(
             graph_id: graph_id.clone(),
             source: edge.source,
             target: edge.target,
+            kind: None,
         };
         let _: Option<EdgeRecord> = db
             .create("edge")
