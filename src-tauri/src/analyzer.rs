@@ -252,8 +252,10 @@ fn collect_rust_mods(node: Node, src: &str, out: &mut Vec<String>) {
         // `mod foo { ... }` (インライン定義) は declaration_list を子に持つ → 外部ファイル参照ではない
         let has_body = {
             let mut cursor = node.walk();
-            node.children(&mut cursor)
-                .any(|c| c.kind() == "declaration_list")
+            let found = node
+                .children(&mut cursor)
+                .any(|c| c.kind() == "declaration_list");
+            found
         };
         if !has_body {
             if let Some(name) = node.child_by_field_name("name") {
