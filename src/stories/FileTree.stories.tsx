@@ -10,7 +10,7 @@
  * 6. readDir 失敗時はエラーメッセージが表示される
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, userEvent } from 'storybook/test'
+import { expect, fn, userEvent } from 'storybook/test'
 import { FileTree } from '@/components/FileTree'
 import type { FsEntry } from '@/bom/file-tree'
 
@@ -119,5 +119,119 @@ export const LoadError: Story = {
     args: { onReadDir: async () => { throw new Error('fs error') } },
     play: async ({ canvas }) => {
         await expect(canvas.findByText('Failed to load directory')).resolves.toBeVisible()
+    },
+}
+
+// ============================================================
+// [CTX-20] 構造グラフ連携ストーリー
+//
+// 前提:
+//   - 既存ストーリーで meta / mockReadDir / Default 等が定義済み
+//   - mockReadDir は rootPath = '/Users/user/projects/zizou-core' を想定
+//     （もしくは既存テストで使われているフィクスチャ rootPath に揃える）
+//
+// ストーリー側で追加 import が必要:
+//   import { expect, fn, userEvent } from 'storybook/test'
+//
+// （既存 stories で既に import 済みなら重複は省く）
+// ============================================================
+
+// 既存の mockReadDir フィクスチャでツリーに src/FileTree.tsx /
+// src/GraphEditor.tsx / src/utils.ts が含まれる想定。
+// もし含まれていなければ既存 mockReadDir を以下に差し替えるか、
+// または別のフィクスチャ stories ファイルとして分離してください。
+
+export const AnalyzedFiles: Story = {
+    name: '[CTX-20] Analyzed files (registered)',
+    args: {
+        analyzedFiles: new Set(['src/FileTree.tsx', 'src/utils.ts']),
+    },
+    play: async ({ canvas }) => {
+        // src フォルダを展開
+        await userEvent.click(canvas.getByTestId('fs-entry-src'))
+
+        // 登録済みは data-analyzed='true'
+        const registered = await canvas.findByTestId('fs-entry-FileTree.tsx')
+        await expect(registered).toHaveAttribute('data-analyzed', 'true')
+
+        // 未登録は data-analyzed 属性が無い
+        const unregistered = canvas.getByTestId('fs-entry-GraphEditor.tsx')
+        await expect(unregistered).not.toHaveAttribute('data-analyzed')
+    },
+}
+
+export const StaleFiles: Story = {
+    name: '[CTX-20] Stale files (changed since analyze)',
+    args: {
+        analyzedFiles: new Set(['src/FileTree.tsx', 'src/utils.ts']),
+        staleFiles: new Set(['src/FileTree.tsx']),
+    },
+    play: async ({ canvas }) => {
+        await userEvent.click(canvas.getByTestId('fs-entry-src'))
+        const stale = await canvas.findByTestId('fs-entry-FileTree.tsx')
+        await expect(stale).toHaveAttribute('data-stale', 'true')
+
+        // utils.ts は analyzed だが stale ではない
+        const freshFile = canvas.getByTestId('fs-entry-utils.ts')
+        await expect(freshFile).toHaveAttribute('data-analyzed', 'true')
+        await expect(freshFile).not.toHaveAttribute('data-stale')
+    },
+}
+
+export const SelectedFile: Story = {
+    name: '[CTX-20] Selected file highlight (Node→File sync)',
+    args: {
+        analyzedFiles: new Set(['src/FileTree.tsx']),
+        selectedFilePath: 'src/FileTree.tsx',
+    },
+    play: async ({ canvas }) => {
+        await userEvent.click(canvas.getByTestId('fs-entry-src'))
+        const selected = await canvas.findByTestId('fs-entry-FileTree.tsx')
+        await expect(selected).toHaveAttribute('data-selected', 'true')
+    },
+}
+
+export const FileClickInvokesHandler: Story = {
+    name: '[CTX-20] File click invokes onFileClick with relative path',
+    args: {
+        onFileClick: fn(),
+    },
+    play: async ({ canvas, args }) => {
+        await userEvent.click(canvas.getByTestId('fs-entry-src'))
+        const file = await canvas.findByTestId('fs-entry-FileTree.tsx')
+        await userEvent.click(file)
+
+        // 渡される引数は rootPath 相対 / forward slash
+        await expect(args.onFileClick).toHaveBeenCalledWith('src/FileTree.tsx')
+    },
+}
+
+export const StaleAnalyzedSelectedCombined: Story = {
+    name: '[CTX-20] Stale + Analyzed + Selected (combined data attrs)',
+    args: {
+        analyzedFiles: new Set(['src/FileTree.tsx']),
+        staleFiles: new Set(['src/FileTree.tsx']),
+        selectedFilePath: 'src/FileTree.tsx',
+    },
+    play: async ({ canvas }) => {
+        await userEvent.click(canvas.getByTestId('fs-entry-src'))
+        const entry = await canvas.findByTestId('fs-entry-FileTree.tsx')
+
+        await expect(entry).toHaveAttribute('data-analyzed', 'true')
+        await expect(entry).toHaveAttribute('data-stale', 'true')
+        await expect(entry).toHaveAttribute('data-selected', 'true')
+    },
+}
+
+export const FileClickOnDirectoryDoesNotInvokeHandler: Story = {
+    name: '[CTX-20] Directory click does NOT invoke onFileClick',
+    args: {
+        onFileClick: fn(),
+    },
+    play: async ({ canvas, args }) => {
+        // ディレクトリをクリック（展開のみ）
+        await userEvent.click(canvas.getByTestId('fs-entry-src'))
+        // ハンドラは呼ばれない
+        await expect(args.onFileClick).not.toHaveBeenCalled()
     },
 }
