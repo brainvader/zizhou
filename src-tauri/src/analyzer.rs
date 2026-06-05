@@ -29,6 +29,7 @@ use tree_sitter::{Node, Parser};
 // ============================================================
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ImportEdge {
     /// rootPath 相対 / forward slash
     pub from: String,
