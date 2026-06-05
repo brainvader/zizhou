@@ -3,6 +3,7 @@
 //! @context CTX-13: node_catalog テーブル
 //! @context CTX-SurrealDB-migration: project / graph テーブル追加
 //! @context CTX-15: node / edge テーブル追加（グラフ永続化）
+//! @context CTX-20: graph.kind / node.file_path / node.analyzed / edge.kind 追加
 //! @note    kv-surrealkv（RocksDB 永続化）を使用。
 //!          surrealdb 2.6.x (stable) を使用。
 
@@ -70,12 +71,18 @@ pub struct GraphRecord {
     pub id: surrealdb::sql::Thing,
     pub name: String,
     pub project_id: String,
+    /// [CTX-20] 'workflow' | 'structure'
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GraphInput {
     pub name: String,
     pub project_id: String,
+    /// [CTX-20] 'workflow' | 'structure'
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
 }
 
 // ============================================================
@@ -101,6 +108,12 @@ pub struct NodeRecord {
     pub description: Option<String>,
     pub position_x: f64,
     pub position_y: f64,
+    /// [CTX-20] rootPath からの相対パス。structure グラフのノードで使用。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
+    /// [CTX-20] 'pending' | 'fresh'（'stale' はフロント描画時に動的判定）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub analyzed: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -121,6 +134,12 @@ pub struct NodeInput {
     pub description: Option<String>,
     pub position_x: f64,
     pub position_y: f64,
+    /// [CTX-20]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
+    /// [CTX-20]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub analyzed: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -129,6 +148,9 @@ pub struct EdgeRecord {
     pub graph_id: String,
     pub source: String,
     pub target: String,
+    /// [CTX-20] 'flow' (workflow) | 'imports' | 'renders' | ...
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -136,6 +158,9 @@ pub struct EdgeInput {
     pub graph_id: String,
     pub source: String,
     pub target: String,
+    /// [CTX-20]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
 }
 
 // ============================================================
@@ -165,6 +190,14 @@ pub async fn init_db(app_data_dir: std::path::PathBuf) -> Result<Db, surrealdb::
 
     // [CTX-16] 既存レコードに root_path がない場合は空文字で補完
     db.query("UPDATE project SET root_path = '' WHERE root_path IS NONE")
+        .await?;
+
+    // [CTX-20] 既存グラフは 'workflow' とみなす
+    db.query("UPDATE graph SET kind = 'workflow' WHERE kind IS NONE")
+        .await?;
+
+    // [CTX-20] 既存エッジは 'flow' とみなす
+    db.query("UPDATE edge SET kind = 'flow' WHERE kind IS NONE")
         .await?;
 
     Ok(db)
