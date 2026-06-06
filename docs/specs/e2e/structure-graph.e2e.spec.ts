@@ -77,13 +77,17 @@ test.describe('CTX-20: Structure Graph', () => {
     })
 
     test('変更ファイルは stale 表示される', async ({ page }) => {
-        // 前のテストで analyze_file が呼ばれ、src/main.tsx が 'fresh' になっている。
-        // _changedFiles = ['src/main.tsx'] なので stale 判定される。
         await navigateToProjectDetail(page)
 
         await page.getByTestId('fs-entry-src').click()
         const mainTsx = page.getByTestId('fs-entry-main.tsx')
         await expect(mainTsx).toBeVisible()
+
+        // まずクリックして解析登録
+        await mainTsx.click()
+        await expect(mainTsx).toHaveAttribute('data-analyzed', 'true', { timeout: 3000 })
+
+        // _changedFiles に含まれるので stale 判定される
         await expect(mainTsx).toHaveAttribute('data-stale', 'true', { timeout: 3000 })
     })
 
