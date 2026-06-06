@@ -58,9 +58,7 @@ test.describe('CTX-20: Structure Graph', () => {
         const btn = page.getByTestId('reanalyze-all-button')
         await btn.click()
 
-        // 解析中はテキストが変わる
-        await expect(btn).toHaveText('Analyzing…')
-        // 完了後に戻る
+        // モックは即完了するので、完了後にボタンが元に戻っていることを確認
         await expect(btn).toHaveText('Reanalyze All', { timeout: 5000 })
     })
 
