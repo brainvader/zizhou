@@ -96,6 +96,7 @@ export const readDir = async (path: string) => {
         ],
         '/Users/user/projects/zizou-core/src': [
             { name: 'components', isFile: false, isDirectory: true, isSymlink: false },
+            { name: 'main.tsx', isFile: true, isDirectory: false, isSymlink: false },
         ],
         '/Users/user/projects/zizou-core/src/components': [
             { name: 'FileTree.tsx', isFile: true, isDirectory: false, isSymlink: false },
