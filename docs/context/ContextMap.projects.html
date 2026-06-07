@@ -807,16 +807,30 @@
               LLMチャットで生成したコードをFileTreeに追加し、
               Zizouが静的解析してグラフに登録する。
               1プロジェクト = 1構造グラフ。
+              SurrealDBが唯一のSSOT（Single Source of Truth）。
+
+            アーキテクチャ（フロントエンド）:
+              SurrealDB
+                  ↑↓
+              GraphStorage            ← Tauriコマンドのラッパー（将来リモートに差し替え可能）
+                  ↑↓
+              useGraphStore           ← ReactFlow用キャッシュ + ビジネスロジック
+                  ↑↓
+              ReactFlow               ← 表示・インタラクションのみ
+
+              - useGraphStore は GraphEditor 内部で閉じる
+              - GraphEditor 外部との共有が必要な状態は URL パラメータか SurrealDB で管理
+              - Zustand による外部共有ストアは作らない
+              - GraphStorage を Props DI で注入することで Storybook / E2E でモック可能
 
             データモデル:
               graph テーブルに kind: 'workflow' | 'structure' を追加
-              node  テーブルに file_path: string / analyzed: 'fresh' | 'stale' | 'pending' を追加
+              node  テーブルに file_path / analyzed: 'fresh' | 'stale' | 'pending' / position_x / position_y を追加
               edge  テーブルに kind: 'imports' | 'renders' を追加
 
-            VCS抽象化:
+            VCS抽象化（Rust）:
               変更ファイル検知は VcsProvider trait で抽象化し初期実装は Git。
               将来 Mercurial / Fossil 等への差し替えを可能にする。
-              フロント側も GetChangedFilesFn として Props DI で差し替え可能にする。
 
             Tauri コマンド:
               get_structure_graph(project_id)
@@ -833,13 +847,15 @@
               グラフ表示時に get_changed_files で stale ノードをハイライト
               ノードクリック → FileTree で該当ファイルをハイライト（双方向ナビゲーション）
               「再解析」ボタン（個別）/ 「全体を再解析」ボタン（一括）
+              ノード位置は SurrealDB に永続化し再読み込み時に復元する
 
             スコープ外（将来の CTX）:
               ファイル保存時のリアルタイム自動解析（notify クレート）
               データフローシミュレーション
               型情報の解決（TSコンパイラAPI）
 
-            [ ][Logic]   DB Schema          — graph/node/edge テーブルに kind / file_path / analyzed フィールドを追加
+            [ ][Logic]   DB Schema          — graph/node/edge テーブルに kind / file_path / analyzed / position フィールドを追加
+            [ ][Logic]   GraphStorage       — Tauriコマンドをラップする GraphStorage を実装する（Props DI対応）
             [ ][Logic]   VcsProvider        — trait で VCS 操作を抽象化し Git 実装を追加する
             [ ][Logic]   get_changed_files  — git diff --name-only HEAD で変更ファイル一覧を返す
             [ ][Logic]   get_structure_graph — project に紐づく structure グラフを取得（なければ作成）
@@ -849,6 +865,7 @@
             [ ][Feature] Reanalyze Button   — 個別ノードの「再解析」ボタンで analyze_file を呼び出す
             [ ][Feature] Reanalyze All      — 「全体を再解析」ボタンで analyze_project を呼び出す
             [ ][Feature] File↔Node Sync     — FileTree のファイルクリックとグラフノードを双方向でハイライトする
+            [ ][Feature] Position Persist   — ノード位置を SurrealDB に永続化し再読み込み時に復元する
         ============================================================ -->
 
 
