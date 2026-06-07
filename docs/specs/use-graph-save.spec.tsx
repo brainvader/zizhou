@@ -1,14 +1,14 @@
 /**
  * Slot 1: 発注用ヘッダー (JSDoc Metadata)
- * @context  useGraphSave — SurrealDB を使ったグラフ永続化 hook（CTX-15）
- * @bom      docs/bom/graph.ts (UseGraphSaveOptions / UseGraphSaveReturn)
+ * @context  useGraphSave — SurrealDB を使ったグラフ永続化 hook（CTX-15 → CTX-21 改訂）
+ * @bom      docs/bom/graph.ts (UseGraphSaveOptions / UseGraphSaveReturn / GraphStorage)
  * @story
  *   1. GraphEditor がマウントされると useGraphSave が subscribe を開始する。
  *      ただし setHydrated(true) が呼ばれるまで保存はスキップされる。
  *   2. setHydrated(true) を呼び出した後に nodes[] / edges[] が変化すると、
- *      onSaveGraph(graphId, nodes, edges) が呼ばれる。
- *   3. activeGraphId が null の場合は onSaveGraph を呼ばない。
- *   4. onSaveGraph が失敗した場合は toast.error() でエラーを通知する。
+ *      storage.saveGraph(graphId, nodes, edges) が呼ばれる。
+ *   3. activeGraphId が null の場合は storage.saveGraph を呼ばない。
+ *   4. storage.saveGraph が失敗した場合は toast.error() でエラーを通知する。
  *      Store にエラー状態は持たない。
  *   5. 保存中に変化が来た場合は pending に積んで保存完了後に再実行する。
  * @output   src/hooks/useGraphSave.ts
@@ -21,7 +21,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import type { Node, Edge } from '@xyflow/react'
-import type { GraphNodeData } from '@/bom/graph'
+import type { GraphNodeData, GraphStorage } from '@/bom/graph'
 import { useGraphSave } from '@/hooks/useGraphSave'
 
 // =============================================================================
@@ -30,16 +30,17 @@ import { useGraphSave } from '@/hooks/useGraphSave'
 
 const MOCK_GRAPH = 'graph-01'
 
+type SubscribeCallback = (state: { nodes: Node<GraphNodeData>[]; edges: Edge[] }) => void
+type GetStateReturn = { activeGraphId: string | null }
+
 const {
     mockToastError,
     mockSubscribe,
     mockGetState,
 } = vi.hoisted(() => ({
-    mockToastError: vi.fn<() => void>(),
-    mockSubscribe: vi.fn<
-        (cb: (state: { nodes: Node<GraphNodeData>[]; edges: Edge[] }) => void) => () => void
-    >(),
-    mockGetState: vi.fn<() => { activeGraphId: string | null }>(() => ({
+    mockToastError: vi.fn(),
+    mockSubscribe: vi.fn<(cb: SubscribeCallback) => () => void>(),
+    mockGetState: vi.fn<() => GetStateReturn>(() => ({
         activeGraphId: MOCK_GRAPH,
     })),
 }))
@@ -54,8 +55,6 @@ vi.mock('@/store/useProjectDetailStore', () => ({
     },
 }))
 
-type SubscribeCallback = (state: { nodes: Node<GraphNodeData>[]; edges: Edge[] }) => void
-
 vi.mock('@/store/useGraphStore', () => ({
     useGraphStore: {
         subscribe: (cb: SubscribeCallback) => mockSubscribe(cb),
@@ -66,6 +65,11 @@ vi.mock('@/store/useGraphStore', () => ({
 vi.mock('@tauri-apps/api/core', () => ({
     invoke: vi.fn(),
 }))
+
+/** テスト用 storage を生成する。saveGraph だけ差し替え可能。 */
+const makeMockStorage = (
+    saveGraph: GraphStorage['saveGraph'] = vi.fn<GraphStorage['saveGraph']>().mockResolvedValue(undefined),
+): Pick<GraphStorage, 'saveGraph'> => ({ saveGraph })
 
 const fixtureNodes: Node<GraphNodeData>[] = [
     {
@@ -92,38 +96,38 @@ describe('useGraphSave: logic', () => {
     // ----------------------------------------------------------------
     // @story 1: setHydrated(true) 前は保存スキップ
     // ----------------------------------------------------------------
-    test('logic: setHydrated(true) が呼ばれるまで onSaveGraph は呼ばれない', async () => {
-        const mockOnSaveGraph = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
+    test('logic: setHydrated(true) が呼ばれるまで storage.saveGraph は呼ばれない', async () => {
+        const mockSaveGraph = vi.fn<GraphStorage['saveGraph']>().mockResolvedValue(undefined)
 
         let cb: SubscribeCallback | null = null
         mockSubscribe.mockImplementation((fn) => { cb = fn; return () => { } })
 
-        const { result } = renderHook(() => useGraphSave({ onSaveGraph: mockOnSaveGraph }))
+        const { result } = renderHook(() => useGraphSave({ storage: makeMockStorage(mockSaveGraph) }))
 
         // setHydrated(true) を呼ばずに subscribe を発火
         await act(async () => { cb?.({ nodes: fixtureNodes, edges: fixtureEdges }) })
 
-        expect(mockOnSaveGraph).not.toHaveBeenCalled()
+        expect(mockSaveGraph).not.toHaveBeenCalled()
         void result
     })
 
     // ----------------------------------------------------------------
-    // @story 2: setHydrated(true) 後に変化があると onSaveGraph が呼ばれる
+    // @story 2: setHydrated(true) 後に変化があると storage.saveGraph が呼ばれる
     // ----------------------------------------------------------------
-    test('logic: setHydrated(true) 後に subscribe が発火すると onSaveGraph を呼ぶ', async () => {
-        const mockOnSaveGraph = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
+    test('logic: setHydrated(true) 後に subscribe が発火すると storage.saveGraph を呼ぶ', async () => {
+        const mockSaveGraph = vi.fn<GraphStorage['saveGraph']>().mockResolvedValue(undefined)
 
         let cb: SubscribeCallback | null = null
         mockSubscribe.mockImplementation((fn) => { cb = fn; return () => { } })
 
-        const { result } = renderHook(() => useGraphSave({ onSaveGraph: mockOnSaveGraph }))
+        const { result } = renderHook(() => useGraphSave({ storage: makeMockStorage(mockSaveGraph) }))
 
         act(() => result.current.setHydrated(true))
 
         await act(async () => { cb?.({ nodes: fixtureNodes, edges: fixtureEdges }) })
 
-        expect(mockOnSaveGraph).toHaveBeenCalledTimes(1)
-        expect(mockOnSaveGraph).toHaveBeenCalledWith(
+        expect(mockSaveGraph).toHaveBeenCalledTimes(1)
+        expect(mockSaveGraph).toHaveBeenCalledWith(
             MOCK_GRAPH,
             fixtureNodes,
             fixtureEdges,
@@ -131,42 +135,42 @@ describe('useGraphSave: logic', () => {
     })
 
     // ----------------------------------------------------------------
-    // @story 2: saveGraph を直接呼んだ場合も onSaveGraph が呼ばれる
+    // @story 2: saveGraph を直接呼んだ場合も storage.saveGraph が呼ばれる
     // ----------------------------------------------------------------
-    test('logic: saveGraph(nodes, edges) を呼ぶと onSaveGraph が発火する', async () => {
-        const mockOnSaveGraph = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
+    test('logic: saveGraph(nodes, edges) を呼ぶと storage.saveGraph が発火する', async () => {
+        const mockSaveGraph = vi.fn<GraphStorage['saveGraph']>().mockResolvedValue(undefined)
 
-        const { result } = renderHook(() => useGraphSave({ onSaveGraph: mockOnSaveGraph }))
+        const { result } = renderHook(() => useGraphSave({ storage: makeMockStorage(mockSaveGraph) }))
 
         act(() => result.current.setHydrated(true))
         await act(() => result.current.saveGraph(fixtureNodes, fixtureEdges))
 
-        expect(mockOnSaveGraph).toHaveBeenCalledTimes(1)
-        expect(mockOnSaveGraph).toHaveBeenCalledWith(MOCK_GRAPH, fixtureNodes, fixtureEdges)
+        expect(mockSaveGraph).toHaveBeenCalledTimes(1)
+        expect(mockSaveGraph).toHaveBeenCalledWith(MOCK_GRAPH, fixtureNodes, fixtureEdges)
     })
 
     // ----------------------------------------------------------------
     // @story 3: activeGraphId が null の場合はスキップ
     // ----------------------------------------------------------------
-    test('logic: activeGraphId が null の場合 onSaveGraph を呼ばない', async () => {
+    test('logic: activeGraphId が null の場合 storage.saveGraph を呼ばない', async () => {
         mockGetState.mockReturnValue({ activeGraphId: null })
-        const mockOnSaveGraph = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
+        const mockSaveGraph = vi.fn<GraphStorage['saveGraph']>().mockResolvedValue(undefined)
 
-        const { result } = renderHook(() => useGraphSave({ onSaveGraph: mockOnSaveGraph }))
+        const { result } = renderHook(() => useGraphSave({ storage: makeMockStorage(mockSaveGraph) }))
 
         act(() => result.current.setHydrated(true))
         await act(() => result.current.saveGraph(fixtureNodes, fixtureEdges))
 
-        expect(mockOnSaveGraph).not.toHaveBeenCalled()
+        expect(mockSaveGraph).not.toHaveBeenCalled()
     })
 
     // ----------------------------------------------------------------
-    // @story 4: onSaveGraph が失敗した場合は toast.error() を呼ぶ
+    // @story 4: storage.saveGraph が失敗した場合は toast.error() を呼ぶ
     // ----------------------------------------------------------------
-    test('logic: onSaveGraph が reject した場合 toast.error() を呼ぶ', async () => {
-        const mockOnSaveGraph = vi.fn<() => Promise<void>>().mockRejectedValue(new Error('db error'))
+    test('logic: storage.saveGraph が reject した場合 toast.error() を呼ぶ', async () => {
+        const mockSaveGraph = vi.fn<GraphStorage['saveGraph']>().mockRejectedValue(new Error('db error'))
 
-        const { result } = renderHook(() => useGraphSave({ onSaveGraph: mockOnSaveGraph }))
+        const { result } = renderHook(() => useGraphSave({ storage: makeMockStorage(mockSaveGraph) }))
 
         act(() => result.current.setHydrated(true))
         await act(() => result.current.saveGraph(fixtureNodes, fixtureEdges))
@@ -181,11 +185,11 @@ describe('useGraphSave: logic', () => {
         let resolveFirst!: () => void
         const first = new Promise<void>((r) => { resolveFirst = r })
 
-        const mockOnSaveGraph = vi.fn<() => Promise<void>>()
+        const mockSaveGraph = vi.fn<GraphStorage['saveGraph']>()
             .mockReturnValueOnce(first)
             .mockResolvedValue(undefined)
 
-        const { result } = renderHook(() => useGraphSave({ onSaveGraph: mockOnSaveGraph }))
+        const { result } = renderHook(() => useGraphSave({ storage: makeMockStorage(mockSaveGraph) }))
         act(() => result.current.setHydrated(true))
 
         // 1回目（解決待ち）
@@ -202,9 +206,9 @@ describe('useGraphSave: logic', () => {
         await p1
 
         // 2回目が pending として再実行される
-        await vi.waitFor(() => expect(mockOnSaveGraph).toHaveBeenCalledTimes(2))
+        await vi.waitFor(() => expect(mockSaveGraph).toHaveBeenCalledTimes(2))
 
-        expect(mockOnSaveGraph).toHaveBeenLastCalledWith(MOCK_GRAPH, updatedNodes, fixtureEdges)
+        expect(mockSaveGraph).toHaveBeenLastCalledWith(MOCK_GRAPH, updatedNodes, fixtureEdges)
     })
 
     // ----------------------------------------------------------------

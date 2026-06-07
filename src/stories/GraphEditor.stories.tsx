@@ -11,6 +11,7 @@ import { expect, fn } from 'storybook/test'
 import type { Node, Edge } from '@xyflow/react'
 import type { GraphNodeData } from '@/bom/graph'
 import { GraphEditor } from '@/components/GraphEditor'
+import { defaultGraphStorage } from '@/services/GraphStorage'
 
 const meta: Meta<typeof GraphEditor> = {
     component: GraphEditor,
@@ -70,11 +71,14 @@ export const ReadyWithNodes: Story = {
         activeGraphId: 'graph-01',
         nodes: mockNodes,
         edges: mockEdges,
-        onInvokeLoadGraph: async () => ({
-            id: 'graph-01',
-            nodes: mockNodes,
-            edges: mockEdges,
-        }),
+        storage: {
+            ...defaultGraphStorage,
+            loadGraph: async () => ({
+                id: 'graph-01',
+                nodes: mockNodes,
+                edges: mockEdges,
+            }),
+        },
     },
     play: async ({ canvas }) => {
         await expect(canvas.getByRole('button', { name: /ノード追加/ })).toBeVisible()
@@ -108,16 +112,19 @@ export const EdgeConnect: Story = {
         edges: [
             { id: 'e1', source: 'n1', target: 'n2' },
         ],
-        onInvokeLoadGraph: async () => ({
-            id: 'graph-01',
-            nodes: [
-                { id: 'n1', type: 'editableNode', position: { x: 100, y: 150 }, data: { label: 'Node A' } },
-                { id: 'n2', type: 'editableNode', position: { x: 380, y: 150 }, data: { label: 'Node B' } },
-            ],
-            edges: [
-                { id: 'e1', source: 'n1', target: 'n2' },
-            ],
-        }),
+        storage: {
+            ...defaultGraphStorage,
+            loadGraph: async () => ({
+                id: 'graph-01',
+                nodes: [
+                    { id: 'n1', type: 'editableNode', position: { x: 100, y: 150 }, data: { label: 'Node A' } },
+                    { id: 'n2', type: 'editableNode', position: { x: 380, y: 150 }, data: { label: 'Node B' } },
+                ],
+                edges: [
+                    { id: 'e1', source: 'n1', target: 'n2' },
+                ],
+            }),
+        },
     },
     play: async ({ canvas }) => {
         await expect(canvas.getByRole('button', { name: /ノード追加/ })).toBeVisible()

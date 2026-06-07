@@ -1,35 +1,31 @@
 import { useEffect } from 'react'
-import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import { useGraphStore } from '@/store/useGraphStore'
-import { GraphFileSchema } from '@/bom/graph'
-import type { GraphFile, UseGraphLoadOptions } from '@/bom/graph'
+import { defaultGraphStorage } from '@/services/GraphStorage'
+import type { UseGraphLoadOptions } from '@/bom/graph'
 
 /**
  * useGraphLoad
  *
- * activeGraphId が変化するたびに invoke('load_graph') を呼び、
+ * activeGraphId が変化するたびに GraphStorage.loadGraph を呼び、
  * SurrealDB からノード・エッジを取得して GraphStore に hydrate する hook。
- *
- * useGraphInit（Tauri fs 依存）の置き換え。
  *
  * - activeGraphId が null のとき何もしない（isDetailHydrated が true になるまで待つ）
  * - load 成功: loadGraph(graphFile) → setHydrated(true)
- * - load 失敗: resetGraph() → toast.error() → setHydrated(true)
- * - グラフが空（nodes/edges が空配列）の場合は resetGraph() を呼ばず loadGraph() で空を渡す
+ * - load 失敗（invoke エラー or バックエンド契約違反）: resetGraph() → toast.error() → setHydrated(true)
  *
  * props DI:
- * - onLoadGraph: テスト・Storybook で invoke を差し替える
+ * - storage:        Pick<GraphStorage, 'loadGraph'> を差し替える（テスト・Storybook）
  * - onLoadGraphFn / onResetGraph: store action を差し替える
- * - setHydrated: isDetailHydrated の setter を差し替える
- * - activeGraphId: store の値を上書きする（Storybook 用）
+ * - setHydrated:    isDetailHydrated の setter を差し替える
+ * - activeGraphId:  store の値を上書きする（Storybook 用）
  *
- * @context CTX-15
+ * @context CTX-15 → CTX-21 改訂（onLoadGraph を storage 経由に統合）
  * @bom     docs/bom/graph.ts UseGraphLoadOptions
  */
 export function useGraphLoad({
-    onLoadGraph,
+    storage,
     onLoadGraphFn,
     onResetGraph,
     setHydrated: setHydratedProp,
@@ -45,11 +41,7 @@ export function useGraphLoad({
     const loadGraphFn = onLoadGraphFn ?? storeLoadGraph
     const resetGraph = onResetGraph ?? storeResetGraph
     const setHydrated = setHydratedProp ?? storeSetDetailHydrated
-
-    const defaultOnLoadGraph = (graphId: string): Promise<GraphFile> =>
-        invoke<GraphFile>('load_graph', { graphId })
-
-    const loadGraphRemote = onLoadGraph ?? defaultOnLoadGraph
+    const loadGraphRemote = storage?.loadGraph ?? defaultGraphStorage.loadGraph
 
     useEffect(() => {
         // isDetailHydrated が false（グラフ一覧未取得）のときはスキップ
@@ -62,16 +54,9 @@ export function useGraphLoad({
         const load = async () => {
             setHydrated(false)
             try {
-                const raw = await loadGraphRemote(activeGraphId)
+                const graph = await loadGraphRemote(activeGraphId)
                 if (cancelled) return
-
-                const result = GraphFileSchema.safeParse(raw)
-                if (result.success) {
-                    loadGraphFn(result.data)
-                } else {
-                    // パース失敗時は空グラフで続行（resetGraph は呼ばない）
-                    loadGraphFn({ id: activeGraphId, nodes: [], edges: [] })
-                }
+                loadGraphFn(graph)
             } catch {
                 if (cancelled) return
                 resetGraph()
