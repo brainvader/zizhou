@@ -21,3 +21,8 @@ tauri-plugin-fs = { version = "2.5.1", features = ["watch"] }
 tauri-plugin-dialog = "2.7.1"
 surrealdb = { version = "=2.6.5", features = ["kv-surrealkv"] }
 tokio = { version = "1", features = ["full"] }
+
+# [CTX-20] tree-sitter による静的解析（ts / tsx / rs）
+tree-sitter = "0.25"
+tree-sitter-typescript = "0.23"
+tree-sitter-rust = "0.24"

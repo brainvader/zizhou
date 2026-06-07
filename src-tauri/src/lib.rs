@@ -5,15 +5,20 @@
 //! @context CTX-SurrealDB-migration: list_projects / create_project / list_graphs / create_graph コマンド追加
 //! @context CTX-15: save_graph / load_graph コマンド追加
 //! @context CTX-19: list_fs_tree コマンド追加
+//! @context CTX-20: get_structure_graph / analyze_file / analyze_project / get_changed_files
 
+mod analyzer;
 mod db;
+mod vcs;
 
 use db::{
     Db, EdgeInput, EdgeRecord, GraphInput, GraphRecord, NodeCatalog, NodeInput, NodeRecord,
     ProjectInput, ProjectRecord,
 };
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use tauri::{Manager, State};
+use vcs::{GitProvider, VcsProvider};
 
 // ============================================================
 // execute_node 用の型定義
@@ -31,6 +36,7 @@ pub struct ExecuteResponse {
     pub output: Option<serde_json::Value>,
     pub error: Option<ExecuteError>,
 }
+
 // ============================================================
 // list_fs_tree 用の型定義                             [CTX-19]
 // ============================================================
@@ -236,11 +242,15 @@ async fn list_graphs(
     Ok(records
         .into_iter()
         .map(|r| {
-            serde_json::json!({
+            let mut obj = serde_json::json!({
                 "id": thing_to_string(&r.id),
                 "name": r.name,
                 "project_id": r.project_id,
-            })
+            });
+            if let Some(k) = r.kind {
+                obj["kind"] = k.into();
+            }
+            obj
         })
         .collect())
 }
@@ -252,7 +262,11 @@ async fn create_graph(
     name: String,
     db: State<'_, Db>,
 ) -> Result<serde_json::Value, String> {
-    let input = GraphInput { name, project_id };
+    let input = GraphInput {
+        name,
+        project_id,
+        kind: None,
+    };
     let created: Option<GraphRecord> = db
         .create("graph")
         .content(input)
@@ -301,6 +315,8 @@ async fn save_graph(
             description: node.description,
             position_x: node.position_x,
             position_y: node.position_y,
+            file_path: None,
+            analyzed: None,
         };
         let _: Option<NodeRecord> = db
             .create("node")
@@ -315,6 +331,7 @@ async fn save_graph(
             graph_id: graph_id.clone(),
             source: edge.source,
             target: edge.target,
+            kind: None,
         };
         let _: Option<EdgeRecord> = db
             .create("edge")
@@ -329,6 +346,11 @@ async fn save_graph(
 /// グラフのノード・エッジを取得して GraphFile 形式で返す。
 #[tauri::command]
 async fn load_graph(graph_id: String, db: State<'_, Db>) -> Result<LoadGraphResponse, String> {
+    load_graph_inner(&db, graph_id).await
+}
+
+/// load_graph の本体ロジック。get_structure_graph からも呼ぶため切り出し。
+async fn load_graph_inner(db: &Db, graph_id: String) -> Result<LoadGraphResponse, String> {
     let raw_nodes: Vec<NodeRecord> = db
         .query("SELECT * FROM node WHERE graph_id = $gid")
         .bind(("gid", graph_id.clone()))
@@ -368,6 +390,13 @@ async fn load_graph(graph_id: String, db: State<'_, Db>) -> Result<LoadGraphResp
             if let Some(v) = n.description {
                 data["description"] = v.into();
             }
+            // [CTX-20]
+            if let Some(v) = n.file_path {
+                data["filePath"] = v.into();
+            }
+            if let Some(v) = n.analyzed {
+                data["analyzed"] = v.into();
+            }
             serde_json::json!({
                 "id": thing_to_string(&n.id),
                 "type": "editableNode",
@@ -380,11 +409,16 @@ async fn load_graph(graph_id: String, db: State<'_, Db>) -> Result<LoadGraphResp
     let edges: Vec<serde_json::Value> = raw_edges
         .into_iter()
         .map(|e| {
-            serde_json::json!({
+            let mut obj = serde_json::json!({
                 "id": thing_to_string(&e.id),
                 "source": e.source,
                 "target": e.target,
-            })
+            });
+            // [CTX-20]
+            if let Some(k) = e.kind {
+                obj["kind"] = k.into();
+            }
+            obj
         })
         .collect();
 
@@ -523,6 +557,258 @@ fn resolve_args(args: &[String], input: &serde_json::Value) -> Result<Vec<String
 }
 
 // ============================================================
+// [CTX-20] get_changed_files
+// ============================================================
+
+/// VcsProvider 経由で変更されたファイル一覧を返す。
+/// 初期実装は Git (`git diff --name-only HEAD`)。
+#[tauri::command]
+fn get_changed_files(root_path: String) -> Result<Vec<String>, String> {
+    let provider = GitProvider;
+    provider.get_changed_files(&root_path)
+}
+
+// ============================================================
+// [CTX-20] Structure Graph ヘルパー
+// ============================================================
+
+/// プロジェクトの structure グラフを取得する。なければ作成する。
+async fn get_or_create_structure_graph(db: &Db, project_id: &str) -> Result<GraphRecord, String> {
+    let existing: Vec<GraphRecord> = db
+        .query("SELECT * FROM graph WHERE project_id = $pid AND kind = 'structure' LIMIT 1")
+        .bind(("pid", project_id.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+        .take(0)
+        .map_err(|e| e.to_string())?;
+
+    if let Some(g) = existing.into_iter().next() {
+        return Ok(g);
+    }
+
+    let input = GraphInput {
+        name: "Structure".to_string(),
+        project_id: project_id.to_string(),
+        kind: Some("structure".to_string()),
+    };
+    let created: Option<GraphRecord> = db
+        .create("graph")
+        .content(input)
+        .await
+        .map_err(|e| e.to_string())?;
+    created.ok_or_else(|| String::from("Failed to create structure graph"))
+}
+
+/// project_id から ProjectRecord を取得する。
+/// プロジェクト数は少ない想定で全件取得 → string id で filter。
+async fn get_project(db: &Db, project_id: &str) -> Result<ProjectRecord, String> {
+    let records: Vec<ProjectRecord> = db.select("project").await.map_err(|e| e.to_string())?;
+    records
+        .into_iter()
+        .find(|p| thing_to_string(&p.id) == project_id)
+        .ok_or_else(|| format!("Project not found: {}", project_id))
+}
+
+/// `file_path` に対応するノードを取得 or 作成する。
+/// 既存ノードがあれば analyzed フィールドを更新（'fresh' への昇格、または 'pending' のまま）。
+/// 既に 'fresh' のノードを 'pending' に降格はしない。
+/// 戻り値: ノード ID（"node:xxx"）
+async fn upsert_file_node(
+    db: &Db,
+    graph_id: &str,
+    file_rel_path: &str,
+    new_analyzed: &str,
+) -> Result<String, String> {
+    let existing: Vec<NodeRecord> = db
+        .query("SELECT * FROM node WHERE graph_id = $gid AND file_path = $fp LIMIT 1")
+        .bind(("gid", graph_id.to_string()))
+        .bind(("fp", file_rel_path.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+        .take(0)
+        .map_err(|e| e.to_string())?;
+
+    if let Some(node) = existing.into_iter().next() {
+        let id_str = thing_to_string(&node.id);
+        let current = node.analyzed.clone().unwrap_or_default();
+        // 既に fresh なら pending に降格しない
+        if new_analyzed == "fresh" || current != "fresh" {
+            db.query("UPDATE $id SET analyzed = $a")
+                .bind(("id", node.id.clone()))
+                .bind(("a", new_analyzed.to_string()))
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        return Ok(id_str);
+    }
+
+    // 新規作成 — 既存ノード数に応じてグリッド配置
+    let count: Option<serde_json::Value> = db
+        .query("SELECT count() FROM node WHERE graph_id = $gid GROUP ALL")
+        .bind(("gid", graph_id.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+        .take(0)
+        .map_err(|e| e.to_string())?;
+    let n = count
+        .and_then(|v| v.get("count").and_then(|c| c.as_i64()))
+        .unwrap_or(0);
+    let x = (n % 6) as f64 * 220.0;
+    let y = (n / 6) as f64 * 140.0;
+
+    let label = Path::new(file_rel_path)
+        .file_name()
+        .and_then(|f| f.to_str())
+        .unwrap_or(file_rel_path)
+        .to_string();
+
+    let input = NodeInput {
+        graph_id: graph_id.to_string(),
+        label,
+        node_type: Some("file".to_string()),
+        status: None,
+        service: None,
+        provider: None,
+        input: None,
+        description: None,
+        position_x: x,
+        position_y: y,
+        file_path: Some(file_rel_path.to_string()),
+        analyzed: Some(new_analyzed.to_string()),
+    };
+    let created: Option<NodeRecord> = db
+        .create("node")
+        .content(input)
+        .await
+        .map_err(|e| e.to_string())?;
+    let rec = created.ok_or_else(|| String::from("Failed to create node"))?;
+    Ok(thing_to_string(&rec.id))
+}
+
+/// 1ファイルを解析して node / edge を UPSERT する。
+async fn do_analyze_file(
+    db: &Db,
+    project: &ProjectRecord,
+    graph_id: &str,
+    file_rel_path: &str,
+) -> Result<(), String> {
+    let root_path = Path::new(&project.root_path);
+    let absolute = root_path.join(file_rel_path);
+    let source = std::fs::read_to_string(&absolute)
+        .map_err(|e| format!("Failed to read {}: {}", file_rel_path, e))?;
+
+    let edges = analyzer::extract_imports(root_path, file_rel_path, &source)?;
+
+    // 該当ファイルのノードを fresh で UPSERT
+    let source_node_id = upsert_file_node(db, graph_id, file_rel_path, "fresh").await?;
+
+    // この source から出る古い 'imports' エッジを削除（再解析対応）
+    db.query("DELETE edge WHERE graph_id = $gid AND source = $src AND kind = 'imports'")
+        .bind(("gid", graph_id.to_string()))
+        .bind(("src", source_node_id.clone()))
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // 参照先ノードを pending で UPSERT し、エッジを作成
+    for edge in edges {
+        let target_node_id = upsert_file_node(db, graph_id, &edge.to, "pending").await?;
+        let edge_input = EdgeInput {
+            graph_id: graph_id.to_string(),
+            source: source_node_id.clone(),
+            target: target_node_id,
+            kind: Some("imports".to_string()),
+        };
+        let _: Option<EdgeRecord> = db
+            .create("edge")
+            .content(edge_input)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// rootPath 配下を再帰的に走査し ts/tsx/rs ファイルの相対パス一覧を返す。
+fn collect_source_files(root: &Path) -> Vec<String> {
+    let mut out = vec![];
+    walk_source_files(root, root, &mut out);
+    out
+}
+
+fn walk_source_files(dir: &Path, root: &Path, out: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        if FS_EXCLUDES.contains(&name.as_str()) {
+            continue;
+        }
+        if path.is_dir() {
+            walk_source_files(&path, root, out);
+        } else if matches!(
+            path.extension().and_then(|e| e.to_str()),
+            Some("ts") | Some("tsx") | Some("rs")
+        ) {
+            if let Ok(rel) = path.strip_prefix(root) {
+                out.push(rel.to_string_lossy().replace('\\', "/"));
+            }
+        }
+    }
+}
+
+// ============================================================
+// [CTX-20] Tauri コマンド
+// ============================================================
+
+/// プロジェクトの structure グラフを返す（なければ作成）。
+/// 返り値は load_graph と同じ ReactFlow 形式。
+#[tauri::command]
+async fn get_structure_graph(
+    project_id: String,
+    db: State<'_, Db>,
+) -> Result<LoadGraphResponse, String> {
+    let graph = get_or_create_structure_graph(&db, &project_id).await?;
+    let gid = thing_to_string(&graph.id);
+    load_graph_inner(&db, gid).await
+}
+
+/// 1ファイルを tree-sitter で解析し、structure グラフに node / edge を UPSERT する。
+#[tauri::command]
+async fn analyze_file(
+    project_id: String,
+    file_path: String,
+    db: State<'_, Db>,
+) -> Result<(), String> {
+    let project = get_project(&db, &project_id).await?;
+    let graph = get_or_create_structure_graph(&db, &project_id).await?;
+    let gid = thing_to_string(&graph.id);
+    do_analyze_file(&db, &project, &gid, &file_path).await
+}
+
+/// rootPath 配下のソースファイルを一括解析する。
+/// 1ファイル失敗で全体は止めず、エラーは stderr に記録して継続する。
+#[tauri::command]
+async fn analyze_project(project_id: String, db: State<'_, Db>) -> Result<(), String> {
+    let project = get_project(&db, &project_id).await?;
+    let graph = get_or_create_structure_graph(&db, &project_id).await?;
+    let gid = thing_to_string(&graph.id);
+
+    let root = Path::new(&project.root_path);
+    if !root.is_dir() {
+        return Err(format!("not a directory: {}", project.root_path));
+    }
+
+    let files = collect_source_files(root);
+    for rel_path in files {
+        if let Err(e) = do_analyze_file(&db, &project, &gid, &rel_path).await {
+            eprintln!("[analyze_project] {} failed: {}", rel_path, e);
+        }
+    }
+    Ok(())
+}
+
+// ============================================================
 // エントリポイント
 // ============================================================
 
@@ -554,6 +840,11 @@ pub fn run() {
             save_graph,
             load_graph,
             list_fs_tree,
+            // [CTX-20]
+            get_changed_files,
+            get_structure_graph,
+            analyze_file,
+            analyze_project,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
