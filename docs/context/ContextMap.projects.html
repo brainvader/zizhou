@@ -879,10 +879,10 @@
             型情報の解決（TSコンパイラAPI）
 
             ── 今回実装スコープ ──────────────────────────────────────
-            [ ][Logic]   GraphStorage Type   — docs/bom/graph.ts に GraphStorage 型を追加する
-            [ ][Logic]   GraphStorage Impl   — src/services/GraphStorage.ts に defaultGraphStorage を実装する
-            [ ][Logic]   useGraphLoad Wire   — useGraphLoad を storage?: Pick<GraphStorage,'loadGraph'> 経由に書き換える
-            [ ][Logic]   useGraphSave Wire   — useGraphSave を storage?: Pick<GraphStorage,'saveGraph'> 経由に書き換える
+            [✓][Logic]   GraphStorage Type   — docs/bom/graph.ts に GraphStorage 型を追加する
+            [✓][Logic]   GraphStorage Impl   — src/services/GraphStorage.ts に defaultGraphStorage を実装する
+            [✓][Logic]   useGraphLoad Wire   — useGraphLoad を storage?: Pick<GraphStorage,'loadGraph'> 経由に書き換える
+            [✓][Logic]   useGraphSave Wire   — useGraphSave を storage?: Pick<GraphStorage,'saveGraph'> 経由に書き換える
 
             ── バックエンド（CTX-21 既実装ぶん） ─────────────────────
             [✓][Logic]   DB Schema           — graph/node/edge テーブルに kind / file_path / analyzed / position フィールドを追加
