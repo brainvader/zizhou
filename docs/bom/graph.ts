@@ -320,7 +320,7 @@ export type ProjectDetailStore = {
 
 export type UseGraphLoadOptions = {
     /** props DI: 省略時は defaultGraphStorage を使用する */
-    storage?: Partial<Pick<GraphStorage, 'loadGraph'>>
+    storage?: Pick<GraphStorage, 'loadGraph'>
     onLoadGraphFn?: (graph: GraphFile) => void
     onResetGraph?: () => void
     setHydrated?: (value: boolean) => void
@@ -337,7 +337,7 @@ export type UseGraphLoadReturn = void
 
 export type UseGraphSaveOptions = {
     /** props DI: 省略時は defaultGraphStorage を使用する */
-    storage?: Partial<Pick<GraphStorage, 'saveGraph'>>
+    storage?: Pick<GraphStorage, 'saveGraph'>
     setHydrated?: (value: boolean) => void
 }
 

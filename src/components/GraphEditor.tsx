@@ -105,7 +105,7 @@ export type GraphEditorProps = {
     // [CTX-6] props DI: 省略時は store.addEdge() を使用する
     onAddEdge?: (connection: Connection) => void
     // [CTX-21] props DI: GraphStorage を差し替える（テスト・Storybook）
-    storage?: Partial<GraphStorage>
+    storage?: GraphStorage
     setHydrated?: (hydrated: boolean) => void
     // [CTX-10] Export/Import 用プロジェクトID。省略時は ''
     projectId?: string
