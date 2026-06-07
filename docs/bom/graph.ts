@@ -313,14 +313,14 @@ export type ProjectDetailStore = {
 }
 
 // ============================================================
-// UseGraphLoadOptions / UseGraphLoadReturn           [CTX-15]
+// UseGraphLoadOptions / UseGraphLoadReturn           [CTX-15 → CTX-21 改訂]
 // useGraphLoad hook の型定義。
-// useGraphInit（Tauri fs 依存）を置き換える。
+// onLoadGraph を storage?: Pick<GraphStorage, 'loadGraph'> に統合した。
 // ============================================================
 
 export type UseGraphLoadOptions = {
-    /** props DI: 省略時は invoke('load_graph') を使用する */
-    onLoadGraph?: (graphId: string) => Promise<GraphFile>
+    /** props DI: 省略時は defaultGraphStorage を使用する */
+    storage?: Pick<GraphStorage, 'loadGraph'>
     onLoadGraphFn?: (graph: GraphFile) => void
     onResetGraph?: () => void
     setHydrated?: (value: boolean) => void
@@ -330,14 +330,14 @@ export type UseGraphLoadOptions = {
 export type UseGraphLoadReturn = void
 
 // ============================================================
-// UseGraphSaveOptions / UseGraphSaveReturn           [CTX-15]
+// UseGraphSaveOptions / UseGraphSaveReturn           [CTX-15 → CTX-21 改訂]
 // useGraphSave hook の型定義。
-// useGraphFile（Tauri fs 依存）を置き換える。
+// onSaveGraph を storage?: Pick<GraphStorage, 'saveGraph'> に統合した。
 // ============================================================
 
 export type UseGraphSaveOptions = {
-    /** props DI: 省略時は invoke('save_graph') を使用する */
-    onSaveGraph?: (graphId: string, nodes: Node<GraphNodeData>[], edges: Edge[]) => Promise<void>
+    /** props DI: 省略時は defaultGraphStorage を使用する */
+    storage?: Pick<GraphStorage, 'saveGraph'>
     setHydrated?: (value: boolean) => void
 }
 
@@ -390,3 +390,43 @@ export type FileTreeProps = {
     /** props DI: 省略時は invoke('list_graphs') を使用 */
     onListGraphs?: (projectId: string) => Promise<GraphListItem[]>
 }
+
+// ============================================================
+// GraphStorage                                       [CTX-21]
+// SurrealDB ↔ useGraphStore 間のストレージ層。
+// Tauri コマンドをラップし、Props DI で差し替え可能にする。
+//
+// マイクロサービス方針:
+//   GraphStorage   — graph / node / edge の CRUD（このファイル）
+//   AnalyzeService — tree-sitter 解析の起動（将来）
+//   VcsService     — Git 等の VCS 操作（将来）
+//
+// 実装: src/services/GraphStorage.ts の defaultGraphStorage
+// ============================================================
+
+export type GraphStorage = {
+    /** プロジェクト配下のグラフ一覧を返す */
+    listGraphs: (projectId: string) => Promise<GraphListItem[]>
+
+    /** グラフを作成する（kind は workflow 既定） */
+    createGraph: (projectId: string, name: string) => Promise<GraphListItem>
+
+    /** ワークフローグラフのノード・エッジを全置換保存する（CTX-15 由来） */
+    saveGraph: (
+        graphId: string,
+        nodes: Node<GraphNodeData>[],
+        edges: Edge[]
+    ) => Promise<void>
+
+    /** グラフのノード・エッジを取得して GraphFile 形式で返す */
+    loadGraph: (graphId: string) => Promise<GraphFile>
+
+    /** プロジェクトの structure グラフを取得する（なければバックエンド側で自動作成） */
+    getStructureGraph: (projectId: string) => Promise<GraphFile>
+}
+
+// ============================================================
+// UseGraphLoadOptions / UseGraphSaveOptions の DI 整理       [CTX-21]
+// 既存の onLoadGraph / onSaveGraph props は storage 経由に統合する。
+// storage は Pick<GraphStorage, '...'> で部分注入可能。
+// ============================================================
