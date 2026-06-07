@@ -22,13 +22,13 @@
  * [CTX-10] Export / Import:
  * - キャンバス左上にツールバーボタン（Export / Import）を固定配置する
  *
- * [CTX-15] Graph Persist (SurrealDB):
- * - useGraphInit → useGraphLoad に置き換え（invoke('load_graph') ベース）
- * - useGraphFile → useGraphSave に置き換え（subscribe + invoke('save_graph')）
- * - props DI: onLoadGraph / onSaveGraph で差し替え可能
+* [CTX-15 → CTX-21] Graph Persist:
+ * - useGraphLoad / useGraphSave 経由で GraphStorage にアクセスする
+ * - props DI: storage（Partial<GraphStorage>）で差し替え可能（テスト・Storybook）
  *
- * @context CTX-2/5/6/7/8/9/10/14/15
+ * @context CTX-2/5/6/7/8/9/10/14/15/21
  * @see docs/bom/graph.ts
+ * @see src/services/GraphStorage.ts
  * @see src/hooks/useGraphLoad.ts
  * @see src/hooks/useGraphSave.ts
  * @see src/hooks/useNodeExecute.ts
@@ -72,7 +72,7 @@ import { ContextMenu } from '@/components/ContextMenu'
 import { CatalogMenu } from '@/components/CatalogMenu'
 import { ExportModal } from '@/components/ExportModal'
 import { ImportModal } from '@/components/ImportModal'
-import type { GraphNodeData, GraphFile } from '@/bom/graph'
+import type { GraphNodeData, GraphFile, GraphStorage } from '@/bom/graph'
 import type { LlmExportPayload, LlmImportPayload } from '@/bom/llm-export'
 
 // [CTX-7] ノード・エッジ用コンテキストメニューのローカル状態型
@@ -104,9 +104,8 @@ export type GraphEditorProps = {
     onSetSelectedNodeIds?: (ids: string[]) => void
     // [CTX-6] props DI: 省略時は store.addEdge() を使用する
     onAddEdge?: (connection: Connection) => void
-    // [CTX-15] props DI: テスト・Storybook で invoke を差し替える
-    onInvokeLoadGraph?: (graphId: string) => Promise<GraphFile>
-    onInvokeSaveGraph?: (graphId: string, nodes: Node<GraphNodeData>[], edges: Edge[]) => Promise<void>
+    // [CTX-21] props DI: GraphStorage を差し替える（テスト・Storybook）
+    storage?: Partial<GraphStorage>
     setHydrated?: (hydrated: boolean) => void
     // [CTX-10] Export/Import 用プロジェクトID。省略時は ''
     projectId?: string
@@ -123,8 +122,7 @@ function GraphEditorInner({
     onResetGraph,
     onSetSelectedNodeIds,
     onAddEdge,
-    onInvokeLoadGraph,
-    onInvokeSaveGraph,
+    storage,
     setHydrated: setHydratedProp,
     projectId: projectIdProp = '',
 }: GraphEditorProps) {
@@ -146,15 +144,15 @@ function GraphEditorInner({
     const activeProject = useProjectStore((s) => s.projects.find((p) => p.id === projectIdProp))
     const rootPath = activeProject?.rootPath ?? ''
 
-    // [CTX-15] useGraphSave（useGraphFile の置き換え）
+    // [CTX-21] useGraphSave — storage 経由で save_graph を呼ぶ
     const { setHydrated: saveSetHydrated } = useGraphSave({
-        onSaveGraph: onInvokeSaveGraph,
+        storage,
         setHydrated: setHydratedProp,
     })
 
-    // [CTX-15] useGraphLoad（useGraphInit の置き換え）
+    // [CTX-21] useGraphLoad — storage 経由で load_graph を呼ぶ
     useGraphLoad({
-        onLoadGraph: onInvokeLoadGraph,
+        storage,
         onLoadGraphFn: onLoadGraph,
         onResetGraph,
         setHydrated: saveSetHydrated,
