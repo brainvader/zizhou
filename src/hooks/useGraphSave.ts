@@ -1,38 +1,37 @@
 import { useEffect, useRef, useCallback } from 'react'
-import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
 import { useGraphStore } from '@/store/useGraphStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
+import { defaultGraphStorage } from '@/services/GraphStorage'
 import type { Node, Edge } from '@xyflow/react'
-import type { GraphNodeData, UseGraphSaveOptions, UseGraphSaveReturn } from '@/bom/graph'
+import type {
+    GraphNodeData,
+    UseGraphSaveOptions,
+    UseGraphSaveReturn,
+} from '@/bom/graph'
 
 /**
  * useGraphSave
  *
  * Zustand GraphStore を subscribe し、nodes / edges が変化するたびに
- * invoke('save_graph') を呼んで SurrealDB に自動保存する hook。
- *
- * useGraphFile（Tauri fs 依存）の置き換え。
- * subscribe ベースの自動保存は useGraphFile と同等の挙動を維持する。
+ * GraphStorage.saveGraph を呼んで SurrealDB に自動保存する hook。
  *
  * - setHydrated(true) が呼ばれるまで保存をスキップする
  * - activeGraphId が null の場合は保存をスキップする
  * - 保存中に変化があった場合は pending に積んで保存完了後に再実行する
- * - invoke 失敗時は toast.error() で通知する（store にエラー状態は持たない）
+ * - 保存失敗時は toast.error() で通知する（store にエラー状態は持たない）
  *
- * フロントから invoke に渡す nodes の形状:
- *   { id, label, nodeType, status, service, provider, input, description, position_x, position_y }
- *   ※ ReactFlow Node<GraphNodeData> から position をフラット化する
+ * Position フラット化 / null 正規化は GraphStorage 内で行う。
  *
  * props DI:
- * - onSaveGraph: テスト・Storybook で invoke を差し替える
+ * - storage:     Pick<GraphStorage, 'saveGraph'> を差し替える（テスト・Storybook）
  * - setHydrated: 外部から hydration フラグを注入する（GraphEditor 経由）
  *
- * @context CTX-15
+ * @context CTX-15 → CTX-21 改訂（onSaveGraph を storage 経由に統合）
  * @bom     docs/bom/graph.ts UseGraphSaveOptions / UseGraphSaveReturn
  */
 export function useGraphSave({
-    onSaveGraph,
+    storage,
     setHydrated: setHydratedProp,
 }: UseGraphSaveOptions = {}): UseGraphSaveReturn {
     const hydrated = useRef(false)
@@ -44,39 +43,15 @@ export function useGraphSave({
         hydrated.current = false
     }, [])
 
-    const setHydrated = useCallback((value: boolean) => {
-        hydrated.current = value
-        if (setHydratedProp) setHydratedProp(value)
-    }, [setHydratedProp])
-
-    const defaultOnSaveGraph = useCallback(
-        (graphId: string, nodes: Node<GraphNodeData>[], edges: Edge[]): Promise<void> => {
-            // ReactFlow の Node<GraphNodeData> → SaveNodeInput に変換
-            const saveNodes = nodes.map((n) => ({
-                id: n.id,
-                label: n.data.label,
-                node_type: n.data.nodeType ?? null,
-                status: n.data.status ?? null,
-                service: n.data.service ?? null,
-                provider: n.data.provider ?? null,
-                input: n.data.input ?? null,
-                description: n.data.description ?? null,
-                position_x: n.position.x,
-                position_y: n.position.y,
-            }))
-
-            const saveEdges = edges.map((e) => ({
-                id: e.id,
-                source: e.source,
-                target: e.target,
-            }))
-
-            return invoke('save_graph', { graphId, nodes: saveNodes, edges: saveEdges })
+    const setHydrated = useCallback(
+        (value: boolean) => {
+            hydrated.current = value
+            if (setHydratedProp) setHydratedProp(value)
         },
-        []
+        [setHydratedProp]
     )
 
-    const saveGraphRemote = onSaveGraph ?? defaultOnSaveGraph
+    const saveGraphRemote = storage?.saveGraph ?? defaultGraphStorage.saveGraph
 
     const saveGraph = useCallback(
         async (nodes: Node<GraphNodeData>[], edges: Edge[]): Promise<void> => {
