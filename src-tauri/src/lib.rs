@@ -1,4 +1,4 @@
-//! lib.rs — Tauri エントリポイント
+//! lib.rs — Tauri エントリポイント（コマンド登録のみ）
 //!
 //! @context CTX-13: catalog_get_all / catalog_search コマンド
 //! @context CTX-14: execute_node コマンド
@@ -7,36 +7,16 @@
 //! @context CTX-19: list_fs_tree コマンド追加
 //! @context CTX-20: get_structure_graph / analyze_file / analyze_project / get_changed_files
 
-mod analyzer;
 mod services;
-mod vcs;
 
-use serde::{Deserialize, Serialize};
-use services::db::{
-    thing_to_string, Db, EdgeInput, EdgeRecord, NodeCatalog, NodeInput, NodeRecord, ProjectInput,
-    ProjectRecord,
-};
+use serde::Serialize;
+use services::analysis::FS_EXCLUDES;
+use services::db::{thing_to_string, Db, NodeCatalog, ProjectInput, ProjectRecord};
+use services::executor::ExecuteResponse;
 use services::graph::{LoadGraphResponse, SaveEdgeInput, SaveNodeInput};
+use services::vcs::{self, VcsProvider};
 use std::path::Path;
 use tauri::{Manager, State};
-use vcs::{GitProvider, VcsProvider};
-
-// ============================================================
-// execute_node 用の型定義
-// ============================================================
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ExecuteError {
-    pub code: String,
-    pub message: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ExecuteResponse {
-    pub success: bool,
-    pub output: Option<serde_json::Value>,
-    pub error: Option<ExecuteError>,
-}
 
 // ============================================================
 // list_fs_tree 用の型定義                             [CTX-19]
@@ -50,8 +30,6 @@ pub struct FsNode {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<FsNode>>,
 }
-
-const FS_EXCLUDES: &[&str] = &["node_modules", ".git", "target", ".next", "dist"];
 
 fn read_dir_recursive(
     path: &std::path::Path,
@@ -99,8 +77,6 @@ fn read_dir_recursive(
 // Tauri コマンド — FS Tree                            [CTX-19]
 // ============================================================
 
-/// プロジェクトの rootPath 以下のファイルツリーを返す。
-/// 深度上限 5、node_modules / .git / target / dist / .next を除外する。
 #[tauri::command]
 fn list_fs_tree(root_path: String) -> Result<Vec<FsNode>, String> {
     let root = std::path::Path::new(&root_path);
@@ -234,276 +210,18 @@ async fn execute_node(
     cwd: String,
     input: serde_json::Value,
 ) -> Result<ExecuteResponse, String> {
-    let mut result = db
-        .query("SELECT * FROM node_catalog WHERE service = $s AND provider = $p LIMIT 1")
-        .bind(("s", service.clone()))
-        .bind(("p", provider.clone()))
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let nodes: Vec<NodeCatalog> = result.take(0).map_err(|e| e.to_string())?;
-
-    let node = match nodes.into_iter().next() {
-        Some(n) => n,
-        None => {
-            return Ok(ExecuteResponse {
-                success: false,
-                output: None,
-                error: Some(ExecuteError {
-                    code: "SERVICE_NOT_FOUND".into(),
-                    message: format!("No catalog entry found for {}:{}", service, provider),
-                }),
-            })
-        }
-    };
-
-    let subcommand = input
-        .get("subcommand")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    if node.profile.subcommand != subcommand {
-        return Ok(ExecuteResponse {
-            success: false,
-            output: None,
-            error: Some(ExecuteError {
-                code: "PROFILE_NOT_FOUND".into(),
-                message: format!(
-                    "Expected subcommand '{}', got '{}'",
-                    node.profile.subcommand, subcommand
-                ),
-            }),
-        });
-    }
-
-    let resolved = match resolve_args(&node.profile.args, &input) {
-        Ok(args) => args,
-        Err(msg) => {
-            return Ok(ExecuteResponse {
-                success: false,
-                output: None,
-                error: Some(ExecuteError {
-                    code: "TEMPLATE_RESOLUTION_FAILED".into(),
-                    message: msg,
-                }),
-            })
-        }
-    };
-
-    let output = match std::process::Command::new("git")
-        .args(&resolved)
-        .current_dir(&cwd)
-        .output()
-    {
-        Ok(o) => o,
-        Err(e) => {
-            return Ok(ExecuteResponse {
-                success: false,
-                output: None,
-                error: Some(ExecuteError {
-                    code: "CLI_EXECUTION_FAILED".into(),
-                    message: e.to_string(),
-                }),
-            })
-        }
-    };
-
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
-    if output.status.success() {
-        Ok(ExecuteResponse {
-            success: true,
-            output: Some(serde_json::json!({ "stdout": stdout, "stderr": stderr })),
-            error: None,
-        })
-    } else {
-        Ok(ExecuteResponse {
-            success: false,
-            output: Some(serde_json::json!({ "stdout": stdout, "stderr": stderr })),
-            error: Some(ExecuteError {
-                code: "CLI_EXECUTION_FAILED".into(),
-                message: stderr,
-            }),
-        })
-    }
+    services::executor::execute_node(&db, &service, &provider, &cwd, &input).await
 }
 
 // ============================================================
-// テンプレート展開ヘルパー
-// ============================================================
-
-fn resolve_args(args: &[String], input: &serde_json::Value) -> Result<Vec<String>, String> {
-    args.iter()
-        .map(|arg| {
-            if arg.starts_with("{input.") && arg.ends_with('}') {
-                let key = &arg[7..arg.len() - 1];
-                input
-                    .get(key)
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string())
-                    .ok_or_else(|| format!("Missing input key: {}", key))
-            } else {
-                Ok(arg.clone())
-            }
-        })
-        .collect()
-}
-
-// ============================================================
-// [CTX-20] get_changed_files
+// [CTX-20] Tauri コマンド — VCS / Analysis
 // ============================================================
 
 #[tauri::command]
 fn get_changed_files(root_path: String) -> Result<Vec<String>, String> {
-    let provider = GitProvider;
+    let provider = vcs::git::GitProvider;
     provider.get_changed_files(&root_path)
 }
-
-// ============================================================
-// [CTX-20] Structure Graph / Analysis ヘルパー
-// ============================================================
-
-/// `file_path` に対応するノードを取得 or 作成する。
-async fn upsert_file_node(
-    db: &Db,
-    graph_id: &str,
-    file_rel_path: &str,
-    new_analyzed: &str,
-) -> Result<String, String> {
-    let existing: Vec<NodeRecord> = db
-        .query("SELECT * FROM node WHERE graph_id = $gid AND file_path = $fp LIMIT 1")
-        .bind(("gid", graph_id.to_string()))
-        .bind(("fp", file_rel_path.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
-        .take(0)
-        .map_err(|e| e.to_string())?;
-
-    if let Some(node) = existing.into_iter().next() {
-        let id_str = thing_to_string(&node.id);
-        let current = node.analyzed.clone().unwrap_or_default();
-        if new_analyzed == "fresh" || current != "fresh" {
-            db.query("UPDATE $id SET analyzed = $a")
-                .bind(("id", node.id.clone()))
-                .bind(("a", new_analyzed.to_string()))
-                .await
-                .map_err(|e| e.to_string())?;
-        }
-        return Ok(id_str);
-    }
-
-    let count: Option<serde_json::Value> = db
-        .query("SELECT count() FROM node WHERE graph_id = $gid GROUP ALL")
-        .bind(("gid", graph_id.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
-        .take(0)
-        .map_err(|e| e.to_string())?;
-    let n = count
-        .and_then(|v| v.get("count").and_then(|c| c.as_i64()))
-        .unwrap_or(0);
-    let x = (n % 6) as f64 * 220.0;
-    let y = (n / 6) as f64 * 140.0;
-
-    let label = Path::new(file_rel_path)
-        .file_name()
-        .and_then(|f| f.to_str())
-        .unwrap_or(file_rel_path)
-        .to_string();
-
-    let input = NodeInput {
-        graph_id: graph_id.to_string(),
-        label,
-        node_type: Some("file".to_string()),
-        status: None,
-        service: None,
-        provider: None,
-        input: None,
-        description: None,
-        position_x: x,
-        position_y: y,
-        file_path: Some(file_rel_path.to_string()),
-        analyzed: Some(new_analyzed.to_string()),
-    };
-    let created: Option<NodeRecord> = db
-        .create("node")
-        .content(input)
-        .await
-        .map_err(|e| e.to_string())?;
-    let rec = created.ok_or_else(|| String::from("Failed to create node"))?;
-    Ok(thing_to_string(&rec.id))
-}
-
-async fn do_analyze_file(
-    db: &Db,
-    project: &ProjectRecord,
-    graph_id: &str,
-    file_rel_path: &str,
-) -> Result<(), String> {
-    let root_path = Path::new(&project.root_path);
-    let absolute = root_path.join(file_rel_path);
-    let source = std::fs::read_to_string(&absolute)
-        .map_err(|e| format!("Failed to read {}: {}", file_rel_path, e))?;
-
-    let edges = analyzer::extract_imports(root_path, file_rel_path, &source)?;
-
-    let source_node_id = upsert_file_node(db, graph_id, file_rel_path, "fresh").await?;
-
-    db.query("DELETE edge WHERE graph_id = $gid AND source = $src AND kind = 'imports'")
-        .bind(("gid", graph_id.to_string()))
-        .bind(("src", source_node_id.clone()))
-        .await
-        .map_err(|e| e.to_string())?;
-
-    for edge in edges {
-        let target_node_id = upsert_file_node(db, graph_id, &edge.to, "pending").await?;
-        let edge_input = EdgeInput {
-            graph_id: graph_id.to_string(),
-            source: source_node_id.clone(),
-            target: target_node_id,
-            kind: Some("imports".to_string()),
-        };
-        let _: Option<EdgeRecord> = db
-            .create("edge")
-            .content(edge_input)
-            .await
-            .map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-fn collect_source_files(root: &Path) -> Vec<String> {
-    let mut out = vec![];
-    walk_source_files(root, root, &mut out);
-    out
-}
-
-fn walk_source_files(dir: &Path, root: &Path, out: &mut Vec<String>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let name = entry.file_name().to_string_lossy().to_string();
-        if FS_EXCLUDES.contains(&name.as_str()) {
-            continue;
-        }
-        if path.is_dir() {
-            walk_source_files(&path, root, out);
-        } else if matches!(
-            path.extension().and_then(|e| e.to_str()),
-            Some("ts") | Some("tsx") | Some("rs")
-        ) {
-            if let Ok(rel) = path.strip_prefix(root) {
-                out.push(rel.to_string_lossy().replace('\\', "/"));
-            }
-        }
-    }
-}
-
-// ============================================================
-// [CTX-20] Tauri コマンド
-// ============================================================
 
 #[tauri::command]
 async fn get_structure_graph(
@@ -524,7 +242,7 @@ async fn analyze_file(
     let project = services::db::get_project(&db, &project_id).await?;
     let graph = services::graph::get_or_create_structure_graph(&db, &project_id).await?;
     let gid = thing_to_string(&graph.id);
-    do_analyze_file(&db, &project, &gid, &file_path).await
+    services::analysis::do_analyze_file(&db, &project, &gid, &file_path).await
 }
 
 #[tauri::command]
@@ -538,9 +256,9 @@ async fn analyze_project(project_id: String, db: State<'_, Db>) -> Result<(), St
         return Err(format!("not a directory: {}", project.root_path));
     }
 
-    let files = collect_source_files(root);
+    let files = services::analysis::collect_source_files(root);
     for rel_path in files {
-        if let Err(e) = do_analyze_file(&db, &project, &gid, &rel_path).await {
+        if let Err(e) = services::analysis::do_analyze_file(&db, &project, &gid, &rel_path).await {
             eprintln!("[analyze_project] {} failed: {}", rel_path, e);
         }
     }
