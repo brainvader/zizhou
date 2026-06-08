@@ -13,9 +13,10 @@ mod vcs;
 
 use serde::{Deserialize, Serialize};
 use services::db::{
-    thing_to_string, Db, EdgeInput, EdgeRecord, GraphInput, GraphRecord, NodeCatalog, NodeInput,
-    NodeRecord, ProjectInput, ProjectRecord,
+    thing_to_string, Db, EdgeInput, EdgeRecord, NodeCatalog, NodeInput, NodeRecord, ProjectInput,
+    ProjectRecord,
 };
+use services::graph::{LoadGraphResponse, SaveEdgeInput, SaveNodeInput};
 use std::path::Path;
 use tauri::{Manager, State};
 use vcs::{GitProvider, VcsProvider};
@@ -94,6 +95,10 @@ fn read_dir_recursive(
     nodes
 }
 
+// ============================================================
+// Tauri コマンド — FS Tree                            [CTX-19]
+// ============================================================
+
 /// プロジェクトの rootPath 以下のファイルツリーを返す。
 /// 深度上限 5、node_modules / .git / target / dist / .next を除外する。
 #[tauri::command]
@@ -103,38 +108,6 @@ fn list_fs_tree(root_path: String) -> Result<Vec<FsNode>, String> {
         return Err(format!("not a directory: {root_path}"));
     }
     Ok(read_dir_recursive(root, root, 5))
-}
-
-// ============================================================
-// save_graph / load_graph 用の型定義                  [CTX-15]
-// ============================================================
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SaveNodeInput {
-    pub id: String,
-    pub label: String,
-    pub node_type: Option<String>,
-    pub status: Option<String>,
-    pub service: Option<String>,
-    pub provider: Option<String>,
-    pub input: Option<serde_json::Value>,
-    pub description: Option<String>,
-    pub position_x: f64,
-    pub position_y: f64,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SaveEdgeInput {
-    pub id: String,
-    pub source: String,
-    pub target: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct LoadGraphResponse {
-    pub id: String,
-    pub nodes: Vec<serde_json::Value>,
-    pub edges: Vec<serde_json::Value>,
 }
 
 // ============================================================
@@ -165,7 +138,6 @@ async fn catalog_search(query: String, db: State<'_, Db>) -> Result<Vec<NodeCata
 // Tauri コマンド — Project
 // ============================================================
 
-/// 全プロジェクトを返す。
 #[tauri::command]
 async fn list_projects(db: State<'_, Db>) -> Result<Vec<serde_json::Value>, String> {
     let records: Vec<ProjectRecord> = db.select("project").await.map_err(|e| e.to_string())?;
@@ -185,7 +157,6 @@ async fn list_projects(db: State<'_, Db>) -> Result<Vec<serde_json::Value>, Stri
         .collect())
 }
 
-/// プロジェクトを作成する。id は SurrealDB が自動生成する。
 #[tauri::command]
 async fn create_project(
     name: String,
@@ -216,68 +187,26 @@ async fn create_project(
 }
 
 // ============================================================
-// Tauri コマンド — Graph
+// Tauri コマンド — Graph                              [CTX-15]
 // ============================================================
 
-/// 指定プロジェクトのグラフ一覧を返す。
 #[tauri::command]
 async fn list_graphs(
     project_id: String,
     db: State<'_, Db>,
 ) -> Result<Vec<serde_json::Value>, String> {
-    let records: Vec<GraphRecord> = db
-        .query("SELECT * FROM graph WHERE project_id = $pid")
-        .bind(("pid", project_id))
-        .await
-        .map_err(|e| e.to_string())?
-        .take(0)
-        .map_err(|e| e.to_string())?;
-    Ok(records
-        .into_iter()
-        .map(|r| {
-            let mut obj = serde_json::json!({
-                "id": thing_to_string(&r.id),
-                "name": r.name,
-                "project_id": r.project_id,
-            });
-            if let Some(k) = r.kind {
-                obj["kind"] = k.into();
-            }
-            obj
-        })
-        .collect())
+    services::graph::list_graphs(&db, &project_id).await
 }
 
-/// グラフを作成する。
 #[tauri::command]
 async fn create_graph(
     project_id: String,
     name: String,
     db: State<'_, Db>,
 ) -> Result<serde_json::Value, String> {
-    let input = GraphInput {
-        name,
-        project_id,
-        kind: None,
-    };
-    let created: Option<GraphRecord> = db
-        .create("graph")
-        .content(input)
-        .await
-        .map_err(|e| e.to_string())?;
-    let r = created.ok_or_else(|| String::from("Failed to create graph"))?;
-    Ok(serde_json::json!({
-        "id": thing_to_string(&r.id),
-        "name": r.name,
-        "project_id": r.project_id,
-    }))
+    services::graph::create_graph(&db, &project_id, &name).await
 }
 
-// ============================================================
-// Tauri コマンド — Graph Persist                     [CTX-15]
-// ============================================================
-
-/// グラフのノード・エッジを SurrealDB に保存する（全置換方式）。
 #[tauri::command]
 async fn save_graph(
     graph_id: String,
@@ -285,141 +214,12 @@ async fn save_graph(
     edges: Vec<SaveEdgeInput>,
     db: State<'_, Db>,
 ) -> Result<(), String> {
-    // 既存レコードを削除
-    db.query("DELETE node WHERE graph_id = $gid")
-        .bind(("gid", graph_id.clone()))
-        .await
-        .map_err(|e| e.to_string())?;
-    db.query("DELETE edge WHERE graph_id = $gid")
-        .bind(("gid", graph_id.clone()))
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // ノードを INSERT
-    for node in nodes {
-        let input = NodeInput {
-            graph_id: graph_id.clone(),
-            label: node.label,
-            node_type: node.node_type,
-            status: node.status,
-            service: node.service,
-            provider: node.provider,
-            input: node.input,
-            description: node.description,
-            position_x: node.position_x,
-            position_y: node.position_y,
-            file_path: None,
-            analyzed: None,
-        };
-        let _: Option<NodeRecord> = db
-            .create("node")
-            .content(input)
-            .await
-            .map_err(|e| e.to_string())?;
-    }
-
-    // エッジを INSERT
-    for edge in edges {
-        let input = EdgeInput {
-            graph_id: graph_id.clone(),
-            source: edge.source,
-            target: edge.target,
-            kind: None,
-        };
-        let _: Option<EdgeRecord> = db
-            .create("edge")
-            .content(input)
-            .await
-            .map_err(|e| e.to_string())?;
-    }
-
-    Ok(())
+    services::graph::save_graph(&db, &graph_id, nodes, edges).await
 }
 
-/// グラフのノード・エッジを取得して GraphFile 形式で返す。
 #[tauri::command]
 async fn load_graph(graph_id: String, db: State<'_, Db>) -> Result<LoadGraphResponse, String> {
-    load_graph_inner(&db, graph_id).await
-}
-
-/// load_graph の本体ロジック。get_structure_graph からも呼ぶため切り出し。
-async fn load_graph_inner(db: &Db, graph_id: String) -> Result<LoadGraphResponse, String> {
-    let raw_nodes: Vec<NodeRecord> = db
-        .query("SELECT * FROM node WHERE graph_id = $gid")
-        .bind(("gid", graph_id.clone()))
-        .await
-        .map_err(|e| e.to_string())?
-        .take(0)
-        .map_err(|e| e.to_string())?;
-
-    let raw_edges: Vec<EdgeRecord> = db
-        .query("SELECT * FROM edge WHERE graph_id = $gid")
-        .bind(("gid", graph_id.clone()))
-        .await
-        .map_err(|e| e.to_string())?
-        .take(0)
-        .map_err(|e| e.to_string())?;
-
-    // ReactFlow Node 形式に変換 { id, type, position: { x, y }, data: { label, ... } }
-    let nodes: Vec<serde_json::Value> = raw_nodes
-        .into_iter()
-        .map(|n| {
-            let mut data = serde_json::json!({ "label": n.label });
-            if let Some(v) = n.node_type {
-                data["nodeType"] = v.into();
-            }
-            if let Some(v) = n.status {
-                data["status"] = v.into();
-            }
-            if let Some(v) = n.service {
-                data["service"] = v.into();
-            }
-            if let Some(v) = n.provider {
-                data["provider"] = v.into();
-            }
-            if let Some(v) = n.input {
-                data["input"] = v;
-            }
-            if let Some(v) = n.description {
-                data["description"] = v.into();
-            }
-            // [CTX-20]
-            if let Some(v) = n.file_path {
-                data["filePath"] = v.into();
-            }
-            if let Some(v) = n.analyzed {
-                data["analyzed"] = v.into();
-            }
-            serde_json::json!({
-                "id": thing_to_string(&n.id),
-                "type": "editableNode",
-                "position": { "x": n.position_x, "y": n.position_y },
-                "data": data,
-            })
-        })
-        .collect();
-
-    let edges: Vec<serde_json::Value> = raw_edges
-        .into_iter()
-        .map(|e| {
-            let mut obj = serde_json::json!({
-                "id": thing_to_string(&e.id),
-                "source": e.source,
-                "target": e.target,
-            });
-            // [CTX-20]
-            if let Some(k) = e.kind {
-                obj["kind"] = k.into();
-            }
-            obj
-        })
-        .collect();
-
-    Ok(LoadGraphResponse {
-        id: graph_id,
-        nodes,
-        edges,
-    })
+    services::graph::load_graph(&db, graph_id).await
 }
 
 // ============================================================
@@ -553,8 +353,6 @@ fn resolve_args(args: &[String], input: &serde_json::Value) -> Result<Vec<String
 // [CTX-20] get_changed_files
 // ============================================================
 
-/// VcsProvider 経由で変更されたファイル一覧を返す。
-/// 初期実装は Git (`git diff --name-only HEAD`)。
 #[tauri::command]
 fn get_changed_files(root_path: String) -> Result<Vec<String>, String> {
     let provider = GitProvider;
@@ -562,50 +360,10 @@ fn get_changed_files(root_path: String) -> Result<Vec<String>, String> {
 }
 
 // ============================================================
-// [CTX-20] Structure Graph ヘルパー
+// [CTX-20] Structure Graph / Analysis ヘルパー
 // ============================================================
 
-/// プロジェクトの structure グラフを取得する。なければ作成する。
-async fn get_or_create_structure_graph(db: &Db, project_id: &str) -> Result<GraphRecord, String> {
-    let existing: Vec<GraphRecord> = db
-        .query("SELECT * FROM graph WHERE project_id = $pid AND kind = 'structure' LIMIT 1")
-        .bind(("pid", project_id.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
-        .take(0)
-        .map_err(|e| e.to_string())?;
-
-    if let Some(g) = existing.into_iter().next() {
-        return Ok(g);
-    }
-
-    let input = GraphInput {
-        name: "Structure".to_string(),
-        project_id: project_id.to_string(),
-        kind: Some("structure".to_string()),
-    };
-    let created: Option<GraphRecord> = db
-        .create("graph")
-        .content(input)
-        .await
-        .map_err(|e| e.to_string())?;
-    created.ok_or_else(|| String::from("Failed to create structure graph"))
-}
-
-/// project_id から ProjectRecord を取得する。
-/// プロジェクト数は少ない想定で全件取得 → string id で filter。
-async fn get_project(db: &Db, project_id: &str) -> Result<ProjectRecord, String> {
-    let records: Vec<ProjectRecord> = db.select("project").await.map_err(|e| e.to_string())?;
-    records
-        .into_iter()
-        .find(|p| thing_to_string(&p.id) == project_id)
-        .ok_or_else(|| format!("Project not found: {}", project_id))
-}
-
 /// `file_path` に対応するノードを取得 or 作成する。
-/// 既存ノードがあれば analyzed フィールドを更新（'fresh' への昇格、または 'pending' のまま）。
-/// 既に 'fresh' のノードを 'pending' に降格はしない。
-/// 戻り値: ノード ID（"node:xxx"）
 async fn upsert_file_node(
     db: &Db,
     graph_id: &str,
@@ -624,7 +382,6 @@ async fn upsert_file_node(
     if let Some(node) = existing.into_iter().next() {
         let id_str = thing_to_string(&node.id);
         let current = node.analyzed.clone().unwrap_or_default();
-        // 既に fresh なら pending に降格しない
         if new_analyzed == "fresh" || current != "fresh" {
             db.query("UPDATE $id SET analyzed = $a")
                 .bind(("id", node.id.clone()))
@@ -635,7 +392,6 @@ async fn upsert_file_node(
         return Ok(id_str);
     }
 
-    // 新規作成 — 既存ノード数に応じてグリッド配置
     let count: Option<serde_json::Value> = db
         .query("SELECT count() FROM node WHERE graph_id = $gid GROUP ALL")
         .bind(("gid", graph_id.to_string()))
@@ -678,7 +434,6 @@ async fn upsert_file_node(
     Ok(thing_to_string(&rec.id))
 }
 
-/// 1ファイルを解析して node / edge を UPSERT する。
 async fn do_analyze_file(
     db: &Db,
     project: &ProjectRecord,
@@ -692,17 +447,14 @@ async fn do_analyze_file(
 
     let edges = analyzer::extract_imports(root_path, file_rel_path, &source)?;
 
-    // 該当ファイルのノードを fresh で UPSERT
     let source_node_id = upsert_file_node(db, graph_id, file_rel_path, "fresh").await?;
 
-    // この source から出る古い 'imports' エッジを削除（再解析対応）
     db.query("DELETE edge WHERE graph_id = $gid AND source = $src AND kind = 'imports'")
         .bind(("gid", graph_id.to_string()))
         .bind(("src", source_node_id.clone()))
         .await
         .map_err(|e| e.to_string())?;
 
-    // 参照先ノードを pending で UPSERT し、エッジを作成
     for edge in edges {
         let target_node_id = upsert_file_node(db, graph_id, &edge.to, "pending").await?;
         let edge_input = EdgeInput {
@@ -720,7 +472,6 @@ async fn do_analyze_file(
     Ok(())
 }
 
-/// rootPath 配下を再帰的に走査し ts/tsx/rs ファイルの相対パス一覧を返す。
 fn collect_source_files(root: &Path) -> Vec<String> {
     let mut out = vec![];
     walk_source_files(root, root, &mut out);
@@ -754,37 +505,32 @@ fn walk_source_files(dir: &Path, root: &Path, out: &mut Vec<String>) {
 // [CTX-20] Tauri コマンド
 // ============================================================
 
-/// プロジェクトの structure グラフを返す（なければ作成）。
-/// 返り値は load_graph と同じ ReactFlow 形式。
 #[tauri::command]
 async fn get_structure_graph(
     project_id: String,
     db: State<'_, Db>,
 ) -> Result<LoadGraphResponse, String> {
-    let graph = get_or_create_structure_graph(&db, &project_id).await?;
+    let graph = services::graph::get_or_create_structure_graph(&db, &project_id).await?;
     let gid = thing_to_string(&graph.id);
-    load_graph_inner(&db, gid).await
+    services::graph::load_graph(&db, gid).await
 }
 
-/// 1ファイルを tree-sitter で解析し、structure グラフに node / edge を UPSERT する。
 #[tauri::command]
 async fn analyze_file(
     project_id: String,
     file_path: String,
     db: State<'_, Db>,
 ) -> Result<(), String> {
-    let project = get_project(&db, &project_id).await?;
-    let graph = get_or_create_structure_graph(&db, &project_id).await?;
+    let project = services::db::get_project(&db, &project_id).await?;
+    let graph = services::graph::get_or_create_structure_graph(&db, &project_id).await?;
     let gid = thing_to_string(&graph.id);
     do_analyze_file(&db, &project, &gid, &file_path).await
 }
 
-/// rootPath 配下のソースファイルを一括解析する。
-/// 1ファイル失敗で全体は止めず、エラーは stderr に記録して継続する。
 #[tauri::command]
 async fn analyze_project(project_id: String, db: State<'_, Db>) -> Result<(), String> {
-    let project = get_project(&db, &project_id).await?;
-    let graph = get_or_create_structure_graph(&db, &project_id).await?;
+    let project = services::db::get_project(&db, &project_id).await?;
+    let graph = services::graph::get_or_create_structure_graph(&db, &project_id).await?;
     let gid = thing_to_string(&graph.id);
 
     let root = Path::new(&project.root_path);

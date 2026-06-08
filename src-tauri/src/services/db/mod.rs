@@ -389,3 +389,17 @@ async fn seed_catalog(db: &Db) -> Result<(), surrealdb::Error> {
 
     Ok(())
 }
+
+// ============================================================
+// プロジェクト取得ヘルパー
+// ============================================================
+
+/// project_id から ProjectRecord を取得する。
+/// プロジェクト数は少ない想定で全件取得 → string id で filter。
+pub async fn get_project(db: &Db, project_id: &str) -> Result<ProjectRecord, String> {
+    let records: Vec<ProjectRecord> = db.select("project").await.map_err(|e| e.to_string())?;
+    records
+        .into_iter()
+        .find(|p| thing_to_string(&p.id) == project_id)
+        .ok_or_else(|| format!("Project not found: {}", project_id))
+}
