@@ -1,15 +1,23 @@
-//! db.rs — SurrealDB セットアップ・スキーマ定義・初期データ INSERT
+//! services/db — SurrealDB セットアップ・スキーマ定義・初期データ INSERT・共通ユーティリティ
 //!
 //! @context CTX-13: node_catalog テーブル
 //! @context CTX-SurrealDB-migration: project / graph テーブル追加
 //! @context CTX-15: node / edge テーブル追加（グラフ永続化）
 //! @context CTX-20: graph.kind / node.file_path / node.analyzed / edge.kind 追加
-//! @note    kv-surrealkv（RocksDB 永続化）を使用。
-//!          surrealdb 2.6.x (stable) を使用。
 
 use serde::{Deserialize, Serialize};
 use surrealdb::engine::local::SurrealKv;
 use surrealdb::Surreal;
+
+// ============================================================
+// 共通ユーティリティ
+// ============================================================
+
+/// Thing 型を "tb:id" 形式の文字列に変換するヘルパー。
+/// 全サービスから参照される。
+pub fn thing_to_string(thing: &surrealdb::sql::Thing) -> String {
+    format!("{}:{}", thing.tb, thing.id)
+}
 
 // ============================================================
 // 型定義（フロントの CatalogEntry / CatalogProfile に対応）
@@ -380,4 +388,18 @@ async fn seed_catalog(db: &Db) -> Result<(), surrealdb::Error> {
     }
 
     Ok(())
+}
+
+// ============================================================
+// プロジェクト取得ヘルパー
+// ============================================================
+
+/// project_id から ProjectRecord を取得する。
+/// プロジェクト数は少ない想定で全件取得 → string id で filter。
+pub async fn get_project(db: &Db, project_id: &str) -> Result<ProjectRecord, String> {
+    let records: Vec<ProjectRecord> = db.select("project").await.map_err(|e| e.to_string())?;
+    records
+        .into_iter()
+        .find(|p| thing_to_string(&p.id) == project_id)
+        .ok_or_else(|| format!("Project not found: {}", project_id))
 }
