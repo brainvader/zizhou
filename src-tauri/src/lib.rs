@@ -8,14 +8,14 @@
 //! @context CTX-20: get_structure_graph / analyze_file / analyze_project / get_changed_files
 
 mod analyzer;
-mod db;
+mod services;
 mod vcs;
 
-use db::{
-    Db, EdgeInput, EdgeRecord, GraphInput, GraphRecord, NodeCatalog, NodeInput, NodeRecord,
-    ProjectInput, ProjectRecord,
-};
 use serde::{Deserialize, Serialize};
+use services::db::{
+    thing_to_string, Db, EdgeInput, EdgeRecord, GraphInput, GraphRecord, NodeCatalog, NodeInput,
+    NodeRecord, ProjectInput, ProjectRecord,
+};
 use std::path::Path;
 use tauri::{Manager, State};
 use vcs::{GitProvider, VcsProvider};
@@ -135,13 +135,6 @@ pub struct LoadGraphResponse {
     pub id: String,
     pub nodes: Vec<serde_json::Value>,
     pub edges: Vec<serde_json::Value>,
-}
-
-// ============================================================
-// Thing 型を "tb:id" 形式の文字列に変換するヘルパー
-// ============================================================
-fn thing_to_string(thing: &surrealdb::sql::Thing) -> String {
-    format!("{}:{}", thing.tb, thing.id)
 }
 
 // ============================================================
@@ -824,7 +817,7 @@ pub fn run() {
                 .app_data_dir()
                 .expect("Failed to get app data dir");
             std::fs::create_dir_all(&app_data_dir).expect("Failed to create app data dir");
-            let db = tauri::async_runtime::block_on(db::init_db(app_data_dir))
+            let db = tauri::async_runtime::block_on(services::db::init_db(app_data_dir))
                 .expect("Failed to initialize SurrealDB");
             app.manage(db);
             Ok(())
