@@ -13,6 +13,7 @@
  *   - ノード位置変更時に onNodesChange(nodes) を呼ぶ（Position Persist）
  *
  * 設計方針:
+ *   - ReactFlowProvider で自己ラップ（GraphEditor と同様）
  *   - Zustand store を持たない（外から nodes/edges を受け取るだけ）
  *   - useNodesState で ReactFlow 内部の位置変更を管理し、
  *     ドラッグ完了後（'position' change の dragging=false）に親へ通知する
@@ -28,6 +29,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import {
     ReactFlow,
+    ReactFlowProvider,
     Background,
     Controls,
     useNodesState,
@@ -46,7 +48,7 @@ import {
 } from '@/bom/source-graph'
 
 // ============================================================
-// nodeTypes は コンポーネント外で定義（再レンダリング時の remount 防止）
+// nodeTypes はコンポーネント外で定義（再レンダリング時の remount 防止）
 // ============================================================
 
 const NODE_TYPES = {
@@ -54,10 +56,10 @@ const NODE_TYPES = {
 } as const
 
 // ============================================================
-// SourceGraphView
+// SourceGraphViewInner — ReactFlowProvider の内側
 // ============================================================
 
-export function SourceGraphView({
+function SourceGraphViewInner({
     nodes: nodesProp,
     edges: edgesProp,
     staleFiles,
@@ -66,14 +68,8 @@ export function SourceGraphView({
     onReanalyze,
     onNodesChange: onNodesChangeProp,
 }: SourceGraphViewProps) {
-    // ----------------------------------------------------------
-    // displayStatus / selected を注入した RF ノードを算出
-    // ----------------------------------------------------------
-
     const onReanalyzeRef = useRef(onReanalyze)
-    useEffect(() => {
-        onReanalyzeRef.current = onReanalyze
-    }, [onReanalyze])
+    useEffect(() => { onReanalyzeRef.current = onReanalyze }, [onReanalyze])
 
     const enrichedNodes = useMemo((): SourceNodeRfType[] => {
         return nodesProp.map((node) => {
@@ -96,23 +92,15 @@ export function SourceGraphView({
         })
     }, [nodesProp, staleFiles, selectedFilePath])
 
-    // ----------------------------------------------------------
-    // ReactFlow 内部状態（位置管理）
-    // ----------------------------------------------------------
-
     const [nodes, setNodes, onNodesChangeInternal] = useNodesState<SourceNodeRfType>(enrichedNodes)
     const [edges, , onEdgesChange] = useEdgesState(edgesProp)
 
-    // nodesProp / staleFiles / selectedFilePath が変わったら RF ノードを同期
     useEffect(() => {
         setNodes(enrichedNodes)
     }, [enrichedNodes, setNodes])
 
-    // ドラッグ完了時のみ親へ通知（position change の dragging=false）
     const onNodesChangePropRef = useRef(onNodesChangeProp)
-    useEffect(() => {
-        onNodesChangePropRef.current = onNodesChangeProp
-    }, [onNodesChangeProp])
+    useEffect(() => { onNodesChangePropRef.current = onNodesChangeProp }, [onNodesChangeProp])
 
     const handleNodesChange = useCallback(
         (changes: NodeChange<SourceNodeRfType>[]) => {
@@ -122,16 +110,11 @@ export function SourceGraphView({
                 (c) => c.type === 'position' && c.dragging === false,
             )
             if (hasDragEnd && onNodesChangePropRef.current) {
-                // 変更適用後の最新 nodes を親へ通知
                 setNodes((prev) => {
                     const next = applyNodeChanges(changes, prev)
-                    // SourceNodeRfType → SourceNodeType へ変換（displayStatus / onReanalyze を除去）
                     const plain = next.map((n) => {
                         const { displayStatus: _d, onReanalyze: _r, ...rest } = n.data
-                        return {
-                            ...n,
-                            data: rest,
-                        } as SourceNodeType
+                        return { ...n, data: rest } as SourceNodeType
                     })
                     onNodesChangePropRef.current?.(plain)
                     return next
@@ -141,25 +124,13 @@ export function SourceGraphView({
         [onNodesChangeInternal, setNodes],
     )
 
-    // ----------------------------------------------------------
-    // ノードクリック（Node→File 同期）
-    // ----------------------------------------------------------
-
     const onNodeSelectRef = useRef(onNodeSelect)
-    useEffect(() => {
-        onNodeSelectRef.current = onNodeSelect
-    }, [onNodeSelect])
+    useEffect(() => { onNodeSelectRef.current = onNodeSelect }, [onNodeSelect])
 
     const handleNodeClick: NodeMouseHandler<SourceNodeRfType> = useCallback((_event, node) => {
         const filePath = node.data.filePath
-        if (filePath) {
-            onNodeSelectRef.current?.(filePath)
-        }
+        if (filePath) onNodeSelectRef.current?.(filePath)
     }, [])
-
-    // ----------------------------------------------------------
-    // 空グラフ表示
-    // ----------------------------------------------------------
 
     const isEmpty = nodesProp.length === 0
 
@@ -200,5 +171,17 @@ export function SourceGraphView({
                 <Controls />
             </ReactFlow>
         </div>
+    )
+}
+
+// ============================================================
+// SourceGraphView — ReactFlowProvider でラップして export
+// ============================================================
+
+export function SourceGraphView(props: SourceGraphViewProps) {
+    return (
+        <ReactFlowProvider>
+            <SourceGraphViewInner {...props} />
+        </ReactFlowProvider>
     )
 }

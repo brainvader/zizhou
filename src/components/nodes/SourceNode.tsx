@@ -14,7 +14,11 @@
  * [CTX-21] ↺ Reanalyze ボタン:
  *   - 常時表示（hover-only より UX が安定している）
  *   - filePath が存在する場合のみ表示
- *   - data-testid="reanalyze-node-{filePath}"
+ *   - data-testid="reanalyze-node-{filePath の / を - に変換}"
+ *
+ * data-testid の / → - 変換:
+ *   CSS セレクタで / が問題になるため filePath の / を - に正規化する。
+ *   例: src/main.tsx → source-node-src-main.tsx
  *
  * props DI:
  *   onReanalyze は SourceGraphView から data に注入される。
@@ -27,6 +31,10 @@
 
 import { Handle, Position } from '@xyflow/react'
 import type { SourceNodeProps } from '@/bom/source-graph'
+
+function toTestId(path: string) {
+    return path.replace(/\//g, '-')
+}
 
 export function SourceNode({ data, selected }: SourceNodeProps) {
     const { label, filePath, displayStatus, onReanalyze } = data
@@ -56,9 +64,11 @@ export function SourceNode({ data, selected }: SourceNodeProps) {
         }
         : {}
 
+    const testId = `source-node-${toTestId(filePath ?? label)}`
+
     return (
         <div
-            data-testid={`source-node-${filePath ?? label}`}
+            data-testid={testId}
             data-selected={selected ? 'true' : 'false'}
             data-status={displayStatus}
             style={{
@@ -66,7 +76,6 @@ export function SourceNode({ data, selected }: SourceNodeProps) {
                 maxWidth: 200,
                 padding: '6px 10px',
                 borderRadius: 6,
-                borderLeft: `3px solid ${borderColor}`,
                 border: `1px solid var(--border, #3f3f46)`,
                 borderLeftWidth: 3,
                 borderLeftColor: borderColor,
@@ -80,10 +89,8 @@ export function SourceNode({ data, selected }: SourceNodeProps) {
                 ...ringStyle,
             }}
         >
-            {/* ソースハンドル（左） */}
             <Handle type="target" position={Position.Left} />
 
-            {/* ラベル行 */}
             <div
                 style={{
                     display: 'flex',
@@ -104,11 +111,10 @@ export function SourceNode({ data, selected }: SourceNodeProps) {
                     {label}
                 </span>
 
-                {/* ↺ Reanalyze ボタン: filePath が存在する場合のみ表示 */}
                 {filePath && onReanalyze && (
                     <button
                         type="button"
-                        data-testid={`reanalyze-node-${filePath}`}
+                        data-testid={`reanalyze-node-${toTestId(filePath)}`}
                         onClick={(e) => {
                             e.stopPropagation()
                             onReanalyze(filePath)
@@ -139,7 +145,6 @@ export function SourceNode({ data, selected }: SourceNodeProps) {
                 )}
             </div>
 
-            {/* ステータスバッジ */}
             {displayStatus !== 'fresh' && (
                 <div
                     style={{
@@ -158,7 +163,6 @@ export function SourceNode({ data, selected }: SourceNodeProps) {
                 </div>
             )}
 
-            {/* ターゲットハンドル（右） */}
             <Handle type="source" position={Position.Right} />
         </div>
     )

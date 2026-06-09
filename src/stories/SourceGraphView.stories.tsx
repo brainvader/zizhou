@@ -13,10 +13,6 @@ import { expect, fn, userEvent, within } from 'storybook/test'
 import { SourceGraphView } from '@/components/SourceGraphView'
 import type { SourceNode, SourceEdge } from '@/bom/source-graph'
 
-// ============================================================
-// 共通フィクスチャ
-// ============================================================
-
 const NODES: SourceNode[] = [
     {
         id: 'node-1',
@@ -43,16 +39,10 @@ const EDGES: SourceEdge[] = [
     { id: 'e2-3', source: 'node-2', target: 'node-3', kind: 'renders' },
 ]
 
-// ============================================================
-// Meta
-// ============================================================
-
 const meta: Meta<typeof SourceGraphView> = {
     component: SourceGraphView,
     title: 'Project Detail/SourceGraphView',
-    parameters: {
-        layout: 'fullscreen',
-    },
+    parameters: { layout: 'fullscreen' },
     decorators: [
         (Story) => (
             <div style={{ width: '100%', height: '600px' }}>
@@ -64,11 +54,6 @@ const meta: Meta<typeof SourceGraphView> = {
 export default meta
 type Story = StoryObj<typeof SourceGraphView>
 
-// ============================================================
-// Stories
-// ============================================================
-
-/** @story 全ノードが fresh（staleFiles 空） */
 export const AllFresh: Story = {
     args: {
         nodes: NODES,
@@ -80,7 +65,6 @@ export const AllFresh: Story = {
     },
 }
 
-/** @story 一部ノードが stale */
 export const WithStaleNodes: Story = {
     args: {
         nodes: NODES,
@@ -92,7 +76,6 @@ export const WithStaleNodes: Story = {
     },
 }
 
-/** @story pending ノードを含む */
 export const WithPendingNode: Story = {
     args: {
         nodes: NODES,
@@ -104,7 +87,6 @@ export const WithPendingNode: Story = {
     },
 }
 
-/** @story File→Node 同期: selectedFilePath でノードをハイライト */
 export const FileNodeSync: Story = {
     args: {
         nodes: NODES,
@@ -129,7 +111,8 @@ export const ReanalyzeButton: Story = {
     },
     play: async ({ canvasElement, args }: { canvasElement: HTMLElement; args: any }) => {
         const canvas = within(canvasElement)
-        const btn = await canvas.findByTestId('reanalyze-node-src/main.ts')
+        // filePath の / → - 変換済み
+        const btn = await canvas.findByTestId('reanalyze-node-src-main.ts')
         await userEvent.click(btn)
         await expect(args.onReanalyze).toHaveBeenCalledWith('src/main.ts')
     },
@@ -147,13 +130,12 @@ export const NodeClick: Story = {
     },
     play: async ({ canvasElement, args }: { canvasElement: HTMLElement; args: any }) => {
         const canvas = within(canvasElement)
-        const node = await canvas.findByTestId('source-node-src/App.tsx')
+        const node = await canvas.findByTestId('source-node-src-App.tsx')
         await userEvent.click(node)
         await expect(args.onNodeSelect).toHaveBeenCalledWith('src/App.tsx')
     },
 }
 
-/** @story ノードなし（空グラフ） */
 export const Empty: Story = {
     args: {
         nodes: [],

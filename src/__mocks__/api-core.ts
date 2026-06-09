@@ -95,6 +95,19 @@ function toGraphFileEdges(edges: MockEdge[]) {
         ...(e.kind != null ? { kind: e.kind } : {}),
     }))
 }
+// [CTX-21] SourceGraphView 用: type を 'sourceNode' で返す
+function toSourceGraphNodes(nodes: MockNode[]) {
+    return nodes.map((n) => ({
+        id: n.id,
+        type: 'sourceNode',
+        position: { x: n.position_x, y: n.position_y },
+        data: {
+            label: n.label,
+            ...(n.file_path != null ? { filePath: n.file_path } : {}),
+            ...(n.analyzed != null ? { analyzed: n.analyzed } : {}),
+        },
+    }))
+}
 
 // ── invoke モック ─────────────────────────────────────────────────────────
 
@@ -206,7 +219,7 @@ export async function invoke<T>(
             const stored = _graphData.get(graph.id) ?? { nodes: [], edges: [] }
             return {
                 id: graph.id,
-                nodes: toGraphFileNodes(stored.nodes),
+                nodes: toSourceGraphNodes(stored.nodes),
                 edges: toGraphFileEdges(stored.edges),
             } as unknown as T
         }
