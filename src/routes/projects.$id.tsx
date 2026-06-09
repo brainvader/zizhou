@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
 import { FileTree } from '@/components/FileTree'
-import { GraphEditor } from '@/components/GraphEditor'
+import { SourceGraphView } from '@/components/SourceGraphView'
 import { NodeProperty } from '@/components/NodeProperty'
 import { ProjectDetailTopbar } from '@/components/ProjectDetailTopbar'
 import { SettingsDialog } from '@/components/SettingsDialog'
@@ -177,6 +177,31 @@ export const ProjectDetailRoute = () => {
         }
     }, [id, refreshStructure, refreshChangedFiles])
 
+    /** SourceGraphView Node->File sync: node click updates selectedFilePath */
+    const handleNodeSelect = useCallback(
+        (filePath: string) => {
+            setSelectedFilePath(filePath)
+        },
+        [],
+    )
+
+    /** SourceGraphView Position Persist: call save_graph after drag */
+    const handleSourceNodesChange = useCallback(
+        async (nodes: import('@xyflow/react').Node[]) => {
+            if (!structureGraph) return
+            try {
+                await invoke('save_graph', {
+                    graphId: structureGraph.id,
+                    nodes,
+                    edges: structureGraph.edges,
+                })
+            } catch (e) {
+                console.error('save_graph failed', e)
+            }
+        },
+        [structureGraph],
+    )
+
     return (
         <div
             style={{
@@ -251,7 +276,15 @@ export const ProjectDetailRoute = () => {
                     defaultSize={GRAPH_EDITOR_PANEL.defaultSize}
                     minSize={GRAPH_EDITOR_PANEL.minSize}
                 >
-                    <GraphEditor projectId={id} activeGraphId={activeGraphId ?? null} />
+                    <SourceGraphView
+                        nodes={structureGraph?.nodes ?? []}
+                        edges={structureGraph?.edges ?? []}
+                        staleFiles={staleFiles}
+                        selectedFilePath={selectedFilePath}
+                        onNodeSelect={handleNodeSelect}
+                        onReanalyze={handleReanalyzeSelected}
+                        onNodesChange={handleSourceNodesChange}
+                    />
                 </ResizablePanel>
 
                 <ResizableHandle />

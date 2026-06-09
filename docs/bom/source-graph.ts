@@ -110,8 +110,13 @@ export type SourceNodeProps = NodeProps<SourceNodeType>
 // ============================================================
 
 export type SourceGraphViewProps = {
-    /** Rust get_structure_graph の戻り値をそのまま渡す */
-    nodes: SourceNode[]
+    /**
+     * Rust get_structure_graph の戻り値をそのまま渡す。
+     * type フィールドが 'sourceNode' 以外（undefined 含む）でも受け入れるため
+     * RfNode<SourceNodeData>[] に緩めている。
+     * SourceGraphView 内部で 'sourceNode' として扱う。
+     */
+    nodes: RfNode<SourceNodeData>[]
     edges: SourceEdge[]
     /** stale 判定に使う変更ファイル集合 */
     staleFiles: ReadonlySet<string>
@@ -122,7 +127,7 @@ export type SourceGraphViewProps = {
     /** ↺ボタン押下: filePath を通知（projects.$id.tsx の handleReanalyzeSelected に接続） */
     onReanalyze?: (filePath: string) => void
     /** ノード位置変更時: 永続化のため親に通知（save_graph 呼び出しに使う） */
-    onNodesChange?: (nodes: SourceNode[]) => void
+    onNodesChange?: (nodes: RfNode<SourceNodeData>[]) => void
 }
 
 // ============================================================

@@ -15,7 +15,7 @@
 
 import { describe, test, expect } from 'vitest'
 import { computeAnalyzedDisplay } from '@/bom/source-graph'
-import type { AnalyzedDisplay, SourceNodeData } from '@/bom/source-graph'
+import type { AnalyzedDisplay } from '@/bom/source-graph'
 
 // ============================================================
 // computeAnalyzedDisplay ロジック検証
