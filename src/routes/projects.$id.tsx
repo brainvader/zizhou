@@ -16,7 +16,7 @@ import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import { useProjectDetailLoad } from '@/hooks/useProjectDetailLoad'
 import { FILE_TREE_PANEL, GRAPH_EDITOR_PANEL, NODE_PROPERTY_PANEL } from '@/bom/layout'
-import type { StructureGraph } from '@/bom/structure-graph'
+import type { SourceGraph } from '@/bom/source-graph'
 
 /**
  * ProjectDetailRoute
@@ -65,7 +65,7 @@ export const ProjectDetailRoute = () => {
     // ============================================================
     // [CTX-20] Structure graph state
     // ============================================================
-    const [structureGraph, setStructureGraph] = useState<StructureGraph | null>(null)
+    const [structureGraph, setStructureGraph] = useState<SourceGraph | null>(null)
     const [changedFiles, setChangedFiles] = useState<string[]>([])
     const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
     const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -73,7 +73,7 @@ export const ProjectDetailRoute = () => {
     const refreshStructure = useCallback(async () => {
         if (!id) return
         try {
-            const graph = await invoke<StructureGraph>('get_structure_graph', {
+            const graph = await invoke<SourceGraph>('get_structure_graph', {
                 projectId: id,
             })
             setStructureGraph(graph)
