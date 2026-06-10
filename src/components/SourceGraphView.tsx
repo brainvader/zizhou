@@ -80,6 +80,7 @@ function SourceGraphViewInner({
             )
             return {
                 ...node,
+                type: 'sourceNode',
                 selected: node.data.filePath
                     ? node.data.filePath === selectedFilePath
                     : false,

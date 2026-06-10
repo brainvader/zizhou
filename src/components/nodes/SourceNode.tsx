@@ -64,7 +64,9 @@ export function SourceNode({ data, selected }: SourceNodeProps) {
         }
         : {}
 
-    const testId = `source-node-${toTestId(filePath ?? label)}`
+    const testId = data.filePath
+        ? `source-node-${data.filePath.replace(/\//g, '-').replace(/\./g, '.')}`
+        : undefined
 
     return (
         <div
