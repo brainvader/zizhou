@@ -208,6 +208,10 @@ pub async fn init_db(app_data_dir: std::path::PathBuf) -> Result<Db, surrealdb::
     db.query("UPDATE edge SET kind = 'flow' WHERE kind IS NONE")
         .await?;
 
+    // [CTX-22] source_context テーブルを SCHEMALESS で定義（初回起動時に作成）
+    db.query("DEFINE TABLE IF NOT EXISTS source_context SCHEMALESS")
+        .await?;
+
     Ok(db)
 }
 
