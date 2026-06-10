@@ -16,6 +16,10 @@
  * get_changed_files:     変更ファイル一覧を返す [CTX-20]
  * analyze_file:          structure グラフにノードを追加する [CTX-20]
  * analyze_project:       全ソースファイル分のノードを追加する [CTX-20]
+ * list_contexts:         インメモリの contexts[] を返す [CTX-22]
+ * create_context:        インメモリに context を追加して返す [CTX-22]
+ * update_context:        インメモリの context を更新して返す [CTX-22]
+ * delete_context:        インメモリから context を削除する [CTX-22]
  */
 import { NODE_CATALOG } from '@/bom/graph'
 import type { CatalogEntry } from '@/bom/graph'
@@ -50,8 +54,17 @@ type MockEdge = {
     kind?: string | null
 }
 
+// [CTX-22]
+type MockContext = {
+    id: string
+    name: string
+    project_id: string
+    node_ids: string[]
+}
+
 const _projects: MockProject[] = []
 const _graphs: MockGraph[] = []
+const _contexts: MockContext[] = []  // [CTX-22]
 
 // graph_id → { nodes, edges } のインメモリグラフストア
 const _graphData: Map<string, { nodes: MockNode[]; edges: MockEdge[] }> = new Map()
@@ -93,19 +106,6 @@ function toGraphFileEdges(edges: MockEdge[]) {
         target: e.target,
         // [CTX-20]
         ...(e.kind != null ? { kind: e.kind } : {}),
-    }))
-}
-// [CTX-21] SourceGraphView 用: type を 'sourceNode' で返す
-function toSourceGraphNodes(nodes: MockNode[]) {
-    return nodes.map((n) => ({
-        id: n.id,
-        type: 'sourceNode',
-        position: { x: n.position_x, y: n.position_y },
-        data: {
-            label: n.label,
-            ...(n.file_path != null ? { filePath: n.file_path } : {}),
-            ...(n.analyzed != null ? { analyzed: n.analyzed } : {}),
-        },
     }))
 }
 
@@ -219,7 +219,7 @@ export async function invoke<T>(
             const stored = _graphData.get(graph.id) ?? { nodes: [], edges: [] }
             return {
                 id: graph.id,
-                nodes: toSourceGraphNodes(stored.nodes),
+                nodes: toGraphFileNodes(stored.nodes),
                 edges: toGraphFileEdges(stored.edges),
             } as unknown as T
         }
@@ -273,6 +273,62 @@ export async function invoke<T>(
             for (const fp of sourceFiles) {
                 await invoke('analyze_file', { projectId, filePath: fp })
             }
+            return undefined as unknown as T
+        }
+
+        // ── CTX-22: SourceContext ────────────────────────────────────────
+
+        case 'list_contexts': {
+            const projectId = args?.projectId as string
+            return _contexts
+                .filter((c) => c.project_id === projectId)
+                .map((c) => ({
+                    id: c.id,
+                    name: c.name,
+                    projectId: c.project_id,
+                    nodeIds: c.node_ids,
+                })) as unknown as T
+        }
+
+        case 'create_context': {
+            const projectId = args?.projectId as string
+            const name = args?.name as string
+            const nodeIds = (args?.nodeIds as string[]) ?? []
+            const context: MockContext = {
+                id: `source_context:mock-${_idCounter++}`,
+                name,
+                project_id: projectId,
+                node_ids: nodeIds,
+            }
+            _contexts.push(context)
+            return {
+                id: context.id,
+                name: context.name,
+                projectId: context.project_id,
+                nodeIds: context.node_ids,
+            } as unknown as T
+        }
+
+        case 'update_context': {
+            const contextId = args?.contextId as string
+            const name = args?.name as string
+            const nodeIds = (args?.nodeIds as string[]) ?? []
+            const ctx = _contexts.find((c) => c.id === contextId)
+            if (!ctx) throw new Error(`[mock] context not found: ${contextId}`)
+            ctx.name = name
+            ctx.node_ids = nodeIds
+            return {
+                id: ctx.id,
+                name: ctx.name,
+                projectId: ctx.project_id,
+                nodeIds: ctx.node_ids,
+            } as unknown as T
+        }
+
+        case 'delete_context': {
+            const contextId = args?.contextId as string
+            const idx = _contexts.findIndex((c) => c.id === contextId)
+            if (idx >= 0) _contexts.splice(idx, 1)
             return undefined as unknown as T
         }
 
