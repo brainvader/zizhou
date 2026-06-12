@@ -90,7 +90,6 @@ export function isBoundaryEdge(
     edgeTarget: string,
     contexts: SourceContext[],
 ): boolean {
-    // source/target が属するコンテクスト ID を解決する
     const findContextId = (nodeId: string): string | null => {
         const ctx = contexts.find((c) => c.nodeIds.includes(nodeId))
         return ctx?.id ?? null
@@ -99,12 +98,89 @@ export function isBoundaryEdge(
     const srcCtx = findContextId(edgeSource)
     const tgtCtx = findContextId(edgeTarget)
 
-    // 両端とも未所属 → 境界なし
     if (srcCtx === null && tgtCtx === null) return false
-
-    // 両端が同じコンテクスト → 内部エッジ
     if (srcCtx !== null && srcCtx === tgtCtx) return false
-
-    // それ以外（片方のみ所属、または異なるコンテクスト）→ 境界エッジ
     return true
+}
+
+// ============================================================
+// Subflow 座標計算                                    [CTX-22]
+// ReactFlow の parentId 方式では子ノードの position は
+// 親コンテナ相対座標になるため、以下の変換関数を使う。
+// ============================================================
+
+/** ノード位置の最小情報。ReactFlow Node から抽出して渡す。 */
+export type NodePositionEntry = {
+    id: string
+    position: { x: number; y: number }
+}
+
+/** コンテナ矩形。x/y は絶対座標、width/height はパディング込みのサイズ。 */
+export type ContainerRect = {
+    x: number
+    y: number
+    width: number
+    height: number
+}
+
+/**
+ * computeContainerRect
+ *
+ * 指定ノード群の絶対座標から包含矩形を計算し、
+ * パディングを加えたコンテナの位置・サイズを返す。
+ *
+ * nodeIds に対応するノードが1つも見つからない場合は null を返す。
+ *
+ * @param nodeIds    コンテナに含めるノードの ID 集合
+ * @param allNodes   グラフ上の全ノード（position は絶対座標）
+ * @param padding    コンテナの内側余白（デフォルト 40px）
+ * @param nodeHeight ノードの概算高さ（下端計算用、デフォルト 60px）
+ * @param nodeWidth  ノードの概算幅（右端計算用、デフォルト 180px）
+ */
+export function computeContainerRect(
+    nodeIds: string[],
+    allNodes: NodePositionEntry[],
+    padding = 40,
+    nodeHeight = 60,
+    nodeWidth = 180,
+): ContainerRect | null {
+    const targets = allNodes.filter((n) => nodeIds.includes(n.id))
+    if (targets.length === 0) return null
+
+    const xs = targets.map((n) => n.position.x)
+    const ys = targets.map((n) => n.position.y)
+
+    const minX = Math.min(...xs)
+    const minY = Math.min(...ys)
+    const maxX = Math.max(...xs) + nodeWidth
+    const maxY = Math.max(...ys) + nodeHeight
+
+    return {
+        x: minX - padding,
+        y: minY - padding,
+        width: maxX - minX + padding * 2,
+        height: maxY - minY + padding * 2,
+    }
+}
+
+/**
+ * toRelativePosition
+ *
+ * 子ノードの絶対座標を親コンテナ相対座標に変換する。
+ *
+ * ReactFlow は parentId が設定されたノードの position を
+ * 親の左上角からの相対座標として解釈する。
+ *
+ * @param absolutePos   子ノードの絶対座標
+ * @param containerPos  親コンテナの絶対座標（ContainerRect の x/y）
+ * @returns             親相対座標
+ */
+export function toRelativePosition(
+    absolutePos: { x: number; y: number },
+    containerPos: { x: number; y: number },
+): { x: number; y: number } {
+    return {
+        x: absolutePos.x - containerPos.x,
+        y: absolutePos.y - containerPos.y,
+    }
 }

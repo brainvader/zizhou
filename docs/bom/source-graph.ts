@@ -2,22 +2,25 @@
  * docs/bom/source-graph.ts
  *
  * @context CTX-21: Source Graph
+ * @context CTX-22: contexts prop 追加（Subflow Display）
  *
  * プロジェクトのファイル間依存関係グラフ（source graph）に関する型契約。
  * Rust 側の get_structure_graph / analyze_file / analyze_project / get_changed_files
  * との対応を定義する。
  *
  * 命名規則:
- *   SourceGraph         — グラフデータ型（Rust get_structure_graph の戻り値に対応）
- *   SourceNode          — ReactFlow Node 型
- *   SourceNodeData      — ReactFlow Node.data 型
- *   SourceNodeDisplayData — 描画用 Node.data 型（displayStatus / onReanalyze を追加）
- *   SourceEdge          — ReactFlow Edge 型
- *   SourceGraphView     — グラフ描画コンポーネント（src/components/SourceGraphView.tsx）
- *   SourceNode (comp)   — ノード描画コンポーネント（src/components/nodes/SourceNode.tsx）
+ *   SourceGraph             — グラフデータ型（Rust get_structure_graph の戻り値に対応）
+ *   SourceNode              — ReactFlow Node 型
+ *   SourceNodeData          — ReactFlow Node.data 型
+ *   SourceNodeDisplayData   — 描画用 Node.data 型（displayStatus / onReanalyze を追加）
+ *   SourceEdge              — ReactFlow Edge 型
+ *   SourceContextContainer  — Subflow コンテナノードコンポーネント（src/components/nodes/SourceContextContainer.tsx）
+ *   SourceGraphView         — グラフ描画コンポーネント（src/components/SourceGraphView.tsx）
+ *   SourceNode (comp)       — ノード描画コンポーネント（src/components/nodes/SourceNode.tsx）
  */
 
 import type { Node as RfNode, Edge as RfEdge, NodeProps } from '@xyflow/react'
+import type { SourceContext } from '@/bom/source-context'
 
 // ============================================================
 // データモデル
@@ -106,7 +109,26 @@ export type SourceNodeType = RfNode<SourceNodeDisplayData, 'sourceNode'>
 export type SourceNodeProps = NodeProps<SourceNodeType>
 
 // ============================================================
-// SourceGraphView コンポーネント Props         [CTX-21]
+// SourceContextContainer コンポーネント用型    [CTX-22]
+// ============================================================
+
+/**
+ * Subflow コンテナノードの data 型。
+ * SourceGraphView が SourceContext から生成して渡す。
+ */
+export type SourceContextContainerData = {
+    /** SourceContext の表示名 */
+    label: string
+    /** 対応する SourceContext の ID */
+    contextId: string
+}
+
+export type SourceContextContainerNode = RfNode<SourceContextContainerData, 'contextContainer'>
+
+export type SourceContextContainerProps = NodeProps<SourceContextContainerNode>
+
+// ============================================================
+// SourceGraphView コンポーネント Props         [CTX-21 / CTX-22]
 // ============================================================
 
 export type SourceGraphViewProps = {
@@ -128,6 +150,8 @@ export type SourceGraphViewProps = {
     onReanalyze?: (filePath: string) => void
     /** ノード位置変更時: 永続化のため親に通知（save_graph 呼び出しに使う） */
     onNodesChange?: (nodes: RfNode<SourceNodeData>[]) => void
+    /** [CTX-22] Subflow 表示対象の SourceContext 一覧。省略時は Subflow なし。 */
+    contexts?: SourceContext[]
 }
 
 // ============================================================

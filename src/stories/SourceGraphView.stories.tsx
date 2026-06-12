@@ -1,5 +1,6 @@
 /**
  * @context SourceGraphView / SourceNode
+ * @context CTX-22: Subflow Display 追加
  * @bom docs/bom/source-graph.ts
  * @story
  * 1. ノードが pending / fresh / stale の各状態で正しく表示される
@@ -7,11 +8,14 @@
  * 3. selectedFilePath に一致するノードが blue でハイライトされる（File→Node 同期）
  * 4. ↺ボタンをクリックすると onReanalyze(filePath) が呼ばれる
  * 5. ノードをクリックすると onNodeSelect(filePath) が呼ばれる（Node→File 同期）
+ * 6. [CTX-22] contexts を渡すとコンテナノードが表示される
+ * 7. [CTX-22] コンテナノードにコンテクスト名が表示される
  */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, userEvent, within } from 'storybook/test'
 import { SourceGraphView } from '@/components/SourceGraphView'
 import type { SourceNode, SourceEdge } from '@/bom/source-graph'
+import type { SourceContext } from '@/bom/source-context'
 
 const NODES: SourceNode[] = [
     {
@@ -37,6 +41,15 @@ const NODES: SourceNode[] = [
 const EDGES: SourceEdge[] = [
     { id: 'e1-2', source: 'node-1', target: 'node-2', kind: 'imports' },
     { id: 'e2-3', source: 'node-2', target: 'node-3', kind: 'renders' },
+]
+
+const CONTEXTS: SourceContext[] = [
+    {
+        id: 'source_context:ctx-a',
+        name: 'Entry Point',
+        projectId: 'project:1',
+        nodeIds: ['node-1', 'node-2'],
+    },
 ]
 
 const meta: Meta<typeof SourceGraphView> = {
@@ -111,7 +124,6 @@ export const ReanalyzeButton: Story = {
     },
     play: async ({ canvasElement, args }: { canvasElement: HTMLElement; args: any }) => {
         const canvas = within(canvasElement)
-        // filePath の / → - 変換済み
         const btn = await canvas.findByTestId('reanalyze-node-src-main.ts')
         await userEvent.click(btn)
         await expect(args.onReanalyze).toHaveBeenCalledWith('src/main.ts')
@@ -144,5 +156,49 @@ export const Empty: Story = {
         onNodeSelect: fn(),
         onReanalyze: fn(),
         onNodesChange: fn(),
+    },
+}
+
+// ── CTX-22: Subflow Display ──────────────────────────────────────────
+
+/** @story [CTX-22] contexts を渡すとコンテナが表示され、名前ラベルが見える */
+export const WithContexts: Story = {
+    args: {
+        nodes: NODES,
+        edges: EDGES,
+        staleFiles: new Set(),
+        contexts: CONTEXTS,
+        onNodeSelect: fn(),
+        onReanalyze: fn(),
+        onNodesChange: fn(),
+    },
+    play: async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+        const canvas = within(canvasElement)
+        // コンテナの名前ラベルが表示される
+        const label = await canvas.findByTestId('context-container-label-source_context:ctx-a')
+        await expect(label).toBeVisible()
+        await expect(label).toHaveTextContent('Entry Point')
+        // コンテナ本体が存在する
+        await expect(
+            canvas.getByTestId('context-container-source_context:ctx-a')
+        ).toBeInTheDocument()
+    },
+}
+
+/** @story [CTX-22] contexts が空のとき（省略）はコンテナが表示されない */
+export const WithoutContexts: Story = {
+    args: {
+        nodes: NODES,
+        edges: EDGES,
+        staleFiles: new Set(),
+        onNodeSelect: fn(),
+        onReanalyze: fn(),
+        onNodesChange: fn(),
+    },
+    play: async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+        const canvas = within(canvasElement)
+        await expect(
+            canvas.queryByTestId('context-container-source_context:ctx-a')
+        ).not.toBeInTheDocument()
     },
 }
