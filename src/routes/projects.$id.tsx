@@ -37,6 +37,10 @@ import type { SourceGraph } from '@/bom/source-graph'
  *   - selectedFilePath は File→Node ハイライトに使用。
  *     Node→File 方向は GraphEditor 改修（別 CTX）で setSelectedFilePath を呼ぶ想定。
  *
+ * [CTX-22] Test Node Display:
+ *   - マウント時・Reanalyze All 時に analyze_tests を呼びテストノードを登録
+ *   - テストノードは nodeType='test' で SourceGraph に含まれ TestNode として描画される
+ *
  * @see src/router.tsx
  * @see src/components/ProjectDetailTopbar.tsx
  * @see docs/bom/layout.ts
@@ -102,6 +106,7 @@ export const ProjectDetailRoute = () => {
     useEffect(() => {
         refreshStructure()
         refreshChangedFiles()
+        if (id) invoke('analyze_tests', { projectId: id }).catch(console.error)
     }, [refreshStructure, refreshChangedFiles])
 
     // ============================================================
@@ -167,6 +172,7 @@ export const ProjectDetailRoute = () => {
         setIsAnalyzing(true)
         try {
             await invoke('analyze_project', { projectId: id })
+            await invoke('analyze_tests', { projectId: id })
             await refreshStructure()
             await refreshChangedFiles()
             toast.success('Project reanalyzed')

@@ -317,6 +317,24 @@ pub async fn do_analyze_test_file(
         extract_test_blocks(&source)?
     };
 
+    // ── [CTX-22] structure グラフにテストノードを登録 ────────────────
+    // do_analyze_file でノード + エッジを UPSERT し、
+    // その後 node_type = 'test' に更新する。
+    // これにより get_structure_graph がテストノードも返すようになる。
+    let graph =
+        crate::services::graph::get_or_create_structure_graph(db, &thing_to_string(&project.id))
+            .await?;
+    let gid = thing_to_string(&graph.id);
+
+    crate::services::analysis::do_analyze_file(db, project, &gid, file_rel_path).await?;
+
+    db.query("UPDATE node SET node_type = 'test' WHERE graph_id = $gid AND file_path = $fp")
+        .bind(("gid", gid))
+        .bind(("fp", file_rel_path.to_string()))
+        .await
+        .map_err(|e| e.to_string())?;
+    // ─────────────────────────────────────────────────────────────────
+
     // import 解析 → node テーブルから nodeIds を解決
     let import_edges = extract_imports(root, file_rel_path, &source).unwrap_or_default();
 
@@ -523,4 +541,179 @@ fn upsert_suite<'a>(
 
         Ok(())
     })
+}
+
+// ============================================================
+// ユニットテスト
+// ============================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── is_test_file ─────────────────────────────────────────
+
+    #[test]
+    fn test_file_ts() {
+        assert!(is_test_file("src/App.test.ts"));
+    }
+
+    #[test]
+    fn test_file_tsx() {
+        assert!(is_test_file("src/App.test.tsx"));
+    }
+
+    #[test]
+    fn test_file_spec_ts() {
+        assert!(is_test_file("src/App.spec.ts"));
+    }
+
+    #[test]
+    fn test_file_spec_tsx() {
+        assert!(is_test_file("src/utils.spec.tsx"));
+    }
+
+    #[test]
+    fn non_test_file_ts() {
+        assert!(!is_test_file("src/App.ts"));
+    }
+
+    #[test]
+    fn non_test_file_tsx() {
+        assert!(!is_test_file("src/App.tsx"));
+    }
+
+    #[test]
+    fn non_test_file_rs() {
+        assert!(!is_test_file("src/main.rs"));
+    }
+
+    // ── extract_test_blocks ───────────────────────────────────
+
+    #[test]
+    fn simple_describe_with_it() {
+        let src = r#"
+            describe('My suite', () => {
+                it('does something', () => {});
+                it('does another thing', () => {});
+            });
+        "#;
+        let blocks = extract_test_blocks(src).unwrap();
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].name, "My suite");
+        assert_eq!(
+            blocks[0].cases,
+            vec!["does something", "does another thing"]
+        );
+        assert!(blocks[0].children.is_empty());
+    }
+
+    #[test]
+    fn describe_with_test_keyword() {
+        let src = r#"
+            describe('Suite', () => {
+                test('works', () => {});
+            });
+        "#;
+        let blocks = extract_test_blocks(src).unwrap();
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].cases, vec!["works"]);
+    }
+
+    #[test]
+    fn nested_describe() {
+        let src = r#"
+            describe('Outer', () => {
+                it('outer case', () => {});
+                describe('Inner', () => {
+                    it('inner case', () => {});
+                });
+            });
+        "#;
+        let blocks = extract_test_blocks(src).unwrap();
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].name, "Outer");
+        assert_eq!(blocks[0].cases, vec!["outer case"]);
+        assert_eq!(blocks[0].children.len(), 1);
+        assert_eq!(blocks[0].children[0].name, "Inner");
+        assert_eq!(blocks[0].children[0].cases, vec!["inner case"]);
+    }
+
+    #[test]
+    fn parallel_describes() {
+        let src = r#"
+            describe('Suite A', () => {
+                it('case a', () => {});
+            });
+            describe('Suite B', () => {
+                it('case b', () => {});
+            });
+        "#;
+        let blocks = extract_test_blocks(src).unwrap();
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].name, "Suite A");
+        assert_eq!(blocks[1].name, "Suite B");
+    }
+
+    #[test]
+    fn it_skip_and_test_only() {
+        let src = r#"
+            describe('Suite', () => {
+                it.skip('skipped', () => {});
+                test.only('only', () => {});
+            });
+        "#;
+        let blocks = extract_test_blocks(src).unwrap();
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].cases, vec!["skipped", "only"]);
+    }
+
+    #[test]
+    fn describe_only_and_skip() {
+        let src = r#"
+            describe.only('Only suite', () => {
+                it('case', () => {});
+            });
+            describe.skip('Skip suite', () => {
+                it('skipped case', () => {});
+            });
+        "#;
+        let blocks = extract_test_blocks(src).unwrap();
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].name, "Only suite");
+        assert_eq!(blocks[1].name, "Skip suite");
+    }
+
+    #[test]
+    fn no_describe_returns_empty() {
+        let src = r#"
+            import { foo } from './foo';
+            const x = 1;
+        "#;
+        let blocks = extract_test_blocks(src).unwrap();
+        assert!(blocks.is_empty());
+    }
+
+    #[test]
+    fn empty_describe_returns_block_with_no_cases() {
+        let src = r#"
+            describe('Empty', () => {});
+        "#;
+        let blocks = extract_test_blocks(src).unwrap();
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].name, "Empty");
+        assert!(blocks[0].cases.is_empty());
+    }
+
+    #[test]
+    fn double_quoted_string() {
+        let src = r#"
+            describe("Double quoted", () => {
+                it("case", () => {});
+            });
+        "#;
+        let blocks = extract_test_blocks(src).unwrap();
+        assert_eq!(blocks[0].name, "Double quoted");
+        assert_eq!(blocks[0].cases, vec!["case"]);
+    }
 }
