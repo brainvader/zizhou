@@ -20,7 +20,7 @@ test.describe('ProjectDetailTopbar — Integration', () => {
         await page.getByRole('button', { name: '作成' }).click()
         await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
         await page.getByRole('link', { name: 'E2E Test Project' }).click()
-        await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 10000 })
+        await page.waitForSelector('.react-flow__pane', { timeout: 10000 })
         await expect(page.locator(NEW_GRAPH_BTN_SELECTOR)).toBeEnabled({ timeout: 10000 })
         await page.locator(NEW_GRAPH_BTN_SELECTOR).click()
         await expect(page).toHaveURL(/\?graph=/)
