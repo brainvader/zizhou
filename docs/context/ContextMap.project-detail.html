@@ -1,28 +1,25 @@
 <!-- ============================================================
-            CTX-22: SOURCE CONTEXT [ ]
+            CTX-22: SOURCE CONTEXT [✓]
             責務: Vitest テストファイルを解析し、SourceGraph 上にテストコンテキストを
-                  Subflow として自動表示する
+                  Subflow として自動表示する。テストノード選択時に関連ソースノード群を
+                  視覚的にグループ化し、LLM に渡すスコープを明示する。
 
             背景:
               LLM 支援コーディングでは「このファイル群の範囲で開発を閉じる」という
               コンテクスト境界の明示が重要。
-              境界を明示することで：
-              - LLM に渡すファイル群を最小化（トークン消費削減）
-              - 変更の影響範囲が明確になる
-              - コンテクスト境界自体が LLM への情報になる
+              手動定義ではなく Vitest テストファイルから自動導出することで、
+              テストを書くことがそのままコンテキスト定義になる。
 
             コンテキストの定義:
-              手動定義ではなく Vitest テストファイルから自動導出する。
               テストファイルの import 群 = コンテキストのスコープ（関与ファイル群）
-              describe 名              = コンテキスト名（Subflow のラベル）
+              describe 名              = コンテキスト名（Subflow ラベル）
 
               例:
-                // FileTree.test.ts
-                import { FileTree } from '@/components/FileTree'   ← スコープ
-                import { useStore } from '@/hooks/useStore'         ← スコープ
+                // App.test.tsx
+                import { App } from '@/components/App'     ← スコープ
 
-                describe('FileTree → SourceGraph 連携', () => {   ← コンテキスト名
-                    it('ファイルをクリックすると選択される', () => { ... })
+                describe('App component tests', () => {   ← コンテキスト名
+                    it('renders correctly', () => { ... })
                 })
 
               テストノードをクリック
@@ -31,69 +28,74 @@
 
             テストとコンテキストの対応:
               describe = コンテキスト（どのノード群が関与するか = Subflow の範囲）
-              it       = シナリオのステップ（CTX-23 でエッジアニメーションに対応）
-
-            1ファイル複数 describe の扱い:
-              ファイルトップレベルの import は全 describe で共有される。
-              describe 単位のスコープ絞り込みは静的解析では不可能なため、
-              ファイル単位の import 群をコンテキストのスコープとする。
-              1ファイル1describe を推奨規約とするが強制はしない。
+              it       = シナリオのステップ（CTX-23 でエッジアニメーションに対応予定）
 
             SurrealDB データモデル:
+              source_context テーブル（SCHEMALESS）— 手動定義コンテキスト用（将来利用）
+                id, name, project_id, node_ids[]
+
               test_file テーブル（SCHEMALESS）
-                id
-                project_id
-                file_path           — rootPath 相対パス
+                id, project_id, file_path
 
               test_suite テーブル（SCHEMALESS）← describe に対応
-                id
-                test_file_id
-                parent_suite_id     — ネスト describe 対応（null = トップレベル）
-                name                — describe の第一引数
-                node_ids[]          — import から解決した SourceNode の id 集合
+                id, test_file_id, parent_suite_id（ネスト対応）, name, node_ids[]
 
               test_case テーブル（SCHEMALESS） ← it / test に対応
-                id
-                suite_id
-                name                — it の第一引数
-                order               — ファイル内の定義順
+                id, suite_id, name, order
 
-            Rust コマンド（新規）:
-              analyze_tests(project_id)
-                → *.test.ts / *.spec.ts を tree-sitter で解析
-                → test_file / test_suite / test_case を UPSERT
-              list_test_suites(project_id) → TestSuite[]
-              list_test_cases(suite_id)    → TestCase[]
+            Rust コマンド:
+              create_context / list_contexts / update_context / delete_context（実装済み）
+              analyze_tests(project_id)         → test_file / test_suite / test_case を UPSERT
+              list_test_suites(project_id)      → TestSuite[]
+              list_test_cases(suite_id)         → TestCase[]
 
             フロントエンド構成:
-              docs/bom/source-context.ts           — SourceContext 型 / 座標計算関数（実装済み）
-              src/components/nodes/SourceContextContainer.tsx — Subflow コンテナ（実装済み）
-              src/components/SourceGraphView.tsx   — contexts prop で Subflow 表示（実装済み）
-              src/services/TestStorage.ts          — analyze_tests / list_test_suites ラッパー
+              docs/bom/source-context.ts                   — SourceContext / ContextStorage /
+                                                             isBoundaryEdge / computeContainerRect /
+                                                             toRelativePosition
+              docs/bom/test-analysis.ts                    — TestFile / TestSuite / TestCase /
+                                                             TestStorage / TestSuiteAsContext
+              docs/bom/source-graph.ts                     — TestNodeData / TestNodeDisplayData /
+                                                             TestNodeType / TestNodeProps
+              src/components/nodes/SourceContextContainer.tsx — Subflow コンテナ
+              src/components/nodes/TestNode.tsx             — テストノード描画（⚗ アイコン・紫系）
+              src/components/SourceGraphView.tsx            — contexts prop で Subflow 表示
+              src/services/ContextStorage.ts               — defaultContextStorage
+              src/services/TestStorage.ts                  — defaultTestStorage
+              src/routes/projects.$id.tsx                  — テストノード選択 → Subflow 自動表示
 
-            視覚表現:
-              - テストノード（*.test.ts）は通常の SourceNode と色分けして表示
-              - テストノードをクリック → 依存ノード群が Subflow で囲まれる
-              - Subflow ラベルは describe 名
-              - ネスト describe は Subflow のネストで表現
+            動作フロー:
+              1. マウント時 / Reanalyze All 時に analyze_tests を呼ぶ
+              2. テストファイルが nodeType='test' で structure グラフに登録される
+              3. SourceGraphView がテストノードを TestNode コンポーネントで描画する
+              4. テストノードをクリックすると selectedFilePath が更新される
+              5. projects.$id.tsx が list_test_suites を呼び test_suite を取得する
+              6. test_suite.node_ids から SourceContext を生成して contexts にセット
+              7. SourceGraphView が contexts を受け取り Subflow を自動表示する
+              8. 通常ノードをクリックすると contexts がクリアされ Subflow が消える
 
             関連: CTX-21 (SourceGraph), CTX-23 (Test Simulation)
 
             ── 実装スコープ ──────────────────────────────────────────
-            [✓][Logic]   DB Schema            — source_context テーブルを SurrealDB に追加する
+            [✓][Logic]   DB Schema            — source_context / test_file / test_suite /
+                                                test_case テーブルを SurrealDB に追加する
             [✓][Logic]   Rust Commands        — create / list / update / delete_context を実装する
-            [✓][Logic]   BOM                  — docs/bom/source-context.ts に型定義・座標計算関数を追加する
+            [✓][Logic]   BOM source-context   — docs/bom/source-context.ts に型定義・座標計算関数を追加する
+            [✓][Logic]   BOM test-analysis    — docs/bom/test-analysis.ts に型定義を追加する
+            [✓][Logic]   BOM source-graph     — TestNode 型を追加する
             [✓][Logic]   ContextStorage       — src/services/ContextStorage.ts を実装する
+            [✓][Logic]   TestStorage          — src/services/TestStorage.ts を実装する
+            [✓][Logic]   analyze_tests        — *.test.ts / *.spec.ts を tree-sitter で解析し UPSERT する
+            [✓][Logic]   list_test_suites     — project_id で test_suite 一覧を返す
+            [✓][Logic]   list_test_cases      — suite_id で test_case 一覧を返す
             [✓][Feature] Subflow Display      — SourceContext を Subflow コンテナとして表示する
-            [ ][Logic]   Test DB Schema       — test_file / test_suite / test_case テーブルを追加する
-            [ ][Logic]   analyze_tests        — *.test.ts / *.spec.ts を tree-sitter で解析し UPSERT する
-            [ ][Logic]   list_test_suites     — project_id で test_suite 一覧を返す
-            [ ][Logic]   list_test_cases      — suite_id で test_case 一覧を返す
-            [ ][Logic]   TestStorage          — src/services/TestStorage.ts を実装する
-            [ ][Feature] Test Node Display    — テストノードを通常ノードと色分けして表示する
-            [ ][Feature] Test Context Subflow — テストノード選択 → 依存ノード群を Subflow で自動表示する
-            [ ][Feature] Context Load         — マウント時に list_test_suites で Subflow を復元する
-        ============================================================ -->
+            [✓][Feature] TestNode Display     — テストノードを ⚗ アイコン・紫系で表示する
+            [✓][Feature] Test Context Subflow — テストノード選択 → 依存ノード群を Subflow で自動表示する
+            [✓][Logic]   Context Load         — マウント時に analyze_tests → list_test_suites で復元する
+            [ ][Feature] Boundary Edge        — コンテクスト境界をまたぐエッジを amber でハイライトする
+            [ ][Feature] Context Load Optimize — 解析済みの場合は analyze_tests をスキップし
+                                                list_test_suites のみ呼ぶ
+============================================================ -->
 
 
 <!-- ============================================================
