@@ -22,15 +22,15 @@
  *
  * 無限ループ回避:
  *   - useNodesState / useEdgesState を使わない（controlled mode）
- *   - staleFiles / contexts は内容比較で参照を安定させる
- *   - onReanalyze / onRunTest は useCallback + useRef で安定した参照にする
+ *   - staleFiles / contexts は useStableValue で内容比較により参照を安定させる
+ *   - onReanalyze / onRunTest は useCallbackRef で安定した参照にする
  *
  * @context CTX-21, CTX-22
  * @bom docs/bom/source-graph.ts
  * @bom docs/bom/source-context.ts
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
     ReactFlow,
     ReactFlowProvider,
@@ -45,18 +45,16 @@ import { SourceNode } from '@/components/nodes/SourceNode'
 import { TestNode } from '@/components/nodes/TestNode'
 import { SourceContextContainer } from '@/components/nodes/SourceContextContainer'
 import {
-    computeAnalyzedDisplay,
     type SourceGraphViewProps,
     type SourceNode as SourceNodeType,
     type SourceNodeType as SourceNodeRfType,
-    type TestNodeType,
     type SourceContextContainerNode,
+    type TestNodeType,
 } from '@/bom/source-graph'
-import {
-    computeContainerRect,
-    toRelativePosition,
-    type SourceContext,
-} from '@/bom/source-context'
+import { useCallbackRef } from '@/hooks/useCallbackRef'
+import { useStableValue } from '@/hooks/useStableValue'
+import { isSameSet, isSameContexts } from '@/lib/compare'
+import { buildContainerRects, enrichNode } from '@/lib/sourceGraphUtils'
 
 // ============================================================
 // nodeTypes はコンポーネント外で定義（再レンダリング時の remount 防止）
@@ -67,31 +65,6 @@ const NODE_TYPES = {
     testNode: TestNode,
     contextContainer: SourceContextContainer,
 } as const
-
-// ============================================================
-// 内容比較ユーティリティ
-// ============================================================
-
-function isSameSet(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
-    if (a.size !== b.size) return false
-    for (const item of a) {
-        if (!b.has(item)) return false
-    }
-    return true
-}
-
-function isSameContexts(a: SourceContext[], b: SourceContext[]): boolean {
-    if (a.length !== b.length) return false
-    return a.every((ca, i) => {
-        const cb = b[i]
-        return (
-            ca.id === cb.id &&
-            ca.name === cb.name &&
-            ca.nodeIds.length === cb.nodeIds.length &&
-            ca.nodeIds.every((id, j) => id === cb.nodeIds[j])
-        )
-    })
-}
 
 // ============================================================
 // AllNodeType — ReactFlow に渡すノードの Union 型
@@ -115,61 +88,29 @@ function SourceGraphViewInner({
     onRunTest,
 }: SourceGraphViewProps) {
     // ============================================================
-    // コールバックを ref 経由で安定化
+    // コールバック安定化
     // ============================================================
 
-    const onReanalyzeRef = useRef(onReanalyze)
-    useEffect(() => { onReanalyzeRef.current = onReanalyze }, [onReanalyze])
-
-    const onNodeSelectRef = useRef(onNodeSelect)
-    useEffect(() => { onNodeSelectRef.current = onNodeSelect }, [onNodeSelect])
-
-    const onNodesChangePropRef = useRef(onNodesChangeProp)
-    useEffect(() => { onNodesChangePropRef.current = onNodesChangeProp }, [onNodesChangeProp])
-
-    const onRunTestRef = useRef(onRunTest)
-    useEffect(() => { onRunTestRef.current = onRunTest }, [onRunTest])
-
-    const stableOnReanalyze = useCallback(
-        (filePath: string) => onReanalyzeRef.current?.(filePath),
-        [],
-    )
-
-    const stableOnRunTest = useCallback(
-        (filePath: string) => onRunTestRef.current?.(filePath),
-        [],
-    )
+    const stableOnReanalyze = useCallbackRef(onReanalyze)
+    const stableOnNodeSelect = useCallbackRef(onNodeSelect)
+    const stableOnNodesChangeProp = useCallbackRef(onNodesChangeProp)
+    const stableOnRunTest = useCallbackRef(onRunTest)
 
     // ============================================================
     // staleFiles / contexts を内容比較で参照安定化
     // ============================================================
 
-    const staleFilesRef = useRef(staleFiles)
-    const stableStaleFiles = useMemo(() => {
-        if (isSameSet(staleFilesRef.current, staleFiles)) return staleFilesRef.current
-        staleFilesRef.current = staleFiles
-        return staleFiles
-    }, [staleFiles])
-
-    const contextsRef = useRef(contexts)
-    const stableContexts = useMemo(() => {
-        if (isSameContexts(contextsRef.current, contexts)) return contextsRef.current
-        contextsRef.current = contexts
-        return contexts
-    }, [contexts])
+    const stableStaleFiles = useStableValue(staleFiles, isSameSet)
+    const stableContexts = useStableValue(contexts, isSameContexts)
 
     // ============================================================
     // [CTX-22] コンテナノード生成
     // ============================================================
 
-    const containerRects = useMemo(() => {
-        const map = new Map<string, { x: number; y: number; width: number; height: number }>()
-        for (const ctx of stableContexts) {
-            const rect = computeContainerRect(ctx.nodeIds, nodesProp)
-            if (rect) map.set(ctx.id, rect)
-        }
-        return map
-    }, [stableContexts, nodesProp])
+    const containerRects = useMemo(
+        () => buildContainerRects(stableContexts, nodesProp),
+        [stableContexts, nodesProp],
+    )
 
     const containerNodes = useMemo((): SourceContextContainerNode[] => {
         return stableContexts.flatMap((ctx) => {
@@ -191,58 +132,22 @@ function SourceGraphViewInner({
 
     // ============================================================
     // enrichedNodes
-    // nodeType === 'test' → TestNodeType、それ以外 → SourceNodeRfType
     // ============================================================
 
-    const enrichedNodes = useMemo((): (SourceNodeRfType | TestNodeType)[] => {
-        return nodesProp.map((node) => {
-            const displayStatus = computeAnalyzedDisplay(
-                node.data.analyzed,
-                node.data.filePath,
-                stableStaleFiles,
-            )
-            const ownerCtx = stableContexts.find((c) => c.nodeIds.includes(node.id))
-            const containerRect = ownerCtx ? containerRects.get(ownerCtx.id) : undefined
-            const position = containerRect
-                ? toRelativePosition(node.position, containerRect)
-                : node.position
-
-            const isTest = node.data.nodeType === 'test'
-
-            const common = {
-                ...node,
-                position,
-                parentId: ownerCtx ? `context-container-${ownerCtx.id}` : undefined,
-                extent: ownerCtx ? ('parent' as const) : undefined,
-                selected: node.data.filePath
-                    ? node.data.filePath === selectedFilePath
-                    : false,
-            }
-
-            if (isTest) {
-                return {
-                    ...common,
-                    type: 'testNode' as const,
-                    data: {
-                        ...node.data,
-                        displayStatus,
-                        onReanalyze: stableOnReanalyze,
-                        onRunTest: onRunTestRef.current ? stableOnRunTest : undefined,
-                    },
-                } as TestNodeType
-            }
-
-            return {
-                ...common,
-                type: 'sourceNode' as const,
-                data: {
-                    ...node.data,
-                    displayStatus,
+    const enrichedNodes = useMemo(
+        (): (SourceNodeRfType | TestNodeType)[] =>
+            nodesProp.map((node) =>
+                enrichNode(node, {
+                    staleFiles: stableStaleFiles,
+                    selectedFilePath,
+                    contexts: stableContexts,
+                    containerRects,
                     onReanalyze: stableOnReanalyze,
-                },
-            } as SourceNodeRfType
-        })
-    }, [nodesProp, stableStaleFiles, selectedFilePath, stableContexts, containerRects, stableOnReanalyze, stableOnRunTest])
+                    onRunTest: stableOnRunTest,
+                }),
+            ),
+        [nodesProp, stableStaleFiles, selectedFilePath, stableContexts, containerRects, stableOnReanalyze, stableOnRunTest],
+    )
 
     const baseNodes = useMemo(
         (): AllNodeType[] => [...containerNodes, ...enrichedNodes],
@@ -273,25 +178,24 @@ function SourceGraphViewInner({
                         .map((n) => {
                             const nodeData = (n as SourceNodeRfType | TestNodeType).data
                             const { displayStatus: _d, onReanalyze: _r, ...rest } = nodeData
-                            // onRunTest は TestNodeDisplayData にのみ存在するため個別に除去
                             const { onRunTest: _t, ...cleanRest } = rest as typeof rest & { onRunTest?: unknown }
                             return { ...n, data: cleanRest } as SourceNodeType
                         })
-                    onNodesChangePropRef.current?.(plain)
+                    stableOnNodesChangeProp(plain)
                     return prev
                 })
             }
         },
-        [],
+        [stableOnNodesChangeProp],
     )
 
     const handleNodeClick: NodeMouseHandler<AllNodeType> = useCallback(
         (_event, node) => {
             if (node.type !== 'sourceNode' && node.type !== 'testNode') return
             const filePath = (node as SourceNodeRfType | TestNodeType).data.filePath
-            if (filePath) onNodeSelectRef.current?.(filePath)
+            if (filePath) stableOnNodeSelect(filePath)
         },
-        [],
+        [stableOnNodeSelect],
     )
 
     const isEmpty = nodesProp.length === 0
