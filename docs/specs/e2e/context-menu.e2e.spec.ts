@@ -25,7 +25,7 @@ const gotoProjectDetail = async (page: import('@playwright/test').Page) => {
     await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
 
     await page.getByRole('link', { name: 'E2E Test Project' }).click()
-    await expect(page.getByTestId('graph-editor')).toBeVisible({ timeout: 10000 })
+    await page.waitForSelector('.react-flow__pane', { timeout: 10000 })
 }
 
 /** New Graph を作成してエディタが ready になるまで待つ */
@@ -37,7 +37,7 @@ const createNewGraph = async (page: import('@playwright/test').Page) => {
 
     await page.locator('[data-testid="new-graph-btn"]').click()
     await page.waitForFunction(() => {
-        const el = document.querySelector('[data-testid="graph-editor"]')
+        const el = document.querySelector('.react-flow__pane')
         if (!el) return false
         const { width, height } = el.getBoundingClientRect()
         return width > 0 && height > 0
