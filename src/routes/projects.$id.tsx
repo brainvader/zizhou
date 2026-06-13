@@ -14,11 +14,11 @@ import {
 } from '@/components/ui/resizable'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
-import { useProjectDetailLoad } from '@/hooks/useProjectDetailLoad'
 import { FILE_TREE_PANEL, GRAPH_EDITOR_PANEL, NODE_PROPERTY_PANEL } from '@/bom/layout'
 import type { SourceGraph } from '@/bom/source-graph'
 import type { SourceContext } from '@/bom/source-context'
 import type { TestSuite } from '@/bom/test-analysis'
+import type { GraphListItem } from '@/bom/graph'
 
 /**
  * ProjectDetailRoute
@@ -47,7 +47,6 @@ import type { TestSuite } from '@/bom/test-analysis'
  * @see src/components/ProjectDetailTopbar.tsx
  * @see docs/bom/layout.ts
  * @see docs/bom/structure-graph.ts
- * @see src/hooks/useProjectDetailLoad.ts
  */
 export const ProjectDetailRoute = () => {
     const { id } = useParams({ from: '/projects/$id' })
@@ -58,10 +57,19 @@ export const ProjectDetailRoute = () => {
     const router = useRouter()
 
     // マウント時に SurrealDB からグラフ一覧を取得し activeGraphId を注入する
-    const { loadProjectDetail } = useProjectDetailLoad()
+    const setDetailHydrated = useProjectDetailStore((s) => s.setDetailHydrated)
+
     useEffect(() => {
-        loadProjectDetail(id)
-    }, [id, loadProjectDetail])
+        const { activeGraphId, setActiveGraphId } = useProjectDetailStore.getState()
+        invoke<GraphListItem[]>('list_graphs', { projectId: id })
+            .then((graphs) => {
+                if (graphs.length > 0 && !activeGraphId) {
+                    setActiveGraphId(graphs[0].id)
+                }
+            })
+            .catch(() => toast.error('プロジェクト詳細の読み込みに失敗しました'))
+            .finally(() => setDetailHydrated(true))
+    }, [id, setDetailHydrated])
 
     // URL の ?graph= を store に同期する
     useEffect(() => {
