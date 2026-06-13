@@ -16,7 +16,9 @@ import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
 import { useProjectDetailLoad } from '@/hooks/useProjectDetailLoad'
 import { FILE_TREE_PANEL, GRAPH_EDITOR_PANEL, NODE_PROPERTY_PANEL } from '@/bom/layout'
-import type { StructureGraph } from '@/bom/structure-graph'
+import type { SourceGraph } from '@/bom/source-graph'
+import type { SourceContext } from '@/bom/source-context'
+import type { TestSuite } from '@/bom/test-analysis'
 
 /**
  * ProjectDetailRoute
@@ -36,6 +38,10 @@ import type { StructureGraph } from '@/bom/structure-graph'
  *   - 「Reanalyze All」/「Reanalyze」ボタンで明示的に再解析
  *   - selectedFilePath は File→Node ハイライトに使用。
  *     Node→File 方向は GraphEditor 改修（別 CTX）で setSelectedFilePath を呼ぶ想定。
+ *
+ * [CTX-22] Test Node Display:
+ *   - マウント時・Reanalyze All 時に analyze_tests を呼びテストノードを登録
+ *   - テストノードは nodeType='test' で SourceGraph に含まれ TestNode として描画される
  *
  * @see src/router.tsx
  * @see src/components/ProjectDetailTopbar.tsx
@@ -65,15 +71,62 @@ export const ProjectDetailRoute = () => {
     // ============================================================
     // [CTX-20] Structure graph state
     // ============================================================
-    const [structureGraph, setStructureGraph] = useState<StructureGraph | null>(null)
+    const [structureGraph, setStructureGraph] = useState<SourceGraph | null>(null)
     const [changedFiles, setChangedFiles] = useState<string[]>([])
     const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
     const [isAnalyzing, setIsAnalyzing] = useState(false)
 
+    // ============================================================
+    // [CTX-22] Test Context Subflow
+    // テストノードが選択されたとき list_test_suites を呼び
+    // import 先ノード群を Subflow として表示する。
+    // テストノード以外が選択されたら contexts をクリアする。
+    // ============================================================
+    const [contexts, setContexts] = useState<SourceContext[]>([])
+
+    useEffect(() => {
+        if (!selectedFilePath || !id) {
+            setContexts([])
+            return
+        }
+        const lower = selectedFilePath.toLowerCase()
+        const isTest =
+            lower.endsWith('.test.ts') ||
+            lower.endsWith('.test.tsx') ||
+            lower.endsWith('.spec.ts') ||
+            lower.endsWith('.spec.tsx')
+
+        if (!isTest) {
+            setContexts([])
+            return
+        }
+
+        invoke<TestSuite[]>('list_test_suites', { projectId: id })
+            .then((suites) => {
+                // 選択中テストファイルに対応する suite のみ抽出
+                // testFileId は "test_file:mock-{projectId}-{filePath の / を - に変換}" 形式
+                const fileKey = selectedFilePath.replace(/\//g, '-')
+                const relevant = suites.filter(
+                    (s) => s.nodeIds.length > 0 && s.testFileId.includes(fileKey)
+                )
+                const ctxs: SourceContext[] = relevant.map((s) => ({
+                    id: s.id,
+                    name: s.name,
+                    projectId: id,
+                    nodeIds: s.nodeIds,
+                }))
+                setContexts(ctxs)
+            })
+            .catch((e) => {
+                console.warn('list_test_suites failed', e)
+                setContexts([])
+            })
+    }, [selectedFilePath, id])
+
     const refreshStructure = useCallback(async () => {
         if (!id) return
         try {
-            const graph = await invoke<StructureGraph>('get_structure_graph', {
+            const graph = await invoke<SourceGraph>('get_structure_graph', {
                 projectId: id,
             })
             setStructureGraph(graph)
@@ -100,8 +153,21 @@ export const ProjectDetailRoute = () => {
     }, [project?.rootPath])
 
     useEffect(() => {
-        refreshStructure()
-        refreshChangedFiles()
+        const init = async () => {
+            await refreshStructure()
+            await refreshChangedFiles()
+            if (id) {
+                // analyze_project の後に analyze_tests を呼ぶ
+                // （ソースノードが登録された後でないと node_ids が解決できない）
+                try {
+                    await invoke('analyze_tests', { projectId: id })
+                    await refreshStructure()
+                } catch (e) {
+                    console.warn('analyze_tests failed', e)
+                }
+            }
+        }
+        init()
     }, [refreshStructure, refreshChangedFiles])
 
     // ============================================================
@@ -167,6 +233,7 @@ export const ProjectDetailRoute = () => {
         setIsAnalyzing(true)
         try {
             await invoke('analyze_project', { projectId: id })
+            await invoke('analyze_tests', { projectId: id })
             await refreshStructure()
             await refreshChangedFiles()
             toast.success('Project reanalyzed')
@@ -284,6 +351,7 @@ export const ProjectDetailRoute = () => {
                         onNodeSelect={handleNodeSelect}
                         onReanalyze={handleReanalyzeSelected}
                         onNodesChange={handleSourceNodesChange}
+                        contexts={contexts}
                     />
                 </ResizablePanel>
 

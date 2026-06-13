@@ -2,25 +2,33 @@
  * docs/bom/source-graph.ts
  *
  * @context CTX-21: Source Graph
+ * @context CTX-22: contexts prop 追加（Subflow Display）
+ * @context CTX-22: TestNode 型追加（テストファイルノード）
  *
  * プロジェクトのファイル間依存関係グラフ（source graph）に関する型契約。
  * Rust 側の get_structure_graph / analyze_file / analyze_project / get_changed_files
  * との対応を定義する。
  *
  * 命名規則:
- *   SourceGraph         — グラフデータ型（Rust get_structure_graph の戻り値に対応）
- *   SourceNode          — ReactFlow Node 型
- *   SourceNodeData      — ReactFlow Node.data 型
- *   SourceNodeDisplayData — 描画用 Node.data 型（displayStatus / onReanalyze を追加）
- *   SourceEdge          — ReactFlow Edge 型
- *   SourceGraphView     — グラフ描画コンポーネント（src/components/SourceGraphView.tsx）
- *   SourceNode (comp)   — ノード描画コンポーネント（src/components/nodes/SourceNode.tsx）
+ *   SourceGraph             — グラフデータ型（Rust get_structure_graph の戻り値に対応）
+ *   SourceNode              — ReactFlow Node 型（通常ソースファイル）
+ *   SourceNodeData          — ReactFlow Node.data 型
+ *   SourceNodeDisplayData   — 描画用 Node.data 型（displayStatus / onReanalyze を追加）
+ *   TestNode                — ReactFlow Node 型（テストファイル専用）
+ *   TestNodeData            — テストノードの Node.data 型
+ *   TestNodeDisplayData     — テストノード描画用 Node.data 型
+ *   SourceEdge              — ReactFlow Edge 型
+ *   SourceContextContainer  — Subflow コンテナノードコンポーネント
+ *   SourceGraphView         — グラフ描画コンポーネント（src/components/SourceGraphView.tsx）
+ *   SourceNode (comp)       — ノード描画コンポーネント（src/components/nodes/SourceNode.tsx）
+ *   TestNode (comp)         — テストノード描画コンポーネント（src/components/nodes/TestNode.tsx）
  */
 
 import type { Node as RfNode, Edge as RfEdge, NodeProps } from '@xyflow/react'
+import type { SourceContext } from '@/bom/source-context'
 
 // ============================================================
-// データモデル
+// SourceNode データモデル
 // ============================================================
 
 /**
@@ -39,21 +47,46 @@ export type SourceNodeData = {
 
 export type SourceNode = RfNode<SourceNodeData, 'sourceNode'>
 
+// ============================================================
+// TestNode データモデル                               [CTX-22]
+// ============================================================
+
 /**
- * source グラフのエッジ。
+ * テストファイルノードのデータ。
+ * *.test.ts / *.spec.ts に対応するノード。
+ * SourceNodeData を継承し、テスト固有のフィールドを追加する。
  */
-export type SourceEdgeKind = 'imports' | 'renders'
+export type TestNodeData = SourceNodeData & {
+    /**
+     * このテストファイルに含まれる describe（test_suite）の数。
+     * analyze_tests 後に設定される。未解析時は undefined。
+     */
+    suiteCount?: number
+}
+
+export type TestNode = RfNode<TestNodeData, 'testNode'>
+
+// ============================================================
+// SourceEdge
+// ============================================================
+
+export type SourceEdgeKind = 'imports' | 'renders' | 'tested-by'
 
 export type SourceEdge = RfEdge & {
     kind?: SourceEdgeKind
 }
 
+// ============================================================
+// SourceGraph
+// ============================================================
+
 /**
  * get_structure_graph の戻り値に対応するフロント型。
+ * テストノードも同じグラフに含まれる（nodeType で区別）。
  */
 export type SourceGraph = {
     id: string
-    nodes: SourceNode[]
+    nodes: RfNode<SourceNodeData, string>[]
     edges: SourceEdge[]
 }
 
@@ -95,53 +128,78 @@ export const computeAnalyzedDisplay = (
  * onReanalyze も SourceGraphView から注入する（Props DI）。
  */
 export type SourceNodeDisplayData = SourceNodeData & {
-    /** 描画用ステータス */
     displayStatus: AnalyzedDisplay
-    /** ↺ボタン押下時コールバック */
     onReanalyze?: (filePath: string) => void
 }
 
 export type SourceNodeType = RfNode<SourceNodeDisplayData, 'sourceNode'>
-
 export type SourceNodeProps = NodeProps<SourceNodeType>
 
 // ============================================================
-// SourceGraphView コンポーネント Props         [CTX-21]
+// TestNode コンポーネント用型                  [CTX-22]
+// ============================================================
+
+/**
+ * TestNode カスタムノードの data 型。
+ * SourceGraphView が displayStatus / onReanalyze / onRunTest を注入して渡す。
+ * onRunTest は CTX-23 で実装する TestRunner に接続する。
+ */
+export type TestNodeDisplayData = TestNodeData & {
+    displayStatus: AnalyzedDisplay
+    onReanalyze?: (filePath: string) => void
+    /**
+     * ▶ ボタン押下時コールバック。
+     * CTX-23 実装前は undefined で ▶ ボタンを非表示にする。
+     */
+    onRunTest?: (filePath: string) => void
+}
+
+export type TestNodeType = RfNode<TestNodeDisplayData, 'testNode'>
+export type TestNodeProps = NodeProps<TestNodeType>
+
+// ============================================================
+// SourceContextContainer コンポーネント用型    [CTX-22]
+// ============================================================
+
+export type SourceContextContainerData = {
+    label: string
+    contextId: string
+}
+
+export type SourceContextContainerNode = RfNode<SourceContextContainerData, 'contextContainer'>
+export type SourceContextContainerProps = NodeProps<SourceContextContainerNode>
+
+// ============================================================
+// SourceGraphView コンポーネント Props         [CTX-21 / CTX-22]
 // ============================================================
 
 export type SourceGraphViewProps = {
     /**
      * Rust get_structure_graph の戻り値をそのまま渡す。
-     * type フィールドが 'sourceNode' 以外（undefined 含む）でも受け入れるため
-     * RfNode<SourceNodeData>[] に緩めている。
-     * SourceGraphView 内部で 'sourceNode' として扱う。
+     * SourceNode / TestNode 両方を含む。
+     * SourceGraphView 内部で nodeType により振り分ける。
      */
-    nodes: RfNode<SourceNodeData>[]
+    nodes: RfNode<SourceNodeData, string>[]
     edges: SourceEdge[]
-    /** stale 判定に使う変更ファイル集合 */
     staleFiles: ReadonlySet<string>
-    /** File→Node 方向のハイライト対象（FileTree 選択中ファイル） */
     selectedFilePath?: string | null
-    /** Node→File 方向: ノードクリック時に filePath を通知 */
     onNodeSelect?: (filePath: string) => void
-    /** ↺ボタン押下: filePath を通知（projects.$id.tsx の handleReanalyzeSelected に接続） */
     onReanalyze?: (filePath: string) => void
-    /** ノード位置変更時: 永続化のため親に通知（save_graph 呼び出しに使う） */
-    onNodesChange?: (nodes: RfNode<SourceNodeData>[]) => void
+    onNodesChange?: (nodes: RfNode<SourceNodeData, string>[]) => void
+    /** [CTX-22] Subflow 表示対象の SourceContext 一覧。省略時は Subflow なし。 */
+    contexts?: SourceContext[]
+    /**
+     * [CTX-22] ▶ ボタン押下時コールバック。
+     * CTX-23 実装前は省略可（ボタン非表示）。
+     */
+    onRunTest?: (filePath: string) => void
 }
 
 // ============================================================
 // Props DI 関数型
 // ============================================================
 
-/** Tauri invoke('get_structure_graph') ラッパー */
 export type GetSourceGraphFn = (projectId: string) => Promise<SourceGraph>
-
-/** Tauri invoke('analyze_file') ラッパー */
 export type AnalyzeFileFn = (projectId: string, filePath: string) => Promise<void>
-
-/** Tauri invoke('analyze_project') ラッパー */
 export type AnalyzeProjectFn = (projectId: string) => Promise<void>
-
-/** Tauri invoke('get_changed_files') ラッパー */
 export type GetChangedFilesFn = (rootPath: string) => Promise<string[]>

@@ -27,15 +27,211 @@ Zizou（Tauri プロセス）
   │     ↓ invoke()
   ├── Tauri コマンド（Rust）
   │     ├── SurrealDB（Rust クレート・組み込み）
-  │     │     ├── node_catalog  — ノード定義 + executor + input_schema
-  │     │     ├── graphs        — グラフ定義（CTX-10）
-  │     │     └── projects      — プロジェクト一覧
+  │     │     ├── node_catalog   — ノード定義 + executor + input_schema
+  │     │     ├── graph          — グラフ定義（workflow / structure）
+  │     │     ├── node           — グラフノード（file_path / analyzed 含む）
+  │     │     ├── edge           — グラフエッジ（kind: imports / renders / flow）
+  │     │     ├── project        — プロジェクト一覧
+  │     │     ├── test_file      — テストファイル（CTX-22）
+  │     │     ├── test_suite     — describe ブロック（CTX-22）
+  │     │     └── test_case      — it / test ブロック（CTX-22）
   │     │
-  │     └── 実行エンジン（CTX-14）
-  │           ├── CLI executor  → std::process::Command
-  │           └── HTTP executor → reqwest
+  │     ├── 実行エンジン（CTX-14）
+  │     │     ├── CLI executor  → std::process::Command
+  │     │     └── HTTP executor → reqwest
+  │     │
+  │     ├── 静的解析エンジン（CTX-20〜22）
+  │     │     ├── tree-sitter   → import / export 抽出
+  │     │     └── VcsProvider   → git diff --name-only HEAD
+  │     │
+  │     └── テスト実行エンジン（CTX-23）
+  │           └── Vitest CLI    → std::process::Command
   │
   └── （サイドカーなし）
+```
+
+---
+
+## Source Graph（CTX-20〜21）
+
+### 概念
+
+プロジェクトのファイル間依存関係を有向グラフとして可視化する。
+
+```
+src/main.tsx
+  └─[imports]→ src/components/FileTree.tsx
+                 └─[imports]→ src/hooks/useStore.ts
+```
+
+- ノード = ソースファイル
+- エッジ = import / renders 関係
+- 解析は tree-sitter で行い SurrealDB に永続化する
+- 変更ファイル（git diff）との交差で stale ノードを動的に算出する
+
+### Stale 判定
+
+```
+staleFiles    = get_changed_files() の結果（git diff --name-only HEAD）
+analyzedFiles = structureGraph.nodes[*].data.filePath の集合
+staleNodes    = staleFiles ∩ analyzedFiles
+```
+
+stale は DB に保存せずフロントで動的に算出する（SSOT は git）。
+
+### SurrealDB テーブル
+
+```
+graph  — kind: 'workflow' | 'structure'
+node   — file_path, analyzed: 'fresh' | 'pending', position_x, position_y
+edge   — kind: 'imports' | 'renders' | 'flow'
+```
+
+---
+
+## Test Context（CTX-22）
+
+### コンセプト
+
+**Vitest テストファイルがそのままコンテキスト定義になる。**
+
+手動でノードをグループ化するのではなく、テストファイルの import 群を
+tree-sitter で解析し、関与するノード群を自動的に Subflow として表示する。
+
+```
+tests/fix-filetree-bug.test.ts
+  import { FileTree } from '@/components/FileTree'   ← スコープ
+  import { useStore } from '@/hooks/useStore'         ← スコープ
+
+  describe('Fix FileTree bug', () => {               ← コンテキスト名 = Subflow ラベル
+      it('ファイルをクリックすると選択される', () => { ... })
+  })
+```
+
+テストノードをクリック → 依存ノード群が Subflow で自動的に囲まれる。
+
+### describe と it の役割
+
+| 要素       | 意味                                     | グラフ上の表現             |
+| ---------- | ---------------------------------------- | -------------------------- |
+| `describe` | コンテキスト（どのノード群が関与するか） | Subflow（parentId 方式）   |
+| `it`       | シナリオステップ（データがどう流れるか） | エッジアニメーションの単位 |
+
+### 1ファイル複数 describe の扱い
+
+`import` はファイルトップレベルに置かれるため、どの `describe` が
+どの `import` を使うかは静的解析では判別不可能（実行時にのみ確定）。
+
+そのため **ファイル単位の import 群をコンテキストのスコープ** とする。
+1ファイル1describe を推奨規約とするが強制はしない。
+
+### ネスト describe
+
+```ts
+describe('ProjectDetail', () => {        // 外側 Subflow
+    describe('FileTree', () => { ... })  // 内側 Subflow（ネスト）
+    describe('SourceGraph', () => { ... })
+})
+```
+
+describe のツリー構造 = Subflow のネスト構造。
+ReactFlow の parentId 方式はネストに対応している。
+
+### SurrealDB テーブル
+
+```
+test_file   — project_id, file_path
+test_suite  — test_file_id, parent_suite_id（ネスト対応）, name, node_ids[]
+test_case   — suite_id, name, order
+```
+
+### Rust コマンド
+
+```
+analyze_tests(project_id)         → test_file / test_suite / test_case を UPSERT
+list_test_suites(project_id)      → TestSuite[]
+list_test_cases(suite_id)         → TestCase[]
+```
+
+---
+
+## Test Simulation（CTX-23）
+
+### コンセプト
+
+Vitest の `it`（テストケース）を実行単位としてグラフ上でシミュレーションする。
+
+```
+describe('FileTree → SourceGraph 連携') {
+    it('ファイルをクリックする')
+        FileTree →[selectedFilePath]→ useStore   ← エッジアニメーション
+    it('ノードがハイライトされる')
+        useStore →[staleFiles]→ SourceGraphView  ← エッジアニメーション
+}
+```
+
+### 実行粒度と ▶ ボタン
+
+| 粒度          | 実行方法                      | ▶ ボタンの場所     |
+| ------------- | ----------------------------- | ------------------ |
+| ファイル全体  | `vitest run FileTree.test.ts` | テストノード       |
+| describe 単位 | `--testNamePattern` 前方一致  | Subflow ラベル横   |
+| it 単位       | `--testNamePattern` 完全一致  | 右ペイン it 一覧横 |
+
+### 右ペイン（NodeProperty 拡張）
+
+テストノード選択時に右ペインに以下を表示する：
+
+```
+┌─────────────────────────────────────┐
+│ 📄 FileTree.test.ts              ▶  │
+├─────────────────────────────────────┤
+│ describe: Fix FileTree bug       ▶  │
+│   ✗ ファイルをクリックすると選択 ▶  │
+│   ✓ ノードがハイライトされる     ▶  │
+│                                  📋 │ ← コピーボタン
+│ FAIL src/components/FileTree...     │
+│ AssertionError: expected 'selected' │
+│   received undefined                │
+│   at FileTree.test.ts:12:5          │
+└─────────────────────────────────────┘
+```
+
+### コピーボタンの出力
+
+Vitest `--reporter=verbose` の**生ログをそのままクリップボードにコピー**する。
+AI による加工・要約は行わない。理由：
+
+- トークン消費防止（Zizou の核心的動機）
+- LLM は生ログを直接解釈できる
+- 加工による情報欠損を防ぐ
+
+コピーした生ログをそのまま LLM にペーストして修正依頼できる。
+
+これが Zizou の核心的なワークフローである：
+
+```
+テスト失敗 → 📋 コピー → LLM にペースト → 最小スコープで修正依頼
+```
+
+### エッジアニメーション
+
+- `it` の定義順にエッジを順次ハイライト
+- passed → 緑、failed → 赤 でエッジ・ノードを着色
+
+### Rust コマンド
+
+```
+run_test_case(project_id, test_case_id) → TestResult
+run_test_suite(project_id, suite_id)    → TestResult[]
+run_test_file(project_id, file_path)    → TestResult[]
+
+TestResult {
+    test_case_id: string
+    passed:       bool
+    log:          string   // Vitest 生ログ
+    duration_ms:  number
+}
 ```
 
 ---
@@ -47,44 +243,54 @@ Zizou（Tauri プロセス）
 ```toml
 # src-tauri/Cargo.toml
 [dependencies]
-surrealdb = { version = "3.0.5", features = ["kv-surrealkv"] }  # 本番
+surrealdb = { version = "=2.6.5", features = ["kv-surrealkv"] }  # 本番（exact pin 必須）
 
 [dev-dependencies]
-surrealdb = { version = "3.0.5", features = ["kv-mem"] }        # テスト
+surrealdb = { version = "=2.6.5", features = ["kv-mem"] }        # テスト
 ```
 
-```rust
-// src-tauri/src/lib.rs
-use surrealdb::engine::local::SurrealKV;
-use surrealdb::Surreal;
+> **注意:** `=2.6.5` の exact pin が必須。`2.6.5` と書くと 3.x に解決され
+> Rust nightly が要求される。
 
-pub async fn setup() -> Surreal<SurrealKV> {
-    let db = Surreal::new::<SurrealKV>("app.db").await.unwrap();
-    db.use_ns("zizou").use_db("zizou").await.unwrap();
-    db
+```rust
+// src-tauri/src/services/db/mod.rs
+pub async fn init_db(app_data_dir: PathBuf) -> Result<Db, surrealdb::Error> {
+    let db = Surreal::new::<SurrealKv>(app_data_dir.join("zizhou.db")).await?;
+    db.use_ns("zizhou").use_db("zizhou").await?;
+    // マイグレーション補完クエリをここに記述
+    Ok(db)
 }
 ```
 
-### スキーマ
+### typed struct 必須ルール
+
+`db.select()` / `db.query().take()` は必ず typed struct で受け取る。
+`serde_json::Value` への直接デシリアライズは不可（serde-content の制約）。
+
+```rust
+// NG
+let records: Vec<serde_json::Value> = db.select("node").await?;
+
+// OK
+let records: Vec<NodeRecord> = db.select("node").await?;
+let json = records.into_iter().map(|r| serde_json::json!({
+    "id": thing_to_string(&r.id),
+    ...
+})).collect();
+```
+
+### SCHEMALESS 必須ルール
+
+`object` 型フィールドを持つテーブルは `SCHEMALESS` で定義する。
+`SCHEMAFULL` + `DEFINE FIELD profile TYPE object` はデシリアライズエラーになる。
 
 ```sql
--- Node Catalog
+-- OK
+DEFINE TABLE IF NOT EXISTS source_context SCHEMALESS;
+
+-- NG（object フィールドがある場合）
 DEFINE TABLE node_catalog SCHEMAFULL;
-DEFINE FIELD service   ON node_catalog TYPE string;
-DEFINE FIELD provider  ON node_catalog TYPE string;
-DEFINE FIELD label     ON node_catalog TYPE string;
-DEFINE FIELD node_type ON node_catalog TYPE string;  -- CTX-9
-DEFINE FIELD executor  ON node_catalog TYPE object;
-DEFINE FIELD profile   ON node_catalog TYPE object;  -- 単数（CTX-9設計決定）
-DEFINE FIELD embedding ON node_catalog TYPE array<float>;  -- CTX-13
-
--- ベクトル類似検索（CTX-13）
-DEFINE INDEX node_hnsw ON node_catalog
-  FIELDS embedding HNSW DIMENSION 1536;
-
--- フルテキスト検索（CTX-13）
-DEFINE INDEX node_search ON node_catalog
-  FIELDS label, service SEARCH ANALYZER ascii BM25;
+DEFINE FIELD profile ON node_catalog TYPE object;
 ```
 
 ---
@@ -99,86 +305,18 @@ pub struct NodeCatalog {
     pub service:   String,
     pub provider:  String,
     pub label:     String,
-    pub node_type: String,   // フロントの CatalogEntry.nodeType に対応（CTX-9）
+    pub node_type: String,
     pub executor:  Executor,
-    pub profile:   Profile,  // 1エントリ = 1プロファイル（CTX-9設計決定）
-    pub embedding: Option<Vec<f32>>,  // CTX-13
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(tag = "type", rename_all = "lowercase")]
-pub enum Executor {
-    Cli {
-        command: String,
-    },
-    Http {
-        endpoint: String,
-        headers: Option<HashMap<String, String>>,
-    },
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Profile {
-    pub subcommand: String,
-    pub args:       Vec<String>,
-    pub fields:     HashMap<String, FieldSchema>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct FieldSchema {
-    pub r#type:   String,   // "string" | "number" | "boolean" | "enum"
-    pub label:    String,
-    pub required: Option<bool>,
-    pub default:  Option<serde_json::Value>,
-    pub values:   Option<Vec<String>>,             // enum の場合
-    pub source:   Option<String>,                  // 動的取得 URL（Ollama 等）
-    pub path:     Option<String>,                  // レスポンスから値を抽出するパス
+    pub profile:   Profile,
+    pub embedding: Option<Vec<f32>>,
 }
 ```
 
 ### ノード定義の追加（再ビルド不要）
 
 ```rust
-// SurrealDB に INSERT するだけで Node Catalog に追加される
-// Git Status
 db.create::<Option<NodeCatalog>>("node_catalog")
-    .content(NodeCatalog {
-        service:   "git".into(),
-        provider:  "local".into(),
-        label:     "Git Status".into(),
-        node_type: "git".into(),
-        executor:  Executor::Cli { command: "git".into() },
-        profile:   Profile {
-            subcommand: "status".into(),
-            args:       vec!["status".into()],
-            fields:     HashMap::new(),
-        },
-        embedding: None,
-    })
-    .await?;
-
-// Git Commit（別レコードとして INSERT）
-db.create::<Option<NodeCatalog>>("node_catalog")
-    .content(NodeCatalog {
-        service:   "git".into(),
-        provider:  "local".into(),
-        label:     "Git Commit".into(),
-        node_type: "git".into(),
-        executor:  Executor::Cli { command: "git".into() },
-        profile:   Profile {
-            subcommand: "commit".into(),
-            args:       vec!["commit".into(), "-m".into(), "{input.message}".into()],
-            fields:     HashMap::from([
-                ("message".into(), FieldSchema {
-                    r#type:   "string".into(),
-                    label:    "Commit Message".into(),
-                    required: Some(true),
-                    ..Default::default()
-                }),
-            ]),
-        },
-        embedding: None,
-    })
+    .content(NodeCatalog { ... })
     .await?;
 ```
 
@@ -190,22 +328,8 @@ db.create::<Option<NodeCatalog>>("node_catalog")
 
 ```rust
 #[tauri::command]
-async fn catalog_get_all(
-    db: State<'_, Surreal<SurrealKV>>,
-) -> Result<Vec<NodeCatalog>, String> {
-    db.select("node_catalog").await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn catalog_search(
-    db: State<'_, Surreal<SurrealKV>>,
-    query: String,
-) -> Result<Vec<NodeCatalog>, String> {
-    db.query("SELECT * FROM node_catalog WHERE label ~ $q OR service ~ $q")
-        .bind(("q", query))
-        .await.map_err(|e| e.to_string())?
-        .take(0).map_err(|e| e.to_string())
+async fn catalog_get_all(db: State<'_, Db>) -> Result<Vec<NodeCatalog>, String> {
+    db.select("node_catalog").await.map_err(|e| e.to_string())
 }
 ```
 
@@ -214,201 +338,78 @@ async fn catalog_search(
 ```rust
 #[tauri::command]
 async fn execute_node(
-    db:      State<'_, Surreal<SurrealKV>>,
-    service:  String,
-    provider: String,
-    cwd:      String,
-    input:    serde_json::Value,
+    db: State<'_, Db>,
+    service: String, provider: String, cwd: String, input: serde_json::Value,
 ) -> Result<ExecuteResponse, String> {
-    // 1. SurrealDB からノード定義を取得
-    let nodes: Vec<NodeCatalog> = db
-        .query("SELECT * FROM node_catalog WHERE service = $s AND provider = $p LIMIT 1")
-        .bind(("s", &service))
-        .bind(("p", &provider))
-        .await.map_err(|e| e.to_string())?
-        .take(0).map_err(|e| e.to_string())?;
-
-    let node = nodes.into_iter().next()
-        .ok_or("SERVICE_NOT_FOUND".to_string())?;
-
-    // 2. executor に応じて直接実行
-    match &node.executor {
-        Executor::Cli { command } => {
-            // subcommand の特定
-            let subcommand = input.get("subcommand")
-                .and_then(|v| v.as_str())
-                .ok_or("Missing subcommand")?;
-
-            // 1エントリ = 1プロファイルなので検索不要
-            // subcommand はノード追加時に input.subcommand として確定済み
-            let profile = &node.profile;
-
-            // subcommand の一致確認（防御的チェック）
-            if profile.subcommand != subcommand {
-                return Err("PROFILE_NOT_FOUND".to_string());
-            }
-
-            // テンプレート展開
-            let resolved = resolve_args(&profile.args, &input)?;
-
-            // CLI 実行
-            let output = std::process::Command::new(command)
-                .args(&resolved)
-                .current_dir(&cwd)
-                .output()
-                .map_err(|e| e.to_string())?;
-
-            Ok(ExecuteResponse {
-                success: output.status.success(),
-                output: serde_json::json!({
-                    "stdout": String::from_utf8_lossy(&output.stdout),
-                    "stderr": String::from_utf8_lossy(&output.stderr),
-                }),
-                error: None,
-            })
-        }
-        Executor::Http { endpoint, headers } => {
-            // HTTP 実行
-            let client = reqwest::Client::new();
-            let mut req = client.post(endpoint).json(&input);
-            if let Some(hdrs) = headers {
-                for (k, v) in hdrs {
-                    req = req.header(k, resolve_env(v)?);
-                }
-            }
-            let res = req.send().await.map_err(|e| e.to_string())?;
-            let body: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-            Ok(ExecuteResponse {
-                success: true,
-                output: body,
-                error: None,
-            })
-        }
-    }
+    services::executor::execute_node(&db, &service, &provider, &cwd, &input).await
 }
+```
+
+### 静的解析（CTX-20〜21）
+
+```rust
+#[tauri::command]
+async fn analyze_file(project_id: String, file_path: String, db: State<'_, Db>)
+    -> Result<(), String>
+
+#[tauri::command]
+async fn analyze_project(project_id: String, db: State<'_, Db>)
+    -> Result<(), String>
+
+#[tauri::command]
+fn get_changed_files(root_path: String) -> Result<Vec<String>, String>
+```
+
+### テスト解析・実行（CTX-22〜23）
+
+```rust
+#[tauri::command]
+async fn analyze_tests(project_id: String, db: State<'_, Db>)
+    -> Result<(), String>
+
+#[tauri::command]
+async fn list_test_suites(project_id: String, db: State<'_, Db>)
+    -> Result<Vec<TestSuite>, String>
+
+#[tauri::command]
+async fn run_test_case(project_id: String, test_case_id: String, db: State<'_, Db>)
+    -> Result<TestResult, String>
+```
+
+---
+
+## フロントエンドサービス層
+
+Props DI パターンで全サービスを差し替え可能にする。
+
+```
+src/services/
+  GraphStorage.ts    — graph / node / edge CRUD
+  ContextStorage.ts  — source_context CRUD（CTX-22 暫定、将来 TestStorage に移行）
+  TestStorage.ts     — test_file / test_suite / test_case CRUD（CTX-22）
+  TestRunner.ts      — run_test_case / run_test_suite / run_test_file（CTX-23）
+```
+
+### Props DI パターン
+
+```ts
+// デフォルト実装を export
+export const defaultGraphStorage: GraphStorage = { ... }
+
+// テスト・Storybook では部分上書き
+const mockStorage = { ...defaultGraphStorage, listGraphs: vi.fn() }
 ```
 
 ---
 
 ## テンプレート変数の展開ルール
 
-`args` 内の `{input.xxx}` 形式のトークンは完全一致で置換する：
-
-```rust
-fn resolve_args(
-    args: &[String],
-    input: &serde_json::Value,
-) -> Result<Vec<String>, String> {
-    let map = input.as_object()
-        .ok_or("input must be an object")?;
-
-    args.iter().map(|arg| resolve_template(arg, map)).collect()
-}
-
-fn resolve_template(
-    target: &str,
-    input: &serde_json::Map<String, serde_json::Value>,
-) -> Result<String, String> {
-    if target.starts_with('{') && target.ends_with('}') {
-        let key = &target[1..target.len() - 1];
-        if let Some(field) = key.strip_prefix("input.") {
-            return input.get(field)
-                .map(|v| match v {
-                    serde_json::Value::String(s) => Ok(s.clone()),
-                    serde_json::Value::Bool(b)   => Ok(b.to_string()),
-                    serde_json::Value::Number(n) => Ok(n.to_string()),
-                    _ => Err(format!("Unsupported type for key: {}", field)),
-                })
-                .unwrap_or_else(|| Err(format!("Missing input key: {}", field)))?;
-        }
-    }
-    Ok(target.to_string())
-}
-```
-
-> **セキュリティ注記:**
-> `std::process::Command::new().args(vec![...])` で引数を配列として渡す。
-> シェル文字列渡し（`sh -c "git {input}"` 等）は禁止する。
-
----
-
-## 環境変数・秘匿情報の管理
-
-HTTP executor の `headers` に `${env.XXX}` 形式で環境変数を参照できる：
-
-```rust
-fn resolve_env(value: &str) -> Result<String, String> {
-    if value.starts_with("${env.") && value.ends_with('}') {
-        let key = &value[6..value.len() - 1];
-        std::env::var(key).map_err(|_| format!("ENV_VAR_NOT_SET: {}", key))
-    } else {
-        Ok(value.to_string())
-    }
-}
-```
-
-- SurrealDB の node_catalog に API キーを直接書くことは禁止する
-- `.env` または Tauri 起動時の環境変数から取得する
-
----
-
-## テスタビリティ
-
-### フロント（Vitest）
-
-```typescript
-vi.mock('@tauri-apps/api/core', () => ({
-    invoke: vi.fn()
-        .mockResolvedValueOnce([{ service: 'git', provider: 'local', ... }])
-}))
-```
-
-### Tauri コマンド単体（Rust）
-
-```rust
-#[cfg(test)]
-mod tests {
-    use surrealdb::engine::local::Mem;
-
-    #[tokio::test]
-    async fn test_catalog_search() {
-        let db = Surreal::new::<Mem>(()).await.unwrap();
-        db.use_ns("test").use_db("test").await.unwrap();
-
-        // テストデータ INSERT
-        db.create::<Option<NodeCatalog>>("node_catalog")
-            .content(NodeCatalog { service: "git".into(), ... })
-            .await.unwrap();
-
-        // 検索テスト
-        let results: Vec<NodeCatalog> = db
-            .query("SELECT * FROM node_catalog WHERE label ~ $q")
-            .bind(("q", "git"))
-            .await.unwrap().take(0).unwrap();
-
-        assert_eq!(results.len(), 1);
-    }
-}
-```
-
-### E2E（Playwright）
-
-Tauri のみ起動すれば良い。外部プロセス不要。
+`args` 内の `{input.xxx}` 形式のトークンは完全一致で置換する。
+シェル文字列渡し（`sh -c "git {input}"` 等）は禁止する。
 
 ---
 
 ## エラーレスポンス
-
-```json
-{
-  "success": false,
-  "output": null,
-  "error": {
-    "code": "SERVICE_NOT_FOUND",
-    "message": "No service found for git:local"
-  }
-}
-```
 
 | code                         | 意味                                            |
 | ---------------------------- | ----------------------------------------------- |
@@ -421,95 +422,12 @@ Tauri のみ起動すれば良い。外部プロセス不要。
 
 ---
 
-## Node Catalog 検索戦略ロードマップ
-
-| フェーズ | 検索実装                                                                     |
-| -------- | ---------------------------------------------------------------------------- |
-| CTX-9    | `useCatalogSearch(query)` で `filter()` インクリメンタルサーチ（固定データ） |
-| CTX-13   | SurrealDB の HNSW ベクトル検索 + SEARCH フルテキスト検索に差し替え           |
-
-CTX-9 では `useCatalogSearch` フックとして分離する。
-CTX-13 での差し替えはフックの内部実装のみの変更で完結する（UI 変更不要）。
-
-動的スキーマ取得（Ollama 等）は CTX-9 の設計フェーズで確定する：
-
-- 候補A: `invoke('catalog_get_schema', { service, provider })` — テスタビリティ高
-- 候補B: フロントから直接 HTTP — シンプル
-
----
-
-## フロントエンド統合メモ
-
-### GraphNodeData への追加（CTX-9 確定済み）
-
-> `docs/bom/graph.ts` を参照。`catalog` ネストは不採用。
-> エクスポートJSONとの一貫性を優先し `service / provider / input` をフラットに持つ。
-
-```typescript
-{
-  service: string | null;
-  provider: string | null;
-  input: Record;
-}
-```
-
-### エクスポート JSON スキーマ候補（CTX-10 で検討）
-
-```json
-{
-  "project_id": "1",
-  "graph_id": "graphs/main.json",
-  "exported_at": "2026-05-27T00:00:00Z",
-  "graph": {
-    "nodes": [
-      {
-        "id": "node_1",
-        "label": "Git Status",
-        "status": "done",
-        "service": "git",
-        "provider": "local",
-        "input": { "subcommand": "status" }
-      },
-      {
-        "id": "node_2",
-        "label": "Analyze Changes",
-        "status": "doing",
-        "service": "llm",
-        "provider": "claude",
-        "input": { "prompt": "変更点を要約してください" }
-      }
-    ],
-    "edges": [
-      {
-        "source": "node_1",
-        "target": "node_2",
-        "mapping": {
-          "input.prompt": "output.stdout"
-        }
-      }
-    ]
-  }
-}
-```
-
-### ノード実行ディスパッチ（CTX-14）
-
-```
-ノード右クリック → Run Node
-  → invoke('execute_node', { service, provider, cwd, input })
-  → Tauri コマンド → SurrealDB からノード定義取得 → CLI / HTTP 実行
-  → 結果を node.status に反映（doing → done）
-  → edges の mapping に従い次のノードの input に注入
-```
-
----
-
 ## 将来の拡張
 
 | 項目              | 内容                                                            |
 | ----------------- | --------------------------------------------------------------- |
 | Wasm executor     | Tauri 内で Wasmtime を組み込み                                  |
 | ストリーミング    | Tauri の `emit` イベントで LLM レスポンスをフロントにストリーム |
-| CTX-13            | SurrealDB ベクトル検索・フルテキスト検索                        |
-| CTX-14            | 実行エンジン（エッジ mapping でノード間データフロー）           |
+| CTX-24 以降       | エッジアニメーション詳細・型情報解決（TSコンパイラAPI）         |
 | Palantir AIP 相当 | グラフをエクスポートして LLM に渡し自律実行                     |
+| リアルタイム解析  | ファイル保存時に notify クレートで自動 analyze_file             |
