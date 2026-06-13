@@ -58,14 +58,3 @@ export type ProjectStore = {
 export type UseProjectLoadReturn = {
     loadProjects: () => Promise<void>
 }
-
-// ============================================================
-// UseProjectSaveReturn
-// useProjectSave hook の戻り値型。
-// New Project ダイアログの作成ボタン押下時に呼び出す。
-// invoke('create_project', { name, description, rootPath }) で SurrealDB に INSERT する。
-// ============================================================
-
-export type UseProjectSaveReturn = {
-    createProject: (form: NewProjectForm) => Promise<Project>
-}

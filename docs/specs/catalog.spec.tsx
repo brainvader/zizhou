@@ -47,7 +47,6 @@ vi.mock('@/store/useGraphStore', () => ({
 import { useCatalogSearch } from '@/hooks/useCatalogSearch'
 import { CatalogMenu } from '@/components/CatalogMenu'
 import { NODE_CATALOG } from '@/bom/graph'
-import type { CatalogEntry } from '@/bom/graph'
 
 // テスト用カタログ DI オプション（invoke の代替）
 const makeCatalogOptions = () => ({

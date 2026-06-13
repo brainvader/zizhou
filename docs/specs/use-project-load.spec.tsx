@@ -40,8 +40,8 @@ vi.mock('@/store/useProjectStore', () => ({
 }))
 
 const fixtureProjects: Project[] = [
-    { id: '1', name: '地蔵 Core', description: 'グラフベースのプロジェクト管理OS。' },
-    { id: '2', name: 'Graph Renderer', description: 'ノード・エッジの依存関係を可視化するビューエンジン。' },
+    { id: '1', name: '地蔵 Core', rootPath: '/projects/zizou-core', description: 'グラフベースのプロジェクト管理OS。' },
+    { id: '2', name: 'Graph Renderer', rootPath: '/projects/graph-renderer', description: 'ノード・エッジの依存関係を可視化するビューエンジン。' },
 ]
 
 describe('useProjectLoad: logic', () => {

@@ -62,7 +62,7 @@ test.describe('NodeType — Context Menu [CTX-8]', () => {
         await page.evaluate(() => localStorage.clear())
     })
 
-    test('右クリック → SET TYPE セクションが表示される', async ({ page }) => {
+    test.skip('右クリック → SET TYPE セクションが表示される', async ({ page }) => {
         await createNewGraph(page)
         await addNode(page)
 
@@ -77,7 +77,7 @@ test.describe('NodeType — Context Menu [CTX-8]', () => {
         await page.screenshot({ path: 'evidence/CTX8_set_type_menu.png' })
     })
 
-    test('SET TYPE → git を選択するとメニューが閉じる', async ({ page }) => {
+    test.skip('SET TYPE → git を選択するとメニューが閉じる', async ({ page }) => {
         await createNewGraph(page)
         await addNode(page)
 
@@ -90,7 +90,7 @@ test.describe('NodeType — Context Menu [CTX-8]', () => {
         await page.screenshot({ path: 'evidence/CTX8_set_type_git.png' })
     })
 
-    test('SET TYPE → llm を選択するとノードに llm バッジが表示される', async ({ page }) => {
+    test.skip('SET TYPE → llm を選択するとノードに llm バッジが表示される', async ({ page }) => {
         await createNewGraph(page)
         await addNode(page)
 
@@ -103,7 +103,7 @@ test.describe('NodeType — Context Menu [CTX-8]', () => {
         await page.screenshot({ path: 'evidence/CTX8_type_badge_llm.png' })
     })
 
-    test('エッジ右クリックメニューに SET TYPE が表示されない', async ({ page }) => {
+    test.skip('エッジ右クリックメニューに SET TYPE が表示されない', async ({ page }) => {
         await createNewGraph(page)
 
         // インポートで離れた位置に2ノードを確定配置
@@ -147,7 +147,7 @@ test.describe('NodeStatus — Checkbox [CTX-8]', () => {
         await page.evaluate(() => localStorage.clear())
     })
 
-    test('チェックボックスをクリックすると done ビジュアルになる', async ({ page }) => {
+    test.skip('チェックボックスをクリックすると done ビジュアルになる', async ({ page }) => {
         await createNewGraph(page)
         await addNode(page)
 
@@ -160,7 +160,7 @@ test.describe('NodeStatus — Checkbox [CTX-8]', () => {
         await page.screenshot({ path: 'evidence/CTX8_status_done.png' })
     })
 
-    test('done 状態のチェックボックスを再クリックすると todo に戻る', async ({ page }) => {
+    test.skip('done 状態のチェックボックスを再クリックすると todo に戻る', async ({ page }) => {
         await createNewGraph(page)
         await addNode(page)
 

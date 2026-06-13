@@ -60,7 +60,7 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
         >
             {/* モーダル本体 */}
             <div
-                className="relative flex flex-col w-[680px] max-h-[80vh] bg-[--card] border border-[--border] rounded-[--radius] shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden"
+                className="flex-1 min-h-80 resize-none bg-[--background] text-[--foreground] font-mono text-[11px] leading-relaxed p-4 outline-none border-none placeholder:text-[--muted-foreground]/40"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* ヘッダー */}
@@ -86,7 +86,7 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
                         setError(null)
                     }}
                     placeholder={'{\n  "graph": {\n    "nodes": [...],\n    "edges": [...]\n  }\n}'}
-                    className="flex-1 min-h-[320px] resize-none bg-[--background] text-[--foreground] font-mono text-[11px] leading-relaxed p-4 outline-none border-none placeholder:text-[--muted-foreground]/40"
+                    className="flex-1 min-h-80 resize-none bg-[--background] text-[--foreground] font-mono text-[11px] leading-relaxed p-4 outline-none border-none placeholder:text-[--muted-foreground]/40"
                     spellCheck={false}
                 />
 

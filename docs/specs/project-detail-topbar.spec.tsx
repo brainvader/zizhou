@@ -51,6 +51,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 const MOCK_PROJECT: Project = {
     id: 'proj-001',
     name: '地蔵 Core',
+    rootPath: '/Users/user/projects/zizou-core',
     description: 'グラフベースのプロジェクト管理OS。',
 }
 

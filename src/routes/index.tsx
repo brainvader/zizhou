@@ -8,7 +8,6 @@ import { SettingsDialog } from '@/components/SettingsDialog'
  * "/" ルートのページコンポーネント。
  *
  * [A] loadProjects は __root.tsx の useProjectLoad に委譲済み。
- *     useProjectSave は SurrealDB 移行により廃止（invoke('create_project') に移行）。
  * [B] isSettingsOpen で CTX-4 SettingsDialog の開閉を制御する。
  *
  * @see src/routes/__root.tsx

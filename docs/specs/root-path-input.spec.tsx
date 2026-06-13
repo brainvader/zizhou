@@ -29,12 +29,6 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
     open: mockTauriOpen,
 }))
 
-const makeProps = (overrides: Partial<React.ComponentProps<typeof RootPathInput>> = {}) => ({
-    value: '',
-    onChange: vi.fn(),
-    ...overrides,
-})
-
 beforeEach(() => {
     vi.clearAllMocks()
 })

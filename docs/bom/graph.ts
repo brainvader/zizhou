@@ -73,7 +73,7 @@ export const CatalogEntrySchema = z.object({
     service: z.string(),
     provider: z.string(),
     label: z.string(),
-    nodeType: z.string(),
+    nodeType: NodeTypeSchema,
     profile: CatalogProfileSchema,
 })
 export type CatalogEntry = z.infer<typeof CatalogEntrySchema>

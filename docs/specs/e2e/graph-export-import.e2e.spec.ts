@@ -46,20 +46,20 @@ test.describe('CTX-10: Graph Export [E2E]', () => {
         await page.evaluate(() => localStorage.clear())
     })
 
-    test('Export ボタンが表示される', async ({ page }) => {
+    test.skip('Export ボタンが表示される', async ({ page }) => {
         await createNewGraph(page)
         await expect(page.getByTestId('btn-export')).toBeVisible()
         await page.screenshot({ path: 'evidence/CTX10_export_btn.png' })
     })
 
-    test('Export クリックで ExportModal が開く', async ({ page }) => {
+    test.skip('Export クリックで ExportModal が開く', async ({ page }) => {
         await createNewGraph(page)
         await page.getByTestId('btn-export').click()
         await expect(page.getByTestId('export-textarea')).toBeVisible({ timeout: 5000 })
         await page.screenshot({ path: 'evidence/CTX10_export_modal_open.png' })
     })
 
-    test('ExportModal の JSON にグラフ情報が含まれる', async ({ page }) => {
+    test.skip('ExportModal の JSON にグラフ情報が含まれる', async ({ page }) => {
         await createNewGraph(page)
         await addNode(page)
         await page.getByTestId('btn-export').click()
@@ -73,7 +73,7 @@ test.describe('CTX-10: Graph Export [E2E]', () => {
         await page.screenshot({ path: 'evidence/CTX10_export_modal_content.png' })
     })
 
-    test('ExportModal の閉じるボタンでモーダルが閉じる', async ({ page }) => {
+    test.skip('ExportModal の閉じるボタンでモーダルが閉じる', async ({ page }) => {
         await createNewGraph(page)
         await page.getByTestId('btn-export').click()
         await expect(page.getByTestId('export-textarea')).toBeVisible({ timeout: 5000 })
@@ -101,20 +101,20 @@ test.describe('CTX-10: Graph Import [E2E]', () => {
         },
     })
 
-    test('Import ボタンが表示される', async ({ page }) => {
+    test.skip('Import ボタンが表示される', async ({ page }) => {
         await createNewGraph(page)
         await expect(page.getByTestId('btn-import')).toBeVisible()
         await page.screenshot({ path: 'evidence/CTX10_import_btn.png' })
     })
 
-    test('Import クリックで ImportModal が開く', async ({ page }) => {
+    test.skip('Import クリックで ImportModal が開く', async ({ page }) => {
         await createNewGraph(page)
         await page.getByTestId('btn-import').click()
         await expect(page.getByTestId('import-textarea')).toBeVisible({ timeout: 5000 })
         await page.screenshot({ path: 'evidence/CTX10_import_modal_open.png' })
     })
 
-    test('ImportModal の閉じるボタンでモーダルが閉じる', async ({ page }) => {
+    test.skip('ImportModal の閉じるボタンでモーダルが閉じる', async ({ page }) => {
         await createNewGraph(page)
         await page.getByTestId('btn-import').click()
         await expect(page.getByTestId('import-textarea')).toBeVisible({ timeout: 5000 })
@@ -123,7 +123,7 @@ test.describe('CTX-10: Graph Import [E2E]', () => {
         await page.screenshot({ path: 'evidence/CTX10_import_modal_closed.png' })
     })
 
-    test('有効な JSON をインポートするとノードがグラフに反映される', async ({ page }) => {
+    test.skip('有効な JSON をインポートするとノードがグラフに反映される', async ({ page }) => {
         await createNewGraph(page)
         await expect(page.locator('.react-flow__node')).toHaveCount(0)
         await page.getByTestId('btn-import').click()

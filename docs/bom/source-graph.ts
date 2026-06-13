@@ -9,62 +9,49 @@
  * Rust 側の get_structure_graph / analyze_file / analyze_project / get_changed_files
  * との対応を定義する。
  *
- * 命名規則:
- *   SourceGraph             — グラフデータ型（Rust get_structure_graph の戻り値に対応）
- *   SourceNode              — ReactFlow Node 型（通常ソースファイル）
- *   SourceNodeData          — ReactFlow Node.data 型
- *   SourceNodeDisplayData   — 描画用 Node.data 型（displayStatus / onReanalyze を追加）
- *   TestNode                — ReactFlow Node 型（テストファイル専用）
- *   TestNodeData            — テストノードの Node.data 型
- *   TestNodeDisplayData     — テストノード描画用 Node.data 型
- *   SourceEdge              — ReactFlow Edge 型
- *   SourceContextContainer  — Subflow コンテナノードコンポーネント
- *   SourceGraphView         — グラフ描画コンポーネント（src/components/SourceGraphView.tsx）
- *   SourceNode (comp)       — ノード描画コンポーネント（src/components/nodes/SourceNode.tsx）
- *   TestNode (comp)         — テストノード描画コンポーネント（src/components/nodes/TestNode.tsx）
+ * このファイルはグラフ全体・エッジ・ビュー Props の型を定義するとともに、
+ * 関連 BOM ファイルの re-export 窓口を担う。
+ *
+ * 直接定義:
+ *   SourceEdge / SourceEdgeKind     — エッジ型
+ *   SourceGraph                     — グラフデータ型
+ *   SourceContextContainerData /
+ *   SourceContextContainerNode /
+ *   SourceContextContainerProps     — Subflow コンテナノード型
+ *   SourceGraphViewProps            — SourceGraphView コンポーネント Props
+ *   GetSourceGraphFn                — Props DI 関数型
+ *
+ * re-export:
+ *   source-node.ts     — SourceNodeData / SourceNode / SourceNodeDisplayData /
+ *                        SourceNodeType / SourceNodeProps
+ *   test-node.ts       — TestNodeData / TestNode / TestNodeDisplayData /
+ *                        TestNodeType / TestNodeProps
+ *   source-analysis.ts — AnalyzedDisplay / computeAnalyzedDisplay /
+ *                        AnalyzeFileFn / AnalyzeProjectFn / GetChangedFilesFn
  */
 
 import type { Node as RfNode, Edge as RfEdge, NodeProps } from '@xyflow/react'
 import type { SourceContext } from '@/bom/source-context'
+import type { SourceNodeData } from '@/bom/source-node'
 
-// ============================================================
-// SourceNode データモデル
-// ============================================================
-
-/**
- * source グラフのノードデータ。
- * ReactFlow Node.data に乗る。
- * data.filePath / data.analyzed は Rust 側で camelCase 化されて渡される。
- */
-export type SourceNodeData = {
-    label: string
-    nodeType?: string
-    /** rootPath 相対 / forward slash */
-    filePath?: string
-    /** DB 保存値: 'pending' | 'fresh'（'stale' はフロント描画時に動的判定） */
-    analyzed?: 'pending' | 'fresh'
-}
-
-export type SourceNode = RfNode<SourceNodeData, 'sourceNode'>
-
-// ============================================================
-// TestNode データモデル                               [CTX-22]
-// ============================================================
-
-/**
- * テストファイルノードのデータ。
- * *.test.ts / *.spec.ts に対応するノード。
- * SourceNodeData を継承し、テスト固有のフィールドを追加する。
- */
-export type TestNodeData = SourceNodeData & {
-    /**
-     * このテストファイルに含まれる describe（test_suite）の数。
-     * analyze_tests 後に設定される。未解析時は undefined。
-     */
-    suiteCount?: number
-}
-
-export type TestNode = RfNode<TestNodeData, 'testNode'>
+// re-export
+export type { AnalyzedDisplay } from '@/bom/source-analysis'
+export { computeAnalyzedDisplay } from '@/bom/source-analysis'
+export type { AnalyzeFileFn, AnalyzeProjectFn, GetChangedFilesFn } from '@/bom/source-analysis'
+export type {
+    SourceNodeData,
+    SourceNode,
+    SourceNodeDisplayData,
+    SourceNodeType,
+    SourceNodeProps,
+} from '@/bom/source-node'
+export type {
+    TestNodeData,
+    TestNode,
+    TestNodeDisplayData,
+    TestNodeType,
+    TestNodeProps,
+} from '@/bom/test-node'
 
 // ============================================================
 // SourceEdge
@@ -89,73 +76,6 @@ export type SourceGraph = {
     nodes: RfNode<SourceNodeData, string>[]
     edges: SourceEdge[]
 }
-
-// ============================================================
-// Stale 判定
-// ============================================================
-
-/**
- * 描画時の表示用ステータス。
- * 'stale' は DB に保存されず、changedFiles ∩ node.filePath の結果から動的に算出する。
- */
-export type AnalyzedDisplay = 'pending' | 'fresh' | 'stale'
-
-/**
- * node.analyzed と changedFiles から表示用ステータスを決定する。
- *
- *   analyzed='fresh' かつ filePath ∈ changedFiles → 'stale'
- *   analyzed='fresh' かつ filePath ∉ changedFiles → 'fresh'
- *   analyzed='pending' / undefined                → 'pending'
- */
-export const computeAnalyzedDisplay = (
-    analyzed: SourceNodeData['analyzed'] | undefined,
-    filePath: string | undefined,
-    changedFiles: ReadonlySet<string>,
-): AnalyzedDisplay => {
-    if (analyzed === 'fresh') {
-        return filePath && changedFiles.has(filePath) ? 'stale' : 'fresh'
-    }
-    return 'pending'
-}
-
-// ============================================================
-// SourceNode コンポーネント用型                [CTX-21]
-// ============================================================
-
-/**
- * SourceNode カスタムノードの data 型。
- * SourceGraphView が computeAnalyzedDisplay で算出した displayStatus を注入して渡す。
- * onReanalyze も SourceGraphView から注入する（Props DI）。
- */
-export type SourceNodeDisplayData = SourceNodeData & {
-    displayStatus: AnalyzedDisplay
-    onReanalyze?: (filePath: string) => void
-}
-
-export type SourceNodeType = RfNode<SourceNodeDisplayData, 'sourceNode'>
-export type SourceNodeProps = NodeProps<SourceNodeType>
-
-// ============================================================
-// TestNode コンポーネント用型                  [CTX-22]
-// ============================================================
-
-/**
- * TestNode カスタムノードの data 型。
- * SourceGraphView が displayStatus / onReanalyze / onRunTest を注入して渡す。
- * onRunTest は CTX-23 で実装する TestRunner に接続する。
- */
-export type TestNodeDisplayData = TestNodeData & {
-    displayStatus: AnalyzedDisplay
-    onReanalyze?: (filePath: string) => void
-    /**
-     * ▶ ボタン押下時コールバック。
-     * CTX-23 実装前は undefined で ▶ ボタンを非表示にする。
-     */
-    onRunTest?: (filePath: string) => void
-}
-
-export type TestNodeType = RfNode<TestNodeDisplayData, 'testNode'>
-export type TestNodeProps = NodeProps<TestNodeType>
 
 // ============================================================
 // SourceContextContainer コンポーネント用型    [CTX-22]
@@ -193,6 +113,10 @@ export type SourceGraphViewProps = {
      * CTX-23 実装前は省略可（ボタン非表示）。
      */
     onRunTest?: (filePath: string) => void
+    /**
+     * [CTX-13] キャンバス右クリック時コールバック。CatalogMenu の表示に使用する。
+     */
+    onPaneContextMenu?: (event: React.MouseEvent) => void
 }
 
 // ============================================================
@@ -200,6 +124,3 @@ export type SourceGraphViewProps = {
 // ============================================================
 
 export type GetSourceGraphFn = (projectId: string) => Promise<SourceGraph>
-export type AnalyzeFileFn = (projectId: string, filePath: string) => Promise<void>
-export type AnalyzeProjectFn = (projectId: string) => Promise<void>
-export type GetChangedFilesFn = (rootPath: string) => Promise<string[]>
