@@ -7,6 +7,7 @@
 //! @context CTX-19: list_fs_tree コマンド追加
 //! @context CTX-20: get_structure_graph / analyze_file / analyze_project / get_changed_files
 //! @context CTX-22: list_contexts / create_context / update_context / delete_context
+//! @context CTX-22: analyze_tests / list_test_suites / list_test_cases
 
 mod services;
 
@@ -304,6 +305,32 @@ async fn delete_context(context_id: String, db: State<'_, Db>) -> Result<(), Str
 }
 
 // ============================================================
+// Tauri コマンド — Test Analysis                      [CTX-22]
+// ============================================================
+
+#[tauri::command]
+async fn analyze_tests(project_id: String, db: State<'_, Db>) -> Result<(), String> {
+    let project = services::db::get_project(&db, &project_id).await?;
+    services::test_analysis::analyze_tests(&db, &project).await
+}
+
+#[tauri::command]
+async fn list_test_suites(
+    project_id: String,
+    db: State<'_, Db>,
+) -> Result<Vec<services::test_analysis::TestSuiteResponse>, String> {
+    services::test_analysis::list_test_suites(&db, &project_id).await
+}
+
+#[tauri::command]
+async fn list_test_cases(
+    suite_id: String,
+    db: State<'_, Db>,
+) -> Result<Vec<services::test_analysis::TestCaseResponse>, String> {
+    services::test_analysis::list_test_cases(&db, &suite_id).await
+}
+
+// ============================================================
 // エントリポイント
 // ============================================================
 
@@ -340,11 +367,15 @@ pub fn run() {
             get_structure_graph,
             analyze_file,
             analyze_project,
-            // [CTX-22]
+            // [CTX-22] SourceContext
             list_contexts,
             create_context,
             update_context,
             delete_context,
+            // [CTX-22] Test Analysis
+            analyze_tests,
+            list_test_suites,
+            list_test_cases,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

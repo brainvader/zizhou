@@ -212,6 +212,14 @@ pub async fn init_db(app_data_dir: std::path::PathBuf) -> Result<Db, surrealdb::
     db.query("DEFINE TABLE IF NOT EXISTS source_context SCHEMALESS")
         .await?;
 
+    // [CTX-22] テスト解析テーブルを SCHEMALESS で定義
+    db.query("DEFINE TABLE IF NOT EXISTS test_file SCHEMALESS")
+        .await?;
+    db.query("DEFINE TABLE IF NOT EXISTS test_suite SCHEMALESS")
+        .await?;
+    db.query("DEFINE TABLE IF NOT EXISTS test_case SCHEMALESS")
+        .await?;
+
     Ok(db)
 }
 
