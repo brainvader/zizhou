@@ -13,17 +13,14 @@ import { test, expect } from '@playwright/test'
 /** / に goto → プロジェクト作成 → プロジェクト詳細へ遷移 */
 const gotoProjectDetail = async (page: import('@playwright/test').Page) => {
     await page.goto('/')
-
     const newProjectBtn = page.getByText('＋ new project')
     await expect(newProjectBtn).toBeEnabled({ timeout: 10000 })
-
     await newProjectBtn.click()
     await page.waitForSelector('[role="dialog"]')
     await page.getByPlaceholder('My Awesome App').fill('E2E Test Project')
     await page.getByPlaceholder('/Users/user/projects/my-app').fill('/tmp/e2e-test')
     await page.getByRole('button', { name: '作成' }).click()
     await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
-
     await page.getByRole('link', { name: 'E2E Test Project' }).click()
     await page.waitForSelector('.react-flow__pane', { timeout: 10000 })
 }
@@ -32,7 +29,6 @@ const gotoProjectDetail = async (page: import('@playwright/test').Page) => {
 const createNewGraph = async (page: import('@playwright/test').Page) => {
     await gotoProjectDetail(page)
 
-    // New Graph ボタンが有効になるまで待機
     await expect(page.getByTestId('new-graph-btn')).toBeEnabled({ timeout: 10000 })
 
     await page.locator('[data-testid="new-graph-btn"]').click()
