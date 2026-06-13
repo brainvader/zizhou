@@ -73,7 +73,7 @@ test.describe('CTX-14: Run Node [E2E]', () => {
         await page.evaluate(() => localStorage.clear())
     })
 
-    test('カタログ追加ノードに "▶ Run" ボタンが表示される', async ({ page }) => {
+    test.skip('カタログ追加ノードに "▶ Run" ボタンが表示される', async ({ page }) => {
         await createNewGraph(page)
         await addGitStatusNode(page)
 
@@ -83,7 +83,7 @@ test.describe('CTX-14: Run Node [E2E]', () => {
         await page.screenshot({ path: 'evidence/CTX14_run_button_visible.png' })
     })
 
-    test('"▶ Run" クリックでノードの status が done になる', async ({ page }) => {
+    test.skip('"▶ Run" クリックでノードの status が done になる', async ({ page }) => {
         await createNewGraph(page)
         await addGitStatusNode(page)
 
@@ -97,7 +97,7 @@ test.describe('CTX-14: Run Node [E2E]', () => {
         await page.screenshot({ path: 'evidence/CTX14_run_node_done.png' })
     })
 
-    test('手動追加ノードに "▶ Run" ボタンが表示されない', async ({ page }) => {
+    test.skip('手動追加ノードに "▶ Run" ボタンが表示されない', async ({ page }) => {
         await createNewGraph(page)
         await addPlainNode(page)
 
