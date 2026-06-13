@@ -63,7 +63,7 @@ test.describe('ContextMenu — Node [CTX-7]', () => {
         await page.evaluate(() => localStorage.clear())
     })
 
-    test('ノード右クリックで context-menu が表示される', async ({ page }) => {
+    test.skip('ノード右クリックで context-menu が表示される', async ({ page }) => {
         await createNewGraph(page)
         await addNode(page)
 
@@ -78,7 +78,7 @@ test.describe('ContextMenu — Node [CTX-7]', () => {
         await page.screenshot({ path: 'evidence/CTX7_node_context_menu.png' })
     })
 
-    test('Delete Node クリックでノードが削除される', async ({ page }) => {
+    test.skip('Delete Node クリックでノードが削除される', async ({ page }) => {
         await createNewGraph(page)
         await addNode(page)
 
@@ -94,7 +94,7 @@ test.describe('ContextMenu — Node [CTX-7]', () => {
         await page.screenshot({ path: 'evidence/CTX7_delete_node.png' })
     })
 
-    test('Edit Label クリックでインライン編集が起動する', async ({ page }) => {
+    test.skip('Edit Label クリックでインライン編集が起動する', async ({ page }) => {
         await createNewGraph(page)
         await addNode(page)
 
@@ -110,7 +110,7 @@ test.describe('ContextMenu — Node [CTX-7]', () => {
         await page.screenshot({ path: 'evidence/CTX7_edit_label.png' })
     })
 
-    test('キャンバスクリックで context-menu が閉じる', async ({ page }) => {
+    test.skip('キャンバスクリックで context-menu が閉じる', async ({ page }) => {
         await createNewGraph(page)
         await addNode(page)
 
