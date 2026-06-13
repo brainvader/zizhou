@@ -232,7 +232,7 @@ function SourceGraphViewInner({
                 edges={edgesProp}
                 onNodesChange={handleNodesChange}
                 onNodeClick={handleNodeClick}
-                onPaneContextMenu={(e) => stableOnPaneContextMenu(e)}
+                onPaneContextMenu={(e) => e instanceof MouseEvent ? undefined : stableOnPaneContextMenu(e)}
                 nodeTypes={NODE_TYPES}
                 fitView
                 fitViewOptions={{ padding: 0.2 }}

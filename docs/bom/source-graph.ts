@@ -33,7 +33,6 @@
 import type { Node as RfNode, Edge as RfEdge, NodeProps } from '@xyflow/react'
 import type { SourceContext } from '@/bom/source-context'
 import type { SourceNodeData } from '@/bom/source-node'
-import type { AnalyzedDisplay } from '@/bom/source-analysis'
 
 // re-export
 export type { AnalyzedDisplay } from '@/bom/source-analysis'
