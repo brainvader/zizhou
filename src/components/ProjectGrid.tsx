@@ -108,7 +108,7 @@ export function ProjectGrid({ onCreateProject, LinkComponent }: ProjectGridProps
                     onClick={() => setOpen(true)}
                     disabled={!isHydrated}
                     variant="outline"
-                    className="h-full min-h-[120px] border-dashed flex flex-col gap-2 items-center justify-center text-muted-foreground hover:text-foreground"
+                    className="h-full min-h-30 border-dashed flex flex-col gap-2 items-center justify-center text-muted-foreground hover:text-foreground"
                 >
                     <span>＋ new project</span>
                 </Button>
