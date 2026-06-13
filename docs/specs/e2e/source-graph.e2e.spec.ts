@@ -66,12 +66,15 @@ test.describe('SourceGraphView: Integration', () => {
     })
 
     test('SourceGraphView でノードをクリックすると FileTree の対応ファイルがハイライトされる', async ({ page }) => {
-        // FileTree の src を展開して fs-entry-main.tsx を DOM に出現させる
         await page.getByTestId('fs-entry-src').click()
         await expect(page.getByTestId('fs-entry-main.tsx')).toBeVisible()
 
-        const node = page.getByTestId('source-node-src-main.tsx')
-        await node.click()
+        // ノードをビューポート内に収める
+        await page.getByRole('button', { name: 'Fit View' }).click()
+        await page.waitForTimeout(300)
+
+        const node = page.locator('.react-flow__node').filter({ has: page.getByTestId('source-node-src-main.tsx') })
+        await node.click({ force: true })
 
         const fileEntry = page.getByTestId('fs-entry-main.tsx')
         await expect(fileEntry).toHaveAttribute('data-selected', 'true', { timeout: 3000 })
