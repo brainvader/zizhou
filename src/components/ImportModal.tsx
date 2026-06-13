@@ -86,7 +86,7 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
                         setError(null)
                     }}
                     placeholder={'{\n  "graph": {\n    "nodes": [...],\n    "edges": [...]\n  }\n}'}
-                    className="flex-1 min-h-[320px] resize-none bg-[--background] text-[--foreground] font-mono text-[11px] leading-relaxed p-4 outline-none border-none placeholder:text-[--muted-foreground]/40"
+                    className="flex-1 min-h-80 resize-none bg-[--background] text-[--foreground] font-mono text-[11px] leading-relaxed p-4 outline-none border-none placeholder:text-[--muted-foreground]/40"
                     spellCheck={false}
                 />
 
