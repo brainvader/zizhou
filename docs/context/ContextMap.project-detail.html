@@ -1,1040 +1,7 @@
-<!DOCTYPE html>
-<html lang="ja">
-    <head>
-        <meta charset="UTF-8" />
-        <title>ContextMap: 地蔵 Project Detail</title>
-
-        <!-- ============================================================
-             STACK
-             runtime:  Tauri 2
-             frontend: React 18 + TypeScript
-             bundler:  Vite
-             styling:  Tailwind CSS v4 + shadcn/ui
-             router:   TanStack Router（routing の SSOT）
-             state:    Zustand
-             persist:  SurrealDB embedded（Rust IPC 経由、RocksDB で永続化）
-             db:       SurrealDB embedded（kv-surrealkv、RocksDB 永続化）
-             testing:  Vitest + RTL + Storybook + Playwright
-             package:  pnpm
-        ============================================================ -->
-
-        <!-- ============================================================
-             GLOBAL STORE
-             routing は TanStack Router に委譲するため持たない。
-             グラフデータは SurrealDB embedded (Rust IPC) で管理する。
-             node / edge テーブルに保存し、RELATE で graph との関係を表現する。
-             activeGraphId: 現在表示中のグラフID（サイドバーで graph レコードを選択して切り替える）
-                            初期値は null（グラフ未選択）
-             activeProjectId: 現在表示中のプロジェクトID（TanStack Router の useParams から取得）
-             注意: projects[] はここでは持たない。SSOTはZustandのuseProjectStore。
-             注意: projectRootPath は不要（ファイルパス管理から SurrealDB 管理へ移行）。
-        ============================================================ -->
-        <script id="global-store" type="application/json">
-            {
-                "activeProjectId": "1",
-                "activeGraphId": null
-            }
-        </script>
-
-        <!-- ctx-file-tree のローカル状態 -->
-        <script data-context="ctx-file-tree" class="local-state" type="application/json">
-            {
-                "selectedPath": null,
-                "expandedDirs": []
-            }
-        </script>
-
-        <!-- ctx-graph-editor のローカル状態 -->
-        <script data-context="ctx-graph-editor" class="local-state" type="application/json">
-            {
-                "nodes": [],
-                "edges": [],
-                "selectedNodeId": null,
-                "selectedNodeIds": [],
-                "editingNodeId": null,
-                "runningNodeId": null
-            }
-        </script>
-
-        <!-- ctx-node-property のローカル状態
-             form: NodeProperty 内のフォームフィールド値（編集中の一時状態）
-             書き込み先は store.updateNodeData() で一本化。blur で commit。
-        -->
-        <script data-context="ctx-node-property" class="local-state" type="application/json">
-            {
-                "selectedNode": null,
-                "form": { "label": "", "description": "" }
-            }
-        </script>
-
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500&family=DM+Mono:wght@300;400&family=Outfit:wght@400;500;600;700&display=swap');
-
-            :root {
-                --background: #1c1e21;
-                --foreground: #dedad4;
-                --card: #22252a;
-                --card-foreground: #dedad4;
-                --muted: #2a2d32;
-                --muted-foreground: #707880;
-                --border: #30343a;
-                --primary: #c0392b;
-                --primary-soft: #a03020;
-                --primary-foreground: #f5ede8;
-                --primary-glow: #c0392b20;
-                --accent: #2a2d32;
-                --radius: 0.375rem;
-                --font-sans: 'Outfit', sans-serif;
-                --font-mono: 'DM Mono', monospace;
-                --font-serif: 'Noto Serif JP', serif;
-
-                --pane-file-tree-width: 220px;
-                --pane-property-width: 240px;
-                --topbar-height: 52px;
-            }
-
-            *,
-            *::before,
-            *::after {
-                box-sizing: border-box;
-                margin: 0;
-                padding: 0;
-            }
-
-            body {
-                background-color: var(--background);
-                color: var(--foreground);
-                font-family: var(--font-sans);
-                font-size: 14px;
-                line-height: 1.5;
-                height: 100vh;
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-            }
-
-            /* ── Tauri titlebar ── */
-            .titlebar {
-                height: 32px;
-                background: #161819;
-                border-bottom: 1px solid var(--border);
-                display: flex;
-                align-items: center;
-                padding: 0 14px;
-                flex-shrink: 0;
-                user-select: none;
-            }
-
-            .dots {
-                display: flex;
-                gap: 6px;
-            }
-
-            .dot {
-                width: 12px;
-                height: 12px;
-                border-radius: 50%;
-            }
-
-            .dot.r {
-                background: #ff5f57;
-            }
-
-            .dot.y {
-                background: #ffbd2e;
-            }
-
-            .dot.g {
-                background: #28c840;
-            }
-
-            /* ── CTX-TOPBAR ── */
-            #ctx-topbar {
-                height: var(--topbar-height);
-                background: var(--card);
-                border-bottom: 1px solid var(--border);
-                display: flex;
-                align-items: center;
-                padding: 0 16px;
-                gap: 8px;
-                flex-shrink: 0;
-            }
-
-            .logo {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .logo-kanji {
-                font-family: var(--font-serif);
-                font-size: 20px;
-                font-weight: 300;
-                color: var(--foreground);
-                letter-spacing: 0.05em;
-            }
-
-            .logo-sep {
-                width: 1px;
-                height: 20px;
-                background: var(--border);
-            }
-
-            .logo-sub {
-                display: flex;
-                flex-direction: column;
-                gap: 1px;
-            }
-
-            .logo-romaji {
-                font-family: var(--font-mono);
-                font-size: 11px;
-                color: var(--foreground);
-                letter-spacing: 0.15em;
-            }
-
-            .logo-ver {
-                font-family: var(--font-mono);
-                font-size: 9px;
-                color: var(--muted-foreground);
-                letter-spacing: 0.1em;
-            }
-
-            .breadcrumb-sep {
-                color: var(--border);
-                font-size: 16px;
-                margin: 0 4px;
-            }
-
-            .breadcrumb-project {
-                font-family: var(--font-mono);
-                font-size: 11px;
-                color: var(--muted-foreground);
-                letter-spacing: 0.1em;
-            }
-
-            .topbar-spacer {
-                flex: 1;
-            }
-
-            .btn-ghost {
-                background: transparent;
-                color: var(--muted-foreground);
-                width: 32px;
-                height: 32px;
-                font-size: 16px;
-                border: 1px solid transparent;
-                border-radius: var(--radius);
-                cursor: pointer;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .btn-ghost:hover {
-                background: var(--accent);
-                color: var(--foreground);
-                border-color: var(--border);
-            }
-
-            /* ── 3ペインレイアウト ── */
-            .workspace {
-                flex: 1;
-                display: flex;
-                overflow: hidden;
-            }
-
-            /* ── CTX-1: FILE TREE ── */
-            #ctx-file-tree {
-                width: var(--pane-file-tree-width);
-                flex-shrink: 0;
-                background: var(--card);
-                border-right: 1px solid var(--border);
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-            }
-
-            .pane-header {
-                height: 36px;
-                display: flex;
-                align-items: center;
-                padding: 0 12px;
-                border-bottom: 1px solid var(--border);
-                flex-shrink: 0;
-            }
-
-            .pane-title {
-                font-family: var(--font-mono);
-                font-size: 9px;
-                color: var(--muted-foreground);
-                letter-spacing: 0.2em;
-                text-transform: uppercase;
-            }
-
-            .file-tree {
-                flex: 1;
-                overflow-y: auto;
-                padding: 8px 0;
-            }
-
-            .tree-item {
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                padding: 3px 12px;
-                font-size: 12px;
-                color: var(--muted-foreground);
-                cursor: pointer;
-                user-select: none;
-            }
-
-            .tree-item:hover {
-                background: var(--muted);
-                color: var(--foreground);
-            }
-
-            .tree-item.selected {
-                background: var(--muted);
-                color: var(--foreground);
-            }
-
-            .tree-item.dir {
-                color: var(--foreground);
-            }
-
-            .tree-item.depth-1 {
-                padding-left: 24px;
-            }
-
-            .tree-item.depth-2 {
-                padding-left: 36px;
-            }
-
-            .tree-icon {
-                font-size: 11px;
-                width: 14px;
-                text-align: center;
-                flex-shrink: 0;
-            }
-
-            /* ── CTX-2: GRAPH EDITOR ── */
-            #ctx-graph-editor {
-                flex: 1;
-                background: var(--background);
-                position: relative;
-                overflow: hidden;
-            }
-
-            .graph-canvas {
-                width: 100%;
-                height: 100%;
-                position: relative;
-            }
-
-            .graph-toolbar {
-                position: absolute;
-                top: 12px;
-                left: 12px;
-                display: flex;
-                gap: 6px;
-                z-index: 10;
-            }
-
-            .btn-tool {
-                background: var(--card);
-                border: 1px solid var(--border);
-                color: var(--muted-foreground);
-                border-radius: var(--radius);
-                padding: 6px 12px;
-                font-family: var(--font-mono);
-                font-size: 11px;
-                cursor: pointer;
-                display: inline-flex;
-                align-items: center;
-                gap: 6px;
-            }
-
-            .btn-tool:hover {
-                color: var(--foreground);
-                border-color: var(--primary);
-            }
-
-            /* ノード */
-            .mock-node {
-                position: absolute;
-                background: var(--card);
-                border: 1px solid var(--border);
-                border-radius: var(--radius);
-                padding: 10px 14px;
-                min-width: 140px;
-                cursor: grab;
-            }
-
-            .mock-node:hover {
-                border-color: #3e4248;
-            }
-
-            .mock-node.selected {
-                border-color: var(--primary);
-                box-shadow: 0 0 12px var(--primary-glow);
-            }
-
-            .mock-node.selected::before {
-                content: '';
-                position: absolute;
-                left: 0;
-                top: 10px;
-                bottom: 10px;
-                width: 2px;
-                background: var(--primary);
-                border-radius: 1px;
-                opacity: 0.7;
-            }
-
-            .mock-node.multi-selected {
-                border-color: var(--primary-soft);
-                box-shadow: 0 0 8px var(--primary-glow);
-                opacity: 0.85;
-            }
-
-            .mock-node.editing {
-                border-color: var(--primary);
-                box-shadow: 0 0 0 2px var(--primary-glow);
-            }
-
-            .node-inline-input {
-                background: transparent;
-                border: none;
-                outline: none;
-                font-size: 12px;
-                font-weight: 600;
-                color: var(--card-foreground);
-                width: 100%;
-                font-family: var(--font-sans);
-            }
-
-            .node-label {
-                font-size: 12px;
-                font-weight: 600;
-                color: var(--card-foreground);
-                padding-left: 8px;
-            }
-
-            .node-desc {
-                font-size: 11px;
-                color: var(--muted-foreground);
-                padding-left: 8px;
-                margin-top: 3px;
-            }
-
-            /* [CTX-14] ノード実行ボタン */
-            .node-run-btn {
-                display: inline-flex;
-                align-items: center;
-                gap: 4px;
-                margin-top: 6px;
-                margin-left: 6px;
-                padding: 2px 8px;
-                font-size: 10px;
-                font-family: var(--font-mono);
-                color: var(--primary);
-                background: transparent;
-                border: 1px solid var(--primary);
-                border-radius: var(--radius);
-                cursor: pointer;
-                opacity: 0.7;
-            }
-
-            .node-run-btn:hover {
-                opacity: 1;
-                box-shadow: 0 0 6px var(--primary-glow);
-            }
-
-            .node-run-btn.running {
-                color: var(--muted-foreground);
-                border-color: var(--border);
-                pointer-events: none;
-                animation: spin 1s linear infinite;
-            }
-
-            @keyframes spin {
-                from {
-                    opacity: 0.3;
-                }
-
-                50% {
-                    opacity: 1;
-                }
-
-                to {
-                    opacity: 0.3;
-                }
-            }
-
-            /* ハンドル */
-            .handle {
-                width: 8px;
-                height: 8px;
-                background: var(--border);
-                border-radius: 50%;
-                position: absolute;
-                border: 1px solid var(--muted-foreground);
-            }
-
-            .handle.right {
-                right: -4px;
-                top: 50%;
-                transform: translateY(-50%);
-            }
-
-            .handle.left {
-                left: -4px;
-                top: 50%;
-                transform: translateY(-50%);
-            }
-
-            /* 空状態 */
-            .graph-empty {
-                position: absolute;
-                inset: 0;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                gap: 8px;
-                opacity: 0.3;
-                pointer-events: none;
-            }
-
-            .graph-empty-text {
-                font-family: var(--font-mono);
-                font-size: 11px;
-                color: var(--muted-foreground);
-                letter-spacing: 0.12em;
-            }
-
-            /* [CTX-7] コンテキストメニュー */
-            .context-menu {
-                position: absolute;
-                background: var(--card);
-                border: 1px solid var(--border);
-                border-radius: var(--radius);
-                padding: 4px 0;
-                min-width: 140px;
-                z-index: 100;
-                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-            }
-
-            .context-menu-item {
-                padding: 6px 12px;
-                font-size: 12px;
-                font-family: var(--font-mono);
-                color: var(--muted-foreground);
-                cursor: pointer;
-            }
-
-            .context-menu-item:hover {
-                background: var(--muted);
-                color: var(--foreground);
-            }
-
-            .context-menu-item.danger:hover {
-                color: var(--primary);
-            }
-
-            /* ── CTX-8: NODE TYPE ── */
-            .node-type-badge {
-                font-size: 9px;
-                font-family: var(--font-mono);
-                color: var(--muted-foreground);
-                margin-bottom: 2px;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-            }
-
-            .mock-node.node-type-git {
-                border-color: #27ae60;
-            }
-
-            .mock-node.node-type-llm {
-                border-color: #8e44ad;
-            }
-
-            .mock-node.node-type-validate {
-                border-color: #2980b9;
-            }
-
-            .mock-node.node-type-analyze {
-                border-color: #f39c12;
-            }
-
-            .mock-node.node-type-custom {
-                border-color: var(--border);
-            }
-
-            .mock-node.node-status-doing {
-                box-shadow: 0 0 8px var(--primary);
-            }
-
-            .mock-node.node-status-done {
-                opacity: 0.4;
-            }
-
-            /* ── CTX-3: NODE PROPERTY ── */
-            #ctx-node-property {
-                width: var(--pane-property-width);
-                flex-shrink: 0;
-                background: var(--card);
-                border-left: 1px solid var(--border);
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-            }
-
-            .property-body {
-                flex: 1;
-                overflow-y: auto;
-                padding: 12px;
-                display: flex;
-                flex-direction: column;
-                gap: 12px;
-            }
-
-            .property-empty {
-                flex: 1;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                opacity: 0.3;
-            }
-
-            .property-empty-text {
-                font-family: var(--font-mono);
-                font-size: 10px;
-                color: var(--muted-foreground);
-                letter-spacing: 0.12em;
-            }
-
-            .property-field {
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-            }
-
-            .property-label {
-                font-family: var(--font-mono);
-                font-size: 9px;
-                color: var(--muted-foreground);
-                letter-spacing: 0.15em;
-                text-transform: uppercase;
-            }
-
-            .property-input {
-                font-size: 12px;
-                color: var(--foreground);
-                background: var(--muted);
-                border: 1px solid var(--border);
-                border-radius: var(--radius);
-                padding: 6px 8px;
-                font-family: var(--font-sans);
-                width: 100%;
-                outline: none;
-            }
-
-            .property-input:focus {
-                border-color: var(--primary);
-                box-shadow: 0 0 0 2px var(--primary-glow);
-            }
-
-            .property-textarea {
-                font-size: 12px;
-                color: var(--foreground);
-                background: var(--muted);
-                border: 1px solid var(--border);
-                border-radius: var(--radius);
-                padding: 6px 8px;
-                font-family: var(--font-sans);
-                resize: vertical;
-                min-height: 80px;
-                width: 100%;
-                outline: none;
-            }
-
-            .property-textarea:focus {
-                border-color: var(--primary);
-                box-shadow: 0 0 0 2px var(--primary-glow);
-            }
-
-            .property-error {
-                font-size: 10px;
-                color: var(--primary);
-                font-family: var(--font-mono);
-            }
-        </style>
-    </head>
-    <body>
-
-        <!-- Tauri titlebar -->
-        <div class="titlebar">
-            <div class="dots">
-                <div class="dot r"></div>
-                <div class="dot y"></div>
-                <div class="dot g"></div>
-            </div>
-        </div>
-
-        <!-- ============================================================
-             CTX-TOPBAR [✓]
-             責務: アプリ識別・グローバルアクション（Settings）・パンくずナビ
-        ============================================================ -->
-        <header id="ctx-topbar">
-            <div class="logo">
-                <span class="logo-kanji">地蔵</span>
-                <div class="logo-sep"></div>
-                <div class="logo-sub">
-                    <span class="logo-romaji">Zizou</span>
-                    <span class="logo-ver">Protocol v8.10</span>
-                </div>
-            </div>
-            <span class="breadcrumb-sep">/</span>
-            <span class="breadcrumb-project">zizou-core</span>
-            <div class="topbar-spacer"></div>
-            <button class="btn-ghost" title="Settings">⚙</button>
-            <!--
-                [✓][Feature] Settings — アイコンボタンクリックで Settings ダイアログを開く
-                [✓][Logic]   Open Dialog — onSettingsClick コールバック経由で isSettingsOpen を true にする
-            -->
-        </header>
-
-        <div class="workspace">
-
-            <!-- ============================================================
-                 CTX-1: FILE TREE [ ]
-                 責務: プロジェクトのファイルツリーを表示し、グラフファイルの選択・新規作成のエントリーポイントを提供する
-                 注意: SurrealDB の graph テーブルからグラフ一覧を取得して表示する
-                       選択時に activeGraphId を更新し、GraphEditor がグラフを読み込む
-            ============================================================ -->
-            <nav id="ctx-file-tree">
-                <div class="pane-header">
-                    <span class="pane-title">Explorer</span>
-                </div>
-                <div class="file-tree">
-                    <div class="tree-item dir"><span class="tree-icon">▼</span> graphs</div>
-                    <div class="tree-item depth-1 selected"><span class="tree-icon">◦</span> main.json</div>
-                    <div class="tree-item depth-1"><span class="tree-icon">◦</span> feature-x.json</div>
-                    <div class="tree-item dir"><span class="tree-icon">▶</span> src</div>
-                </div>
-                <!--
-                    [✓][Feature] Graph List Display  — invoke('list_graphs', { projectId }) で SurrealDB から graphs[] を取得し一覧表示する
-                    [✓][Feature] Graph Select       — グラフクリックで activeGraphId を更新しグラフを切り替える
-                    [✓][Feature] New Graph          — 「＋」ボタンで invoke('create_graph', { projectId }) を呼び新規グラフを作成する
-                    [✓][Logic]   SurrealDB Load     — invoke('list_graphs') で project -[has_graph]-> graph を辿り取得する
-                    [✓][Logic]   activeGraphId Sync — グラフ選択時に useProjectDetailStore の activeGraphId を更新する
-                -->
-            </nav>
-
-            <!-- ============================================================
-                 CTX-2: GRAPH EDITOR [✓]
-                 責務: グラフの表示・編集・ノード実行を担う中心エリア
-
-                 実装メモ:
-                 [CTX-11] Root Layout: [✓]
-                       __root.tsx を作成し loadProjects() をルートレイアウトに移動した
-
-                 [CTX-12] ProjectDetail Store の永続化: [ ] ← SurrealDB 移行により再実装
-                       activeGraphId は SurrealDB embedded で管理する（Tauri fs JSON 廃止）
-                       useProjectDetailLoad / useProjectDetailSave は invoke() ベースに置き換える
-                       projectRootPath は不要（SurrealDB がプロジェクトデータを管理するため）
-
-                 [CTX-15] Graph Persist (SurrealDB): [✓]
-                       グラフのノード・エッジを SurrealDB に永続化する。
-                       useGraphFile（Tauri fs 依存）を廃止し、以下の invoke に移行する。
-
-                       save_graph:
-                         invoke('save_graph', { graphId, nodes, edges })
-                         → SurrealDB の node / edge テーブルに UPSERT する
-                         → graph -[has_node]-> node / graph -[has_edge]-> edge の RELATE を張る
-                         → useGraphFile の subscribe ベースの自動保存と同等の挙動を維持する
-
-                       load_graph:
-                         invoke('load_graph', { graphId })
-                         → SurrealDB から nodes[] / edges[] を取得して GraphFile 形式で返す
-                         → useGraphInit（Tauri fs 依存）を廃止し useGraphLoad hook に置き換える
-                         → activeGraphId が変化するたびに呼び出す
-            ============================================================ -->
-            <main id="ctx-graph-editor">
-                <div class="graph-canvas">
-
-                    <div class="graph-toolbar">
-                        <button class="btn-tool">＋ ノード追加</button>
-                    </div>
-
-                    <!-- 通常ノード（単一選択済み）: service なし → Run ボタン非表示 -->
-                    <div class="mock-node selected" style="top:80px;left:120px;">
-                        <div class="handle left"></div>
-                        <div class="node-label">ProjectGrid.tsx</div>
-                        <div class="node-desc">カードグリッド表示</div>
-                        <div class="handle right"></div>
-                    </div>
-
-                    <!-- [CTX-8/9] カタログ紐付きノード（service=git）: Run ボタン表示 -->
-                    <div class="mock-node node-type-git" style="top:80px;left:340px;">
-                        <div class="handle left"></div>
-                        <div class="node-type-badge">git</div>
-                        <div class="node-label">Git Status</div>
-                        <!-- [CTX-14] service 付きノードの Run ボタン -->
-                        <button class="node-run-btn">▶ Run</button>
-                        <div class="handle right"></div>
-                    </div>
-
-                    <!-- [CTX-14] 実行中ノード（status=doing）: スピナー表示 -->
-                    <div class="mock-node node-type-git node-status-doing" style="top:200px;left:340px;">
-                        <div class="handle left"></div>
-                        <div class="node-type-badge">git</div>
-                        <div class="node-label">Git Commit</div>
-                        <button class="node-run-btn running">⟳ Running…</button>
-                        <div class="handle right"></div>
-                    </div>
-
-                    <!-- [CTX-5] 複数選択中ノード -->
-                    <div class="mock-node multi-selected" style="top:240px;left:120px;">
-                        <div class="handle left"></div>
-                        <div class="node-label">useProjectStore</div>
-                        <div class="handle right"></div>
-                    </div>
-
-                    <!-- [CTX-6] エッジ（接続済み） -->
-                    <svg style="position:absolute;inset:0;pointer-events:none;">
-                        <line x1="268" y1="110" x2="340" y2="110" stroke="#c0392b" stroke-width="1.5" opacity="0.4" />
-                    </svg>
-
-                    <!-- [CTX-7] コンテキストメニュー（ノード右クリック後） -->
-                    <div class="context-menu" style="top:100px;left:480px;">
-                        <div class="context-menu-item">Edit Label</div>
-                        <div class="context-menu-item">SET TYPE ▸</div>
-                        <div class="context-menu-item danger">Delete Node</div>
-                    </div>
-
-                </div>
-
-                <!--
-                    [✓][Feature] Node Add           — 「＋ ノード追加」ボタンでノードをキャンバスに追加できる
-                    [✓][Feature] Node Move          — ノードをドラッグで移動できる
-                    [✓][Feature] Node Select        — ノードをクリックで単一選択できる
-                    [✓][Feature] Empty State        — nodes[] が空のとき「ノードを追加してください」を表示する
-                    [✓][Feature] Node Inline Edit   — ノードダブルクリックでインライン編集できる
-                    [✓][Logic]   EditableNode       — ReactFlow の nodeTypes に登録した EditableNode で描画する
-                                                      EditableNode の isEditing は prop で外部制御する（GraphEditor → editingNodeId 経由）
-
-                    [✓][Feature] Multi Select       — Shift+クリックまたはドラッグで複数ノードを選択できる
-                    [✓][Logic]   selectedNodeIds    — onSelectionChange で selectedNodeIds[] を store に反映する
-
-                    [✓][Feature] Edge Connect       — ノードのハンドルをドラッグして接続できる
-                    [✓][Feature] Edge Delete        — エッジを選択して Delete キーで削除できる
-                    [✓][Logic]   onConnect          — ReactFlow の onConnect で addEdge() を呼び store に反映する
-                    [✓][Logic]   onEdgesChange      — remove イベントを store に反映する
-                    [✓][Logic]   Edge Persist       — edges[] の変化を既存の subscribe で自動保存する（追加実装不要）
-
-                    [✓][Feature] Node Context Menu  — ノード右クリックでコンテキストメニューを表示する
-                    [✓][Feature] Menu: Delete Node  — メニューから選択中ノードを削除できる
-                    [✓][Feature] Menu: Edit Label   — メニューからインライン編集を起動できる
-                    [✓][Feature] Edge Context Menu  — エッジ右クリックでコンテキストメニューを表示する
-                    [✓][Feature] Menu: Delete Edge  — メニューからエッジを削除できる
-                    [✓][Logic]   Context Menu State — contextMenu: { type, id, x, y } | null を useState で管理する
-                    [✓][Logic]   Close on Pane Click — キャンバスクリックでメニューを閉じる
-
-                    [✓][Feature] Node Type Select   — 右クリックメニューからノードのタイプを選択できる
-                    [✓][Feature] Node Type Color    — タイプに応じてノードの色が変わる（git=緑 / validate=青 / analyze=黄 / llm=紫 / custom=グレー）
-                    [✓][Feature] Node Status        — ノードにステータスを持つ（todo / doing / done）
-                    [✓][Feature] Node Status Visual — ステータスに応じてノードの見た目が変わる（done=薄くなる / doing=ハイライト）
-                    [✓][Logic]   GraphNodeData Update — nodeType / status を GraphNodeData に追加する
-
-                    [✓][CTX-9][Feature]  Catalog Panel       — グラフエディタ内にカタログパネルを表示する
-                    [✓][CTX-9][Feature]  Catalog Node Add    — カタログからノードをグラフに追加できる
-                    [✓][CTX-9][Feature]  Catalog List        — カテゴリ別にカタログ一覧を表示する（git / validate / analyze / llm / custom）
-                    [✓][CTX-9][Feature]  Catalog Search      — useCatalogSearch(query) で filter() インクリメンタルサーチ
-                    [✓][CTX-9][Logic]    Catalog Data        — NODE_CATALOG 定数として BOM にハードコードする（SurrealDB は CTX-13）
-
-                    [✓][CTX-10][Feature] Graph Export        — グラフ+カタログをJSONでエクスポートする（クリップボード / ファイル保存）
-                    [✓][CTX-10][Feature] Graph Import        — LLMが返したJSONをグラフに反映する
-                    [✓][CTX-10][Logic]   TODO Integration    — status=doing が現在タスク / status=done が完了タスク
-                    [✓][CTX-10][Logic]   LLM Knowledge Format — { graph: { nodes, edges }, catalog: [...] } 形式でエクスポートする
-                    [✓][CTX-10][Logic]   Edge Mapping        — edges に mapping 定義を追加（source.output → target.input）
-
-                    [✓][CTX-13][Feature] Vector Search       — "コードをレビューしたい" → 類似ノードを発見できる
-                    [✓][CTX-13][Logic]   SurrealDB Schema    — node_catalog テーブル + HNSW インデックスを定義する
-                    [✓][CTX-13][Logic]   Node INSERT         — ノード定義を SurrealDB に直接 INSERT する（TOML 不要）
-                    [✓][CTX-13][Logic]   useCatalogSearch    — 内部実装を SurrealDB クエリに差し替える（UI 変更不要）
-                    [✓][CTX-13][Logic]   Tauri コマンド      — catalog_get_all / catalog_search / execute_node を実装する
-                    [✓][CTX-13][Logic]   Import Validation   — インポート時にZodでJSONを検証する
-
-                    [✓][CTX-14][Feature] Node Run Button     — service 付きノードに「▶ Run」ボタンを表示する
-                                                               service が null のノードにはボタンを表示しない
-                    [✓][CTX-14][Feature] Run Status Visual   — 実行中（runningNodeId === nodeId）はボタンが「⟳ Running…」になり非活性になる
-                    [✓][CTX-14][Feature] Status Transition   — 実行開始で status が doing になり、完了で done になる
-                    [✓][CTX-14][Feature] Error Toast         — 実行失敗時に sonner toast.error() でエラーを表示する
-                    [✓][CTX-14][Logic]   useNodeExecute      — invoke('execute_node', { service, provider, cwd, input }) を呼ぶ hook
-                                                               cwd は activeProject.root_path から取得する（projects.html CTX-16 参照）
-                                                               開始: updateNodeData({ status: 'doing' })
-                                                               成功: updateNodeData({ status: 'done' })
-                                                               失敗: updateNodeData({ status: 'todo' }) + toast.error()
-                    [✓][CTX-14][Logic]   Run Button DI       — EditableNode に onRun?: () => void prop を追加（props DI）
-                                                               省略時は何もしない（テスト・Storybook で差し替え可能）
-                    [✓][CTX-14][Logic]   GraphEditor Wire    — useNodeExecute を GraphEditor でマウントし、
-                                                               nodeTypes の editableNode に onRun を注入する
-
-                    [✓][CTX-15][Feature] Graph Save         — ノード・エッジの変化を invoke('save_graph') で SurrealDB に自動保存する
-                    [✓][CTX-15][Feature] Graph Load         — activeGraphId 変化時に invoke('load_graph') でグラフを読み込む
-                    [✓][CTX-15][Logic]   useGraphLoad       — useGraphInit を置き換える SurrealDB ベースの hook
-                    [✓][CTX-15][Logic]   useGraphSave       — useGraphFile を置き換える SurrealDB ベースの hook（subscribe + invoke）
-                    [✓][CTX-15][Logic]   Rust Commands      — save_graph / load_graph コマンドを lib.rs に追加する
-                                                              node テーブル: { id, graph_id, label, node_type, status, service, provider, input, position_x, position_y }
-                                                              edge テーブル: { id, graph_id, source, target }
-                -->
-            </main>
-
-            <!-- ============================================================
-                 CTX-3: NODE PROPERTY [✓]
-                 責務: 選択中ノードの label・description を編集するフォームを提供する
-                 注意: selectedNodeIds.length !== 1 のとき（未選択・複数選択）は非表示にする
-            ============================================================ -->
-            <aside id="ctx-node-property">
-                <div class="pane-header">
-                    <span class="pane-title">Properties</span>
-                </div>
-
-                <!-- ノード単一選択中: 編集フォーム -->
-                <div class="property-body">
-                    <div class="property-field">
-                        <span class="property-label">name</span>
-                        <input class="property-input" type="text" value="Git Status" />
-                    </div>
-                    <div class="property-field">
-                        <span class="property-label">description</span>
-                        <textarea class="property-textarea">ワーキングツリーの状態を確認する。</textarea>
-                    </div>
-                </div>
-
-                <!--
-                    [✓][Feature] Property Display  — 選択中ノードの name・description を表示する
-                    [✓][Feature] Empty State       — selectedNodeId が null のとき何も表示しない
-                    [✓][Feature] Label Edit        — name フィールドを <input> で編集できる
-                    [✓][Feature] Desc Edit         — description フィールドを <textarea> で編集できる
-                    [✓][Logic]   Blur Commit       — blur で store.updateNodeData() に commit する
-                    [✓][Logic]   Form Reset        — selectedNodeId 変化時にフォームを store の値で reset する
-                    [✓][Logic]   Validation        — label が空のとき commit せずエラーを表示する（Zod min(1)）
-                    [✓][Logic]   onUpdateNode      — 確定時に呼ぶコールバック prop（props DI）
-                                                     省略時は store.updateNodeData() に直接 commit する
-                    [✓][Feature] Hide on Multi Select — 複数ノード選択中は NodeProperty を非表示にする
-                    [✓][Logic]   Visibility Guard     — selectedNodeIds.length !== 1 のとき null を返す
-                -->
-            </aside>
-
-        </div>
-
-
-        <!-- ============================================================
-            CTX-21: PROJECT STRUCTURE GRAPH [✓]
-            責務: プロジェクトのファイル間依存関係をグラフとして可視化する
-
-            背景:
-            LLMチャットで生成したコードをFileTreeに追加し、
-            Zizouが静的解析してグラフに登録する。
-            1プロジェクト = 1構造グラフ。
-            SurrealDBが唯一のSSOT（Single Source of Truth）。
-
-            アーキテクチャ（フロントエンド）:
-            SurrealDB
-                ↑↓
-            GraphStorage            ← Tauriコマンドのラッパー（Props DIで差し替え可能）
-                ↑↓
-            useGraphStore           ← ReactFlow用キャッシュ + ビジネスロジック
-                ↑↓
-            ReactFlow               ← 表示・インタラクションのみ
-
-            - useGraphStore は GraphEditor 内部で閉じる
-            - GraphEditor 外部との共有が必要な状態は URL パラメータか SurrealDB で管理
-            - Zustand による外部共有ストアは作らない
-            - GraphStorage を Props DI で注入することで Storybook / E2E でモック可能
-
-            マイクロサービス方針:
-            フロントエンド層は責務ごとに独立したサービスに分離する。
-            GraphStorage はその第一弾でストレージ層のみを担当する。
-                GraphStorage   — SurrealDB の graph / node / edge の CRUD（今回実装）
-                AnalyzeService — tree-sitter 解析の起動（analyze_file / analyze_project）
-                VcsService     — Git 等の VCS 操作（get_changed_files 等）
-            将来リモートDBや別解析エンジンに差し替える際は当該サービスのみを書き換える。
-
-            GraphStorage API:
-            type GraphStorage = {
-                // Graph CRUD
-                listGraphs:        (projectId: string) => Promise<GraphListItem[]>
-                createGraph:       (projectId: string, name: string) => Promise<GraphListItem>
-
-                // Workflow Graph Persist (CTX-15 由来)
-                saveGraph:         (graphId: string, nodes: Node<GraphNodeData>[], edges: Edge[]) => Promise<void>
-                loadGraph:         (graphId: string) => Promise<GraphFile>
-
-                // Structure Graph (リードのみ — 解析は AnalyzeService)
-                getStructureGraph: (projectId: string) => Promise<GraphFile>
-            }
-            defaultGraphStorage を実装として export する。
-            テスト/Storybook では Partial<GraphStorage> で部分上書き可能とする。
-
-            データモデル（CTX-21 実装済み）:
-            graph テーブルに kind: 'workflow' | 'structure' を追加 [済]
-            node  テーブルに file_path / analyzed: 'fresh' | 'stale' | 'pending' / position_x / position_y を追加 [済]
-            edge  テーブルに kind: 'imports' | 'renders' を追加 [済]
-
-            VCS抽象化（Rust）:
-            変更ファイル検知は VcsProvider trait で抽象化し初期実装は Git。
-            将来 Mercurial / Fossil 等への差し替えを可能にする。 [済]
-
-            Tauri コマンド（実装済み）:
-            get_structure_graph(project_id)       [済]
-                → kind='structure' のグラフを返す（なければ作成）
-            analyze_file(project_id, file_path)   [済]
-                → 単一ファイルを tree-sitter で解析し node / edge を UPSERT
-            analyze_project(project_id)           [済]
-                → rootPath 配下の全ファイルを一括解析
-            get_changed_files(root_path)          [済]
-                → VcsProvider 経由で変更ファイル一覧を返す（初期実装: git diff --name-only HEAD）
-
-            フロントエンド構成:
-              docs/bom/source-graph.ts            — SourceGraph / SourceNode / SourceNodeData 型定義
-              src/components/SourceGraphView.tsx   — ReactFlowProvider 付きグラフ描画コンポーネント
-              src/components/nodes/SourceNode.tsx  — stale/fresh/pending 表示・↺ボタン
-              src/routes/projects.$id.tsx          — 中央ペインに SourceGraphView を配置
-
-            スコープ外（将来の CTX）:
-            ファイル保存時のリアルタイム自動解析（notify クレート）
-            データフローシミュレーション
-            型情報の解決（TSコンパイラAPI）
-
-            ── 実装スコープ ──────────────────────────────────────────
-            [✓][Logic]   GraphStorage Type   — docs/bom/graph.ts に GraphStorage 型を追加する
-            [✓][Logic]   GraphStorage Impl   — src/services/GraphStorage.ts に defaultGraphStorage を実装する
-            [✓][Logic]   useGraphLoad Wire   — useGraphLoad を storage?: Pick<GraphStorage,'loadGraph'> 経由に書き換える
-            [✓][Logic]   useGraphSave Wire   — useGraphSave を storage?: Pick<GraphStorage,'saveGraph'> 経由に書き換える
-            [✓][Logic]   DB Schema           — graph/node/edge テーブルに kind / file_path / analyzed / position フィールドを追加
-            [✓][Logic]   VcsProvider         — trait で VCS 操作を抽象化し Git 実装を追加する
-            [✓][Logic]   get_changed_files   — git diff --name-only HEAD で変更ファイル一覧を返す
-            [✓][Logic]   get_structure_graph — project に紐づく structure グラフを取得（なければ作成）
-            [✓][Logic]   analyze_file        — tree-sitter で imports を抽出し node / edge を UPSERT する
-            [✓][Logic]   analyze_project     — rootPath 配下の全ファイルを一括解析する
-            [✓][Feature] Stale Highlight     — 変更ファイルに対応するノードを stale としてハイライト表示する
-            [✓][Feature] Reanalyze Button    — 個別ノードの「再解析」ボタンで analyze_file を呼び出す
-            [✓][Feature] Reanalyze All       — 「全体を再解析」ボタンで analyze_project を呼び出す
-            [✓][Feature] File↔Node Sync      — FileTree のファイルクリックとグラフノードを双方向でハイライトする
-            [ ][Feature] Position Persist    — ノード位置を SurrealDB に永続化し再読み込み時に復元する（実装済み / E2E 確認 skip 中）
-        ============================================================ -->
-
-
-        <!-- ============================================================
+<!-- ============================================================
             CTX-22: SOURCE CONTEXT [ ]
-            責務: SourceGraph 上でファイルのグループ（SourceContext）を定義・永続化し、
-                  コンテクスト境界を視覚的に表示する
+            責務: Vitest テストファイルを解析し、SourceGraph 上にテストコンテキストを
+                  Subflow として自動表示する
 
             背景:
               LLM 支援コーディングでは「このファイル群の範囲で開発を閉じる」という
@@ -1044,68 +11,174 @@
               - 変更の影響範囲が明確になる
               - コンテクスト境界自体が LLM への情報になる
 
-            SourceContext とは:
-              SourceGraph 上のノード集合に名前を付けたもの。
-              「このファイル群はひとまとまりの責務を持つ」という人間の意図を表現する。
-              データフロー（Subflow）ではなく、構造的グループ分け。
+            コンテキストの定義:
+              手動定義ではなく Vitest テストファイルから自動導出する。
+              テストファイルの import 群 = コンテキストのスコープ（関与ファイル群）
+              describe 名              = コンテキスト名（Subflow のラベル）
 
-            命名規則:
-              SourceContext     — データ型・DB テーブル（source_context）・Rust 構造体
-              SourceContextView — ReactFlow 上の Subflow コンテナコンポーネント
+              例:
+                // FileTree.test.ts
+                import { FileTree } from '@/components/FileTree'   ← スコープ
+                import { useStore } from '@/hooks/useStore'         ← スコープ
 
-            データモデル（SurrealDB）:
-              DEFINE TABLE source_context SCHEMALESS;
-              フィールド:
-                id:         record id（source_context:xxx）
-                name:       string        — ユーザーが付ける名前
-                project_id: ref → project — 所属プロジェクト
-                node_ids:   string[]      — 含まれる SourceNode の id 集合
+                describe('FileTree → SourceGraph 連携', () => {   ← コンテキスト名
+                    it('ファイルをクリックすると選択される', () => { ... })
+                })
+
+              テストノードをクリック
+                → import 解析済みの依存ノード群が Subflow で囲まれる
+                → describe 名が Subflow ラベルになる
+
+            テストとコンテキストの対応:
+              describe = コンテキスト（どのノード群が関与するか = Subflow の範囲）
+              it       = シナリオのステップ（CTX-23 でエッジアニメーションに対応）
+
+            1ファイル複数 describe の扱い:
+              ファイルトップレベルの import は全 describe で共有される。
+              describe 単位のスコープ絞り込みは静的解析では不可能なため、
+              ファイル単位の import 群をコンテキストのスコープとする。
+              1ファイル1describe を推奨規約とするが強制はしない。
+
+            SurrealDB データモデル:
+              test_file テーブル（SCHEMALESS）
+                id
+                project_id
+                file_path           — rootPath 相対パス
+
+              test_suite テーブル（SCHEMALESS）← describe に対応
+                id
+                test_file_id
+                parent_suite_id     — ネスト describe 対応（null = トップレベル）
+                name                — describe の第一引数
+                node_ids[]          — import から解決した SourceNode の id 集合
+
+              test_case テーブル（SCHEMALESS） ← it / test に対応
+                id
+                suite_id
+                name                — it の第一引数
+                order               — ファイル内の定義順
 
             Rust コマンド（新規）:
-              create_context(project_id, name, node_ids) → SourceContext
-              list_contexts(project_id)                  → SourceContext[]
-              update_context(context_id, name, node_ids) → SourceContext
-              delete_context(context_id)                 → void
+              analyze_tests(project_id)
+                → *.test.ts / *.spec.ts を tree-sitter で解析
+                → test_file / test_suite / test_case を UPSERT
+              list_test_suites(project_id) → TestSuite[]
+              list_test_cases(suite_id)    → TestCase[]
 
             フロントエンド構成:
-              docs/bom/source-context.ts           — SourceContext / SourceContextViewProps 型定義
-              src/components/SourceContextView.tsx  — Subflow コンテナ（ReactFlow parentId 方式）
-              SourceGraphView に統合: contexts prop を受け取り Subflow として重ねて表示
+              docs/bom/source-context.ts           — SourceContext 型 / 座標計算関数（実装済み）
+              src/components/nodes/SourceContextContainer.tsx — Subflow コンテナ（実装済み）
+              src/components/SourceGraphView.tsx   — contexts prop で Subflow 表示（実装済み）
+              src/services/TestStorage.ts          — analyze_tests / list_test_suites ラッパー
 
             視覚表現:
-              - SourceContext に属するノードは Subflow コンテナ（parentId）の子になる
-              - コンテナには名前ラベルを表示
-              - コンテクスト境界をまたぐエッジ（境界エッジ）を amber でハイライト
-              - コンテクスト内エッジはデフォルトスタイル
+              - テストノード（*.test.ts）は通常の SourceNode と色分けして表示
+              - テストノードをクリック → 依存ノード群が Subflow で囲まれる
+              - Subflow ラベルは describe 名
+              - ネスト describe は Subflow のネストで表現
 
-            レイアウト:
-              中央ペイン（SourceGraphView）内に Subflow コンテナを重ねて表示。
-              サイドバー（FileTree ペイン下部）に SourceContext 一覧を追加。
-
-            Context 作成フロー:
-              1. SourceGraphView でノードを複数選択（Shift+クリック）
-              2. 「Create Context」ボタンを押す（ツールバーに追加）
-              3. 名前入力ダイアログ → 確定 → SurrealDB に保存 → Subflow 表示
-
-            Props DI:
-              SourceGraphView に contexts prop を追加
-              createContext / deleteContext コールバックを props で受け取る
-
-            関連: CTX-21 (SourceGraph)
+            関連: CTX-21 (SourceGraph), CTX-23 (Test Simulation)
 
             ── 実装スコープ ──────────────────────────────────────────
-            [✓][Logic]   DB Schema          — source_context テーブルを SurrealDB に追加する
-            [✓][Logic]   Rust Commands      — create / list / update / delete_context を実装する
-            [✓][Logic]   BOM               — docs/bom/source-context.ts に型定義を追加する
-            [✓][Logic]   GraphStorage Wire  — src/services/GraphStorage.ts に context CRUD を追加する
-            [ ][Feature] Context Create UI  — 複数選択 → 名前入力 → 作成ボタン
-            [ ][Feature] Subflow Display    — SourceContext を Subflow コンテナとして表示する
-            [ ][Feature] Boundary Edge      — コンテクスト境界をまたぐエッジを amber でハイライトする
-            [ ][Feature] Context List UI    — FileTree ペイン下部に SourceContext 一覧を表示する
-            [ ][Feature] Context Delete     — SourceContext を削除する（ノード自体は残す）
-            [ ][Logic]   Context Load       — マウント時に list_contexts で SourceContext を取得する
-            [ ][Logic]   Boundary Detection — context 内外をまたぐエッジを算出する
+            [✓][Logic]   DB Schema            — source_context テーブルを SurrealDB に追加する
+            [✓][Logic]   Rust Commands        — create / list / update / delete_context を実装する
+            [✓][Logic]   BOM                  — docs/bom/source-context.ts に型定義・座標計算関数を追加する
+            [✓][Logic]   ContextStorage       — src/services/ContextStorage.ts を実装する
+            [✓][Feature] Subflow Display      — SourceContext を Subflow コンテナとして表示する
+            [ ][Logic]   Test DB Schema       — test_file / test_suite / test_case テーブルを追加する
+            [ ][Logic]   analyze_tests        — *.test.ts / *.spec.ts を tree-sitter で解析し UPSERT する
+            [ ][Logic]   list_test_suites     — project_id で test_suite 一覧を返す
+            [ ][Logic]   list_test_cases      — suite_id で test_case 一覧を返す
+            [ ][Logic]   TestStorage          — src/services/TestStorage.ts を実装する
+            [ ][Feature] Test Node Display    — テストノードを通常ノードと色分けして表示する
+            [ ][Feature] Test Context Subflow — テストノード選択 → 依存ノード群を Subflow で自動表示する
+            [ ][Feature] Context Load         — マウント時に list_test_suites で Subflow を復元する
         ============================================================ -->
 
-    </body>
-</html>
+
+<!-- ============================================================
+            CTX-23: TEST SIMULATION [ ]
+            責務: Vitest の it（テストケース）をグラフ上でシミュレーションし、
+                  データフローをエッジアニメーションで可視化する。
+                  テスト実行結果を右ペインに表示しLLMへのコピーを提供する。
+
+            背景:
+              CTX-22 でテストコンテキストが Subflow として可視化される。
+              CTX-23 ではその中の it（テストケース）を実行単位として扱い、
+              - データがノード間をどう流れるか をエッジアニメーションで示す
+              - テスト実行結果を右ペインに表示する
+              - 失敗ログをワンクリックでコピーし LLM にペーストできる
+
+            シミュレーションの概念:
+              describe = コンテキスト（Subflow の範囲・登場ノード群）
+              it       = シナリオステップ（エッジ上を流れるデータの単位）
+
+              例:
+                describe('FileTree → SourceGraph 連携') {
+                    it('ファイルをクリックする')
+                        FileTree →[selectedFilePath]→ useStore   ← エッジアニメーション
+                    it('ノードがハイライトされる')
+                        useStore →[staleFiles]→ SourceGraphView  ← エッジアニメーション
+                }
+
+            実行単位:
+              Vitest の最小実行単位は it（= test）。
+              ▶ ボタンの粒度:
+                テストノード（ファイル）▶  → ファイル全体実行
+                describe ▶               → describe 単位実行（--testNamePattern 前方一致）
+                it ▶                     → it 単位実行（--testNamePattern 完全一致）
+
+            右ペイン表示（NodeProperty 拡張）:
+              テストノード選択時:
+                - test_suite / test_case 一覧を表示
+                - 各 it の横に ▶ ボタン
+                - 実行結果（passed ✓ / failed ✗）をインラインで表示
+                - 失敗時は Vitest の生ログを表示
+                - 📋 コピーボタン → 生ログをクリップボードにコピー
+                  （そのまま LLM にペーストして修正依頼できる）
+
+            コピー内容（生ログ）:
+              Vitest --reporter=verbose の出力をそのまま使用。
+              AIによる加工・要約は行わない（トークン消費防止・LLMが生ログを直接解釈できる）。
+
+              例:
+                FAIL src/components/FileTree.test.ts
+                ✗ ファイルをクリックすると選択される
+
+                AssertionError: expected 'selected' received undefined
+                  at FileTree.test.ts:12:5
+
+            エッジアニメーション:
+              it の定義順にエッジを順次ハイライト（フローアニメーション）。
+              実行結果が passed → 緑、failed → 赤でエッジを着色。
+
+            Tauri コマンド（新規）:
+              run_test_case(project_id, test_case_id) → TestResult
+              run_test_suite(project_id, suite_id)    → TestResult[]
+              run_test_file(project_id, file_path)    → TestResult[]
+
+              TestResult:
+                test_case_id: string
+                passed:       bool
+                log:          string   ← Vitest の生ログ
+                duration_ms:  number
+
+            フロントエンド構成:
+              docs/bom/test-simulation.ts          — TestResult / TestRunnerProps 型定義
+              src/services/TestRunner.ts           — run_test_case / run_test_suite ラッパー
+              src/components/NodeProperty.tsx      — テストノード選択時の結果表示・コピーボタン拡張
+
+            関連: CTX-22 (Source Context), CTX-21 (SourceGraph)
+
+            ── 実装スコープ ──────────────────────────────────────────
+            [ ][Logic]   BOM                  — docs/bom/test-simulation.ts に型定義を追加する
+            [ ][Logic]   run_test_case        — it 単位で Vitest を実行し生ログを返す
+            [ ][Logic]   run_test_suite       — describe 単位で Vitest を実行する
+            [ ][Logic]   run_test_file        — ファイル単位で Vitest を実行する
+            [ ][Logic]   TestRunner           — src/services/TestRunner.ts を実装する
+            [ ][Feature] Run Buttons          — テストノード / describe / it の横に ▶ ボタンを表示する
+            [ ][Feature] Result Display       — 右ペインに実行結果（passed/failed + 生ログ）を表示する
+            [ ][Feature] Copy Button          — 生ログをクリップボードにコピーする 📋 ボタン
+            [ ][Feature] Edge Animation       — it の順序に沿ってエッジをアニメーションする
+            [ ][Feature] Result Color         — passed → 緑 / failed → 赤 でエッジ・ノードを着色する
+        ============================================================ -->
