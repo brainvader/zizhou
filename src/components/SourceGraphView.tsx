@@ -16,12 +16,14 @@
  *   - computeContainerRect でコンテナの位置・サイズを算出する
  *   - toRelativePosition で子ノードの座標を親相対に変換する
  *
+ * [CTX-22] TestNode:
+ *   - nodeType === 'test' のノードを TestNode コンポーネントで描画する
+ *   - onRunTest を TestNodeDisplayData に注入する（CTX-23 で接続）
+ *
  * 無限ループ回避:
  *   - useNodesState / useEdgesState を使わない（controlled mode）
- *   - staleFiles は Set オブジェクトで毎レンダリング新参照になりやすいため
- *     内容比較で参照を安定させる（stableStaleFiles）
- *   - onReanalyze は useCallback + useRef で安定した参照にする
- *   - contexts も内容比較で参照を安定させる（stableContexts）
+ *   - staleFiles / contexts は内容比較で参照を安定させる
+ *   - onReanalyze / onRunTest は useCallback + useRef で安定した参照にする
  *
  * @context CTX-21, CTX-22
  * @bom docs/bom/source-graph.ts
@@ -40,12 +42,14 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { SourceNode } from '@/components/nodes/SourceNode'
+import { TestNode } from '@/components/nodes/TestNode'
 import { SourceContextContainer } from '@/components/nodes/SourceContextContainer'
 import {
     computeAnalyzedDisplay,
     type SourceGraphViewProps,
     type SourceNode as SourceNodeType,
     type SourceNodeType as SourceNodeRfType,
+    type TestNodeType,
     type SourceContextContainerNode,
 } from '@/bom/source-graph'
 import {
@@ -60,6 +64,7 @@ import {
 
 const NODE_TYPES = {
     sourceNode: SourceNode,
+    testNode: TestNode,
     contextContainer: SourceContextContainer,
 } as const
 
@@ -67,7 +72,6 @@ const NODE_TYPES = {
 // 内容比較ユーティリティ
 // ============================================================
 
-/** Set の内容が同じか比較する（参照ではなく内容で） */
 function isSameSet(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
     if (a.size !== b.size) return false
     for (const item of a) {
@@ -76,7 +80,6 @@ function isSameSet(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
     return true
 }
 
-/** SourceContext[] の内容が同じか比較する */
 function isSameContexts(a: SourceContext[], b: SourceContext[]): boolean {
     if (a.length !== b.length) return false
     return a.every((ca, i) => {
@@ -91,6 +94,12 @@ function isSameContexts(a: SourceContext[], b: SourceContext[]): boolean {
 }
 
 // ============================================================
+// AllNodeType — ReactFlow に渡すノードの Union 型
+// ============================================================
+
+type AllNodeType = SourceNodeRfType | TestNodeType | SourceContextContainerNode
+
+// ============================================================
 // SourceGraphViewInner — ReactFlowProvider の内側
 // ============================================================
 
@@ -103,6 +112,7 @@ function SourceGraphViewInner({
     onReanalyze,
     onNodesChange: onNodesChangeProp,
     contexts = [],
+    onRunTest,
 }: SourceGraphViewProps) {
     // ============================================================
     // コールバックを ref 経由で安定化
@@ -117,15 +127,21 @@ function SourceGraphViewInner({
     const onNodesChangePropRef = useRef(onNodesChangeProp)
     useEffect(() => { onNodesChangePropRef.current = onNodesChangeProp }, [onNodesChangeProp])
 
+    const onRunTestRef = useRef(onRunTest)
+    useEffect(() => { onRunTestRef.current = onRunTest }, [onRunTest])
+
     const stableOnReanalyze = useCallback(
         (filePath: string) => onReanalyzeRef.current?.(filePath),
         [],
     )
 
+    const stableOnRunTest = useCallback(
+        (filePath: string) => onRunTestRef.current?.(filePath),
+        [],
+    )
+
     // ============================================================
     // staleFiles / contexts を内容比較で参照安定化
-    // Set や配列は毎レンダリングで新参照になるため
-    // useMemo のキャッシュを正しく効かせるために必要
     // ============================================================
 
     const staleFilesRef = useRef(staleFiles)
@@ -175,9 +191,10 @@ function SourceGraphViewInner({
 
     // ============================================================
     // enrichedNodes
+    // nodeType === 'test' → TestNodeType、それ以外 → SourceNodeRfType
     // ============================================================
 
-    const enrichedNodes = useMemo((): SourceNodeRfType[] => {
+    const enrichedNodes = useMemo((): (SourceNodeRfType | TestNodeType)[] => {
         return nodesProp.map((node) => {
             const displayStatus = computeAnalyzedDisplay(
                 node.data.analyzed,
@@ -190,15 +207,34 @@ function SourceGraphViewInner({
                 ? toRelativePosition(node.position, containerRect)
                 : node.position
 
-            return {
+            const isTest = node.data.nodeType === 'test'
+
+            const common = {
                 ...node,
-                type: 'sourceNode' as const,
                 position,
                 parentId: ownerCtx ? `context-container-${ownerCtx.id}` : undefined,
                 extent: ownerCtx ? ('parent' as const) : undefined,
                 selected: node.data.filePath
                     ? node.data.filePath === selectedFilePath
                     : false,
+            }
+
+            if (isTest) {
+                return {
+                    ...common,
+                    type: 'testNode' as const,
+                    data: {
+                        ...node.data,
+                        displayStatus,
+                        onReanalyze: stableOnReanalyze,
+                        onRunTest: onRunTestRef.current ? stableOnRunTest : undefined,
+                    },
+                } as TestNodeType
+            }
+
+            return {
+                ...common,
+                type: 'sourceNode' as const,
                 data: {
                     ...node.data,
                     displayStatus,
@@ -206,10 +242,10 @@ function SourceGraphViewInner({
                 },
             } as SourceNodeRfType
         })
-    }, [nodesProp, stableStaleFiles, selectedFilePath, stableContexts, containerRects, stableOnReanalyze])
+    }, [nodesProp, stableStaleFiles, selectedFilePath, stableContexts, containerRects, stableOnReanalyze, stableOnRunTest])
 
     const baseNodes = useMemo(
-        () => [...containerNodes, ...enrichedNodes],
+        (): AllNodeType[] => [...containerNodes, ...enrichedNodes],
         [containerNodes, enrichedNodes],
     )
 
@@ -217,15 +253,15 @@ function SourceGraphViewInner({
     // ドラッグ位置管理（controlled mode）
     // ============================================================
 
-    const [localNodes, setLocalNodes] = useState(baseNodes)
+    const [localNodes, setLocalNodes] = useState<AllNodeType[]>(baseNodes)
 
     useEffect(() => {
         setLocalNodes(baseNodes)
     }, [baseNodes])
 
     const handleNodesChange = useCallback(
-        (changes: NodeChange<SourceNodeRfType | SourceContextContainerNode>[]) => {
-            setLocalNodes((prev) => applyNodeChanges(changes, prev) as typeof prev)
+        (changes: NodeChange<AllNodeType>[]) => {
+            setLocalNodes((prev) => applyNodeChanges(changes, prev) as AllNodeType[])
 
             const hasDragEnd = changes.some(
                 (c) => c.type === 'position' && c.dragging === false,
@@ -233,10 +269,13 @@ function SourceGraphViewInner({
             if (hasDragEnd) {
                 setLocalNodes((prev) => {
                     const plain = prev
-                        .filter((n) => n.type === 'sourceNode')
+                        .filter((n) => n.type === 'sourceNode' || n.type === 'testNode')
                         .map((n) => {
-                            const { displayStatus: _d, onReanalyze: _r, ...rest } = (n as SourceNodeRfType).data
-                            return { ...n, data: rest } as SourceNodeType
+                            const nodeData = (n as SourceNodeRfType | TestNodeType).data
+                            const { displayStatus: _d, onReanalyze: _r, ...rest } = nodeData
+                            // onRunTest は TestNodeDisplayData にのみ存在するため個別に除去
+                            const { onRunTest: _t, ...cleanRest } = rest as typeof rest & { onRunTest?: unknown }
+                            return { ...n, data: cleanRest } as SourceNodeType
                         })
                     onNodesChangePropRef.current?.(plain)
                     return prev
@@ -246,10 +285,10 @@ function SourceGraphViewInner({
         [],
     )
 
-    const handleNodeClick: NodeMouseHandler<SourceNodeRfType | SourceContextContainerNode> = useCallback(
+    const handleNodeClick: NodeMouseHandler<AllNodeType> = useCallback(
         (_event, node) => {
-            if (node.type !== 'sourceNode') return
-            const filePath = (node as SourceNodeRfType).data.filePath
+            if (node.type !== 'sourceNode' && node.type !== 'testNode') return
+            const filePath = (node as SourceNodeRfType | TestNodeType).data.filePath
             if (filePath) onNodeSelectRef.current?.(filePath)
         },
         [],
