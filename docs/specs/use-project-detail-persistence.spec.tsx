@@ -11,11 +11,7 @@
  * 3. 完了後に setDetailHydrated(true) を呼ぶ。
  * 4. invoke 失敗時に toast.error を呼ぶ。
  *
- * @note useProjectDetailSave は SurrealDB 移行に伴い再設計予定。
- *       現在のテストは保留中（skipped）。
- *
  * @output src/hooks/useProjectDetailLoad.ts
- * @output src/hooks/useProjectDetailSave.ts
  */
 
 import { describe, test, expect, vi, beforeEach } from 'vitest'
@@ -119,12 +115,4 @@ describe('useProjectDetailLoad: logic', () => {
         // graph-02 は存在するので上書きしない
         expect(mockSetActiveGraphId).not.toHaveBeenCalled()
     })
-})
-
-// =============================================================================
-// useProjectDetailSave: SurrealDB 移行に伴い再設計予定
-// =============================================================================
-
-describe.skip('useProjectDetailSave: logic', () => {
-    test.todo('SurrealDB 移行後に再実装する')
 })

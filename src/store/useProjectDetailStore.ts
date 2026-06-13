@@ -35,7 +35,6 @@ export type ProjectDetailStore = ProjectDetailStoreState & ProjectDetailStoreAct
  *
  * isDetailHydrated:
  * useProjectDetailLoad 完了後に true になる。
- * useProjectDetailSave が hydration 前の保存をスキップするために使用する（save-before-load 防止）。
  *
  * @see src/hooks/useProjectDetailLoad.ts
  * @see src/hooks/useProjectDetailSave.ts
