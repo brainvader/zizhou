@@ -114,6 +114,10 @@ export type SourceGraphViewProps = {
      * CTX-23 実装前は省略可（ボタン非表示）。
      */
     onRunTest?: (filePath: string) => void
+    /**
+     * [CTX-13] キャンバス右クリック時コールバック。CatalogMenu の表示に使用する。
+     */
+    onPaneContextMenu?: (event: React.MouseEvent) => void
 }
 
 // ============================================================

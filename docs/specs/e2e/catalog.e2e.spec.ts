@@ -26,7 +26,6 @@ async function navigateToEditor(page: Page) {
     // 作成されたプロジェクトカードをクリック
     await page.getByRole('link', { name: 'E2E Test Project' }).click()
 
-    await page.waitForSelector('[data-testid="graph-editor"]')
     await page.waitForSelector('.react-flow__pane')
 }
 

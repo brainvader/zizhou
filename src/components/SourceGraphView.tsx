@@ -20,12 +20,15 @@
  *   - nodeType === 'test' のノードを TestNode コンポーネントで描画する
  *   - onRunTest を TestNodeDisplayData に注入する（CTX-23 で接続）
  *
+ * [CTX-13] CatalogMenu:
+ *   - onPaneContextMenu をキャンバス右クリック時に呼ぶ
+ *
  * 無限ループ回避:
  *   - useNodesState / useEdgesState を使わない（controlled mode）
  *   - staleFiles / contexts は useStableValue で内容比較により参照を安定させる
  *   - onReanalyze / onRunTest は useCallbackRef で安定した参照にする
  *
- * @context CTX-21, CTX-22
+ * @context CTX-21, CTX-22, CTX-13
  * @bom docs/bom/source-graph.ts
  * @bom docs/bom/source-context.ts
  */
@@ -86,6 +89,7 @@ function SourceGraphViewInner({
     onNodesChange: onNodesChangeProp,
     contexts = [],
     onRunTest,
+    onPaneContextMenu,
 }: SourceGraphViewProps) {
     // ============================================================
     // コールバック安定化
@@ -95,6 +99,7 @@ function SourceGraphViewInner({
     const stableOnNodeSelect = useCallbackRef(onNodeSelect)
     const stableOnNodesChangeProp = useCallbackRef(onNodesChangeProp)
     const stableOnRunTest = useCallbackRef(onRunTest)
+    const stableOnPaneContextMenu = useCallbackRef(onPaneContextMenu)
 
     // ============================================================
     // staleFiles / contexts を内容比較で参照安定化
@@ -227,6 +232,7 @@ function SourceGraphViewInner({
                 edges={edgesProp}
                 onNodesChange={handleNodesChange}
                 onNodeClick={handleNodeClick}
+                onPaneContextMenu={(e) => stableOnPaneContextMenu(e)}
                 nodeTypes={NODE_TYPES}
                 fitView
                 fitViewOptions={{ padding: 0.2 }}

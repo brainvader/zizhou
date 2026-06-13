@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import { useParams, useSearch, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { FileTree } from '@/components/FileTree'
 import { SourceGraphView } from '@/components/SourceGraphView'
+import { CatalogMenu } from '@/components/CatalogMenu'
 import { NodeProperty } from '@/components/NodeProperty'
 import { ProjectDetailTopbar } from '@/components/ProjectDetailTopbar'
 import { SettingsDialog } from '@/components/SettingsDialog'
@@ -13,6 +14,7 @@ import {
 } from '@/components/ui/resizable'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
+import { useGraphStore } from '@/store/useGraphStore'
 import { FILE_TREE_PANEL, GRAPH_EDITOR_PANEL, NODE_PROPERTY_PANEL } from '@/bom/layout'
 import { useGraphList } from '@/hooks/useGraphList'
 import { useSourceGraph } from '@/hooks/useSourceGraph'
@@ -37,7 +39,9 @@ export const ProjectDetailRoute = () => {
     const { graph: activeGraphId } = useSearch({ from: '/projects/$id' })
     const project = useProjectStore((s) => s.projects.find((p) => p.id === id))
     const setActiveGraphId = useProjectDetailStore((s) => s.setActiveGraphId)
+    const addNodeFromCatalog = useGraphStore((s) => s.addNodeFromCatalog)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+    const [catalogMenu, setCatalogMenu] = useState<{ x: number; y: number } | null>(null)
     const router = useRouter()
 
     // SurrealDB からグラフ一覧を取得し activeGraphId を注入する
@@ -64,6 +68,14 @@ export const ProjectDetailRoute = () => {
 
     // テストノード選択時の Subflow コンテキスト
     const contexts = useTestContexts(id, selectedFilePath)
+
+    const handlePaneContextMenu = useCallback(
+        (event: React.MouseEvent) => {
+            event.preventDefault()
+            setCatalogMenu({ x: event.clientX, y: event.clientY })
+        },
+        [],
+    )
 
     return (
         <div
@@ -139,16 +151,30 @@ export const ProjectDetailRoute = () => {
                     defaultSize={GRAPH_EDITOR_PANEL.defaultSize}
                     minSize={GRAPH_EDITOR_PANEL.minSize}
                 >
-                    <SourceGraphView
-                        nodes={structureGraph?.nodes ?? []}
-                        edges={structureGraph?.edges ?? []}
-                        staleFiles={staleFiles}
-                        selectedFilePath={selectedFilePath}
-                        onNodeSelect={setSelectedFilePath}
-                        onReanalyze={handleReanalyzeSelected}
-                        onNodesChange={handleSourceNodesChange}
-                        contexts={contexts}
-                    />
+                    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                        <SourceGraphView
+                            nodes={structureGraph?.nodes ?? []}
+                            edges={structureGraph?.edges ?? []}
+                            staleFiles={staleFiles}
+                            selectedFilePath={selectedFilePath}
+                            onNodeSelect={setSelectedFilePath}
+                            onReanalyze={handleReanalyzeSelected}
+                            onNodesChange={handleSourceNodesChange}
+                            contexts={contexts}
+                            onPaneContextMenu={handlePaneContextMenu}
+                        />
+                        {catalogMenu && (
+                            <CatalogMenu
+                                x={catalogMenu.x}
+                                y={catalogMenu.y}
+                                onClose={() => setCatalogMenu(null)}
+                                onSelectEntry={(entry) => {
+                                    addNodeFromCatalog(entry, { x: catalogMenu.x, y: catalogMenu.y })
+                                    setCatalogMenu(null)
+                                }}
+                            />
+                        )}
+                    </div>
                 </ResizablePanel>
 
                 <ResizableHandle />
