@@ -20,6 +20,9 @@
  * create_context:        インメモリに context を追加して返す [CTX-22]
  * update_context:        インメモリの context を更新して返す [CTX-22]
  * delete_context:        インメモリから context を削除する [CTX-22]
+ * analyze_tests:         テストファイルを structure グラフに node_type='test' で登録する [CTX-22]
+ * list_test_suites:      インメモリの test_suites[] を返す [CTX-22]
+ * list_test_cases:       インメモリの test_cases[] を返す [CTX-22]
  */
 import { NODE_CATALOG } from '@/bom/graph'
 import type { CatalogEntry } from '@/bom/graph'
@@ -62,9 +65,27 @@ type MockContext = {
     node_ids: string[]
 }
 
+// [CTX-22] Test Analysis
+type MockTestSuite = {
+    id: string
+    test_file_id: string
+    parent_suite_id: string | null
+    name: string
+    node_ids: string[]
+}
+
+type MockTestCase = {
+    id: string
+    suite_id: string
+    name: string
+    order: number
+}
+
 const _projects: MockProject[] = []
 const _graphs: MockGraph[] = []
-const _contexts: MockContext[] = []  // [CTX-22]
+const _contexts: MockContext[] = []       // [CTX-22]
+const _testSuites: MockTestSuite[] = []   // [CTX-22]
+const _testCases: MockTestCase[] = []     // [CTX-22]
 
 // graph_id → { nodes, edges } のインメモリグラフストア
 const _graphData: Map<string, { nodes: MockNode[]; edges: MockEdge[] }> = new Map()
@@ -330,6 +351,116 @@ export async function invoke<T>(
             const idx = _contexts.findIndex((c) => c.id === contextId)
             if (idx >= 0) _contexts.splice(idx, 1)
             return undefined as unknown as T
+        }
+
+        // ── CTX-22: Test Analysis ────────────────────────────────────────
+
+        case 'analyze_tests': {
+            const projectId = args?.projectId as string
+            // 固定テストファイルリストでシミュレート
+            const testFiles = [
+                'src/components/App.test.tsx',
+                'src/hooks/useStore.test.ts',
+            ]
+            // テストファイルごとの固定フィクスチャ
+            // node_ids は対応するソースファイルパスで解決する
+            const suiteFixtures: Record<string, { name: string; sourceFilePaths: string[] }> = {
+                'src/components/App.test.tsx': {
+                    name: 'App component tests',
+                    sourceFilePaths: ['src/components/App.tsx'],
+                },
+                'src/hooks/useStore.test.ts': {
+                    name: 'useStore hook tests',
+                    sourceFilePaths: ['src/hooks/useStore.ts'],
+                },
+            }
+
+            // structure グラフを取得 or 作成
+            let graph = _graphs.find(
+                (g) => g.project_id === projectId && g.kind === 'structure'
+            )
+            if (!graph) {
+                graph = {
+                    id: `graph:mock-${_idCounter++}`,
+                    name: 'Structure',
+                    project_id: projectId,
+                    kind: 'structure',
+                }
+                _graphs.push(graph)
+            }
+            const data = _graphData.get(graph.id) ?? { nodes: [], edges: [] }
+
+            for (const fp of testFiles) {
+                // structure グラフにテストノードを登録（node_type = 'test'）
+                const existing = data.nodes.find((n) => n.file_path === fp)
+                if (existing) {
+                    existing.node_type = 'test'
+                    existing.analyzed = 'fresh'
+                } else {
+                    const fileName = fp.split('/').pop() ?? fp
+                    const n = data.nodes.length
+                    data.nodes.push({
+                        id: `node:mock-${_idCounter++}`,
+                        label: fileName,
+                        node_type: 'test',
+                        position_x: (n % 6) * 220,
+                        position_y: Math.floor(n / 6) * 140 + 300,
+                        file_path: fp,
+                        analyzed: 'fresh',
+                    })
+                }
+
+                // test_suite を登録（既存の場合は node_ids を再解決）
+                const testFileId = `test_file:mock-${projectId}-${fp.replace(/\//g, '-')}`
+                const fixture = suiteFixtures[fp]
+                const nodeIds = fixture
+                    ? data.nodes
+                        .filter((n) => fixture.sourceFilePaths.includes(n.file_path ?? ''))
+                        .map((n) => n.id)
+                    : []
+
+                const suiteExists = _testSuites.find((s) => s.test_file_id === testFileId)
+                if (suiteExists) {
+                    // analyze_project 後に再呼び出された場合に node_ids を更新する
+                    suiteExists.node_ids = nodeIds
+                } else {
+                    _testSuites.push({
+                        id: `test_suite:mock-${_idCounter++}`,
+                        test_file_id: testFileId,
+                        parent_suite_id: null,
+                        name: fixture?.name ?? fp,
+                        node_ids: nodeIds,
+                    })
+                }
+            }
+            _graphData.set(graph.id, data)
+            return undefined as unknown as T
+        }
+
+        case 'list_test_suites': {
+            const projectId = args?.projectId as string
+            // project に紐づく test_file_id を含む suite を返す
+            return _testSuites
+                .filter((s) => s.test_file_id.includes(projectId))
+                .map((s) => ({
+                    id: s.id,
+                    testFileId: s.test_file_id,
+                    parentSuiteId: s.parent_suite_id,
+                    name: s.name,
+                    nodeIds: s.node_ids,
+                })) as unknown as T
+        }
+
+        case 'list_test_cases': {
+            const suiteId = args?.suiteId as string
+            return _testCases
+                .filter((c) => c.suite_id === suiteId)
+                .map((c) => ({
+                    id: c.id,
+                    suiteId: c.suite_id,
+                    name: c.name,
+                    order: c.order,
+                })) as unknown as T
         }
 
         default:
