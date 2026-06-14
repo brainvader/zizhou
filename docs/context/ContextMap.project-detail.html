@@ -140,6 +140,65 @@
         ============================================================ -->
 
 <!-- ============================================================
+            CTX-22c: TEST CASE EDGE（TCE）[ ]
+            責務: Vitest の it / test 単位でエッジを自動生成し、
+                  テストケースが依存するノードとの接続をグラフ上に表示する。
+                  エッジラベルにフィクスチャ名・引数名を表示する。
+
+            背景:
+              CTX-22b で選択テストファイルの依存ノードがグラフ表示される。
+              しかし現状は「ファイル全体の import 先」という粗い粒度でしか
+              依存関係が見えない。
+              CTX-22c では it / test 単位まで粒度を細かくし、
+              「このテストケースはどのノードとどんなデータをやり取りするか」
+              をエッジとして可視化する。
+
+            Vitest に限定する理由:
+              - tree-sitter による静的解析が可能（実行不要）
+              - describe / it / test の構造が明確
+              - vi.fn() / mockResolvedValue 等のモックパターンが解析しやすい
+              - Playwright / Jest 等の対応は将来の拡張とする
+
+            表示ルール:
+              エッジの単位: it / test ブロック単位
+              エッジラベル: フィクスチャ変数名・vi.fn() モック名・引数名
+              エッジの向き: テストケース → 依存ノード
+
+              例:
+                it('renders with props', () => {
+                    const mockFn = vi.fn()          ← エッジラベル: mockFn
+                    render(<App onClick={mockFn} />) ← App ノードへのエッジ
+                })
+
+            tree-sitter 解析対象（Vitest 限定）:
+              - it / test ブロックの第一引数（テストケース名）
+              - ブロック内の vi.fn() / vi.spyOn() の変数名
+              - ブロック内の import / require（動的インポート）
+              - describe.each / it.each のパラメータ
+
+            SurrealDB データモデル（拡張）:
+              test_case_edge テーブル（SCHEMALESS）
+                id, test_case_id, node_id, label（フィクスチャ名）
+
+            Rust コマンド（新規）:
+              analyze_test_case_edges(project_id) → test_case_edge を UPSERT
+              list_test_case_edges(test_case_id)  → TestCaseEdge[]
+
+            フロントエンド構成:
+              docs/bom/test-case-edge.ts           — TestCaseEdge 型定義
+              src/components/SourceGraphView.tsx   — it エッジ表示ロジック追加
+
+            関連: CTX-22b (TaaC), CTX-23 (Test Simulation)
+
+            ── 実装スコープ ──────────────────────────────────────────
+            [ ][Logic]   BOM                       — docs/bom/test-case-edge.ts に型定義を追加する
+            [ ][Logic]   analyze_test_case_edges   — it ブロック内の vi.fn() / 変数名を tree-sitter で抽出する
+            [ ][Logic]   list_test_case_edges      — test_case_id で TestCaseEdge[] を返す
+            [ ][Feature] Test Case Edge Display    — it 単位のエッジをラベル付きで表示する
+            [ ][Feature] Edge Label                — フィクスチャ名・vi.fn() モック名をエッジラベルに表示する
+        ============================================================ -->
+
+<!-- ============================================================
             CTX-23: TEST SIMULATION [ ]
             責務: Vitest の it（テストケース）をグラフ上でシミュレーションし、
                   データフローをエッジアニメーションで可視化する。
