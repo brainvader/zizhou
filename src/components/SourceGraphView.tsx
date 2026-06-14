@@ -40,7 +40,7 @@
  * @bom docs/bom/source-context.ts
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
     ReactFlow,
     ReactFlowProvider,
@@ -124,8 +124,6 @@ function SourceGraphViewInner({
     // ============================================================
 
     const isTaaCMode = onGetRelatedNodes != null
-    const onGetRelatedNodesRef = useRef(onGetRelatedNodes)
-    onGetRelatedNodesRef.current = onGetRelatedNodes
 
     const [relatedNodes, setRelatedNodes] = useState<RelatedNodes | null>(null)
 
@@ -134,20 +132,16 @@ function SourceGraphViewInner({
     }, [selectedFilePath])
 
     useEffect(() => {
-        if (!isTaaCMode) return
-        const fn = onGetRelatedNodesRef.current
-        if (!fn) return
+        if (!onGetRelatedNodes) return
         if (!selectedFilePath || !isTestFile(selectedFilePath)) return
 
         let cancelled = false
-        Promise.resolve(fn('', selectedFilePath)).then((data) => {
+        Promise.resolve(onGetRelatedNodes('', selectedFilePath)).then((data) => {
             if (!cancelled && data) setRelatedNodes(data)
         }).catch(() => { })
 
         return () => { cancelled = true }
-        // selectedFilePath が変わったときだけ再実行。fn は ref 経由で常に最新を参照。
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedFilePath])
+    }, [onGetRelatedNodes, selectedFilePath])
 
     // ============================================================
     // [CTX-22] コンテナノード生成
