@@ -135,11 +135,9 @@ function SourceGraphViewInner({
         if (!selectedFilePath || !isTestFile(selectedFilePath)) return
 
         let cancelled = false
-        const result = fn('', selectedFilePath)
-        if (!result || typeof result.then !== 'function') return
-        result.then((data) => {
-            if (!cancelled) setRelatedNodes(data)
-        })
+        Promise.resolve(fn('', selectedFilePath)).then((data) => {
+            if (!cancelled && data) setRelatedNodes(data)
+        }).catch(() => { /* fn() が undefined を返す場合は無視 */ })
 
         return () => { cancelled = true }
     }, [isTaaCMode, selectedFilePath])
