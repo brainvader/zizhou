@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react'
 import { useParams, useSearch, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { FileTree } from '@/components/FileTree'
 import { SourceGraphView } from '@/components/SourceGraphView'
 import { CatalogMenu } from '@/components/CatalogMenu'
@@ -19,6 +20,7 @@ import { FILE_TREE_PANEL, GRAPH_EDITOR_PANEL, NODE_PROPERTY_PANEL } from '@/bom/
 import { useGraphList } from '@/hooks/useGraphList'
 import { useSourceGraph } from '@/hooks/useSourceGraph'
 import { useTestContexts } from '@/hooks/useTestContexts'
+import type { RelatedNodes } from '@/bom/source-graph'
 
 /**
  * ProjectDetailRoute
@@ -75,6 +77,13 @@ export const ProjectDetailRoute = () => {
             setCatalogMenu({ x: event.clientX, y: event.clientY })
         },
         [],
+    )
+
+    // [CTX-22b] TaaC: 選択テストファイルの依存先・利用先を取得する
+    const handleGetRelatedNodes = useCallback(
+        (_projectId: string, filePath: string) =>
+            invoke<RelatedNodes>('get_related_nodes', { projectId: id, filePath }),
+        [id],
     )
 
     return (
@@ -162,6 +171,7 @@ export const ProjectDetailRoute = () => {
                             onNodesChange={handleSourceNodesChange}
                             contexts={contexts}
                             onPaneContextMenu={handlePaneContextMenu}
+                            onGetRelatedNodes={handleGetRelatedNodes}
                         />
                         {catalogMenu && (
                             <CatalogMenu

@@ -8,6 +8,7 @@
 //! @context CTX-20: get_structure_graph / analyze_file / analyze_project / get_changed_files
 //! @context CTX-22: list_contexts / create_context / update_context / delete_context
 //! @context CTX-22: analyze_tests / list_test_suites / list_test_cases
+//! @context CTX-22b: get_related_nodes
 
 mod services;
 
@@ -330,6 +331,15 @@ async fn list_test_cases(
     services::test_analysis::list_test_cases(&db, &suite_id).await
 }
 
+#[tauri::command]
+async fn get_related_nodes(
+    project_id: String,
+    file_path: String,
+    db: State<'_, Db>,
+) -> Result<serde_json::Value, String> {
+    services::analysis::get_related_nodes(&db, &project_id, &file_path).await
+}
+
 // ============================================================
 // エントリポイント
 // ============================================================
@@ -376,6 +386,7 @@ pub fn run() {
             analyze_tests,
             list_test_suites,
             list_test_cases,
+            get_related_nodes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

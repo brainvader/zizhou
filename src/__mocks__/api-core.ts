@@ -23,6 +23,7 @@
  * analyze_tests:         テストファイルを structure グラフに node_type='test' で登録する [CTX-22]
  * list_test_suites:      インメモリの test_suites[] を返す [CTX-22]
  * list_test_cases:       インメモリの test_cases[] を返す [CTX-22]
+ * get_related_nodes:    選択ファイルの center / dependencies / dependents を返す [CTX-22b]
  */
 import { NODE_CATALOG } from '@/bom/graph'
 import type { CatalogEntry } from '@/bom/graph'
@@ -461,6 +462,59 @@ export async function invoke<T>(
                     name: c.name,
                     order: c.order,
                 })) as unknown as T
+        }
+
+        // ── CTX-22b: TaaC ────────────────────────────────────────────────
+
+        case 'get_related_nodes': {
+            const projectId = args?.projectId as string
+            const filePath = args?.filePath as string
+
+            // structure グラフを取得
+            const graph = _graphs.find(
+                (g) => g.project_id === projectId && g.kind === 'structure'
+            )
+            const data = graph ? (_graphData.get(graph.id) ?? { nodes: [], edges: [] }) : { nodes: [], edges: [] }
+
+            // center ノードを取得
+            const centerNode = data.nodes.find((n) => n.file_path === filePath)
+            if (!centerNode) {
+                throw new Error(`[mock] get_related_nodes: node not found for file_path: ${filePath}`)
+            }
+
+            const toRfNode = (n: MockNode) => ({
+                id: n.id,
+                type: n.node_type === 'test' ? 'testNode' : 'sourceNode',
+                position: { x: n.position_x, y: n.position_y },
+                data: {
+                    label: n.label,
+                    ...(n.node_type != null ? { nodeType: n.node_type } : {}),
+                    ...(n.file_path != null ? { filePath: n.file_path } : {}),
+                    ...(n.analyzed != null ? { analyzed: n.analyzed } : {}),
+                },
+            })
+
+            // dependencies: centerNode が source のエッジの target ノード
+            const depNodeIds = data.edges
+                .filter((e) => e.source === centerNode.id && e.kind === 'imports')
+                .map((e) => e.target)
+            const dependencies = data.nodes
+                .filter((n) => depNodeIds.includes(n.id))
+                .map(toRfNode)
+
+            // dependents: centerNode が target のエッジの source ノード
+            const dntNodeIds = data.edges
+                .filter((e) => e.target === centerNode.id && e.kind === 'imports')
+                .map((e) => e.source)
+            const dependents = data.nodes
+                .filter((n) => dntNodeIds.includes(n.id))
+                .map(toRfNode)
+
+            return {
+                center: toRfNode(centerNode),
+                dependencies,
+                dependents,
+            } as unknown as T
         }
 
         default:

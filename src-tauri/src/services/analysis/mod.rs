@@ -665,3 +665,139 @@ mod tests {
         assert_eq!(edges[0].from, "src/a.ts");
     }
 }
+
+/// NodeRecord を ReactFlow Node 形式の JSON に変換する。
+fn node_record_to_rf(n: NodeRecord) -> serde_json::Value {
+    let node_type = n.node_type.as_deref().unwrap_or("file");
+    let rf_type = if node_type == "test" {
+        "testNode"
+    } else {
+        "sourceNode"
+    };
+
+    let mut data = serde_json::json!({ "label": n.label });
+    if let Some(v) = n.node_type {
+        data["nodeType"] = v.into();
+    }
+    if let Some(v) = n.file_path {
+        data["filePath"] = v.into();
+    }
+    if let Some(v) = n.analyzed {
+        data["analyzed"] = v.into();
+    }
+
+    serde_json::json!({
+        "id":       thing_to_string(&n.id),
+        "type":     rf_type,
+        "position": { "x": n.position_x, "y": n.position_y },
+        "data":     data,
+    })
+}
+
+// edge テーブルから target / source の ID 文字列を取得するための typed struct
+#[derive(serde::Deserialize)]
+struct EdgeTarget {
+    target: String,
+}
+
+#[derive(serde::Deserialize)]
+struct EdgeSource {
+    source: String,
+}
+
+/// 選択ファイルの依存先（dependencies）と利用先（dependents）を返す。
+///
+/// 返り値は `{ center, dependencies, dependents }` の JSON。
+/// フロントエンドの `RelatedNodes` 型に対応する。
+///
+/// - dependencies: file_path が import しているノード（depth=1、node_modules 除外済み）
+/// - dependents:   file_path を import しているノード（edge テーブル逆引き）
+///
+/// # Arguments
+/// * `db`         - SurrealDB 接続
+/// * `project_id` - プロジェクト ID（"project:xxx" 形式）
+/// * `file_path`  - 選択テストファイルの rootPath 相対パス（forward slash）
+pub async fn get_related_nodes(
+    db: &Db,
+    project_id: &str,
+    file_path: &str,
+) -> Result<serde_json::Value, String> {
+    // structure グラフを取得
+    let graph = crate::services::graph::get_or_create_structure_graph(db, project_id).await?;
+    let graph_id = thing_to_string(&graph.id);
+
+    // center ノードを取得
+    let center_records: Vec<NodeRecord> = db
+        .query("SELECT * FROM node WHERE graph_id = $gid AND file_path = $fp LIMIT 1")
+        .bind(("gid", graph_id.clone()))
+        .bind(("fp", file_path.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+        .take(0)
+        .map_err(|e| e.to_string())?;
+
+    let center_record = center_records
+        .into_iter()
+        .next()
+        .ok_or_else(|| format!("node not found for file_path: {}", file_path))?;
+    let center_id = thing_to_string(&center_record.id);
+    let center = node_record_to_rf(center_record);
+
+    // dependencies: center が source のエッジの target ノードを取得
+    let dep_targets: Vec<EdgeTarget> = db
+        .query(
+            "SELECT target FROM edge WHERE graph_id = $gid AND source = $src AND kind = 'imports'",
+        )
+        .bind(("gid", graph_id.clone()))
+        .bind(("src", center_id.clone()))
+        .await
+        .map_err(|e| e.to_string())?
+        .take(0)
+        .map_err(|e| e.to_string())?;
+
+    let mut dependencies = vec![];
+    for et in dep_targets {
+        let records: Vec<NodeRecord> = db
+            .query("SELECT * FROM node WHERE id = type::thing($id) LIMIT 1")
+            .bind(("id", et.target))
+            .await
+            .map_err(|e| e.to_string())?
+            .take(0)
+            .map_err(|e| e.to_string())?;
+        if let Some(n) = records.into_iter().next() {
+            dependencies.push(node_record_to_rf(n));
+        }
+    }
+
+    // dependents: center が target のエッジの source ノードを取得
+    let dnt_sources: Vec<EdgeSource> = db
+        .query(
+            "SELECT source FROM edge WHERE graph_id = $gid AND target = $tgt AND kind = 'imports'",
+        )
+        .bind(("gid", graph_id.clone()))
+        .bind(("tgt", center_id.clone()))
+        .await
+        .map_err(|e| e.to_string())?
+        .take(0)
+        .map_err(|e| e.to_string())?;
+
+    let mut dependents = vec![];
+    for es in dnt_sources {
+        let records: Vec<NodeRecord> = db
+            .query("SELECT * FROM node WHERE id = type::thing($id) LIMIT 1")
+            .bind(("id", es.source))
+            .await
+            .map_err(|e| e.to_string())?
+            .take(0)
+            .map_err(|e| e.to_string())?;
+        if let Some(n) = records.into_iter().next() {
+            dependents.push(node_record_to_rf(n));
+        }
+    }
+
+    Ok(serde_json::json!({
+        "center":       center,
+        "dependencies": dependencies,
+        "dependents":   dependents,
+    }))
+}
