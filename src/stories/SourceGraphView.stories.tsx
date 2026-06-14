@@ -128,9 +128,29 @@ const DEPENDENT_NODES: RelatedNodes['dependents'] = [
     },
 ]
 
+const ISOLATED_RELATED: RelatedNodes = {
+    center: CENTER_NODE,
+    dependencies: [],
+    dependents: [],
+}
+
+const EMPTY_STALE_FILES = new Set<string>()
+
 const FULL_RELATED: RelatedNodes = {
     center: CENTER_NODE,
     dependencies: DEP_NODES,
+    dependents: DEPENDENT_NODES,
+}
+
+const DEPS_ONLY_RELATED: RelatedNodes = {
+    center: CENTER_NODE,
+    dependencies: DEP_NODES,
+    dependents: [],
+}
+
+const DEPENDENTS_ONLY_RELATED: RelatedNodes = {
+    center: CENTER_NODE,
+    dependencies: [],
     dependents: DEPENDENT_NODES,
 }
 
@@ -162,7 +182,7 @@ export const Default: Story = {
     args: {
         nodes: SOURCE_NODES,
         edges: EDGES,
-        staleFiles: new Set(),
+        staleFiles: EMPTY_STALE_FILES,
         onNodeSelect: fn(),
         onReanalyze: fn(),
         onNodesChange: fn(),
@@ -174,7 +194,7 @@ export const Empty: Story = {
     args: {
         nodes: [],
         edges: [],
-        staleFiles: new Set(),
+        staleFiles: EMPTY_STALE_FILES,
         onNodeSelect: fn(),
         onReanalyze: fn(),
         onNodesChange: fn(),
@@ -190,7 +210,7 @@ export const NodeClick: Story = {
     args: {
         nodes: SOURCE_NODES,
         edges: EDGES,
-        staleFiles: new Set(),
+        staleFiles: EMPTY_STALE_FILES,
         onNodeSelect: fn(),
         onReanalyze: fn(),
         onNodesChange: fn(),
@@ -212,7 +232,7 @@ export const WithTestNodes: Story = {
     args: {
         nodes: ALL_NODES,
         edges: EDGES,
-        staleFiles: new Set(),
+        staleFiles: EMPTY_STALE_FILES,
         onNodeSelect: fn(),
         onReanalyze: fn(),
         onNodesChange: fn(),
@@ -228,7 +248,7 @@ export const TaaCEmpty: Story = {
     args: {
         nodes: [],
         edges: [],
-        staleFiles: new Set(),
+        staleFiles: EMPTY_STALE_FILES,
         selectedFilePath: null,
         onGetRelatedNodes: fn(),
         onNodeSelect: fn(),
@@ -250,17 +270,19 @@ export const TaaCTestFileSelected: Story = {
     args: {
         nodes: [],
         edges: [],
-        staleFiles: new Set(),
+        staleFiles: EMPTY_STALE_FILES,
         selectedFilePath: 'src/components/App.test.tsx',
-        onGetRelatedNodes: fn().mockResolvedValue(FULL_RELATED),
+        onGetRelatedNodes: async () => FULL_RELATED,
         onNodeSelect: fn(),
         onReanalyze: fn(),
         onNodesChange: fn(),
     },
-    play: async ({ args }: { args: any }) => {
-        // onGetRelatedNodes が呼ばれたか確認するだけ
-        await new Promise(r => setTimeout(r, 1000))
-        await expect(args.onGetRelatedNodes).toHaveBeenCalled()
+    play: async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+        const canvas = within(canvasElement)
+        await expect(
+            await canvas.findByTestId('test-node-src-components-App.test.tsx', {}, { timeout: 3000 }),
+        ).toBeVisible()
+        await expect(canvas.queryByTestId('taac-empty-state')).not.toBeInTheDocument()
     },
 }
 
@@ -273,9 +295,9 @@ export const TaaCFullLayout: Story = {
     args: {
         nodes: [],
         edges: [],
-        staleFiles: new Set(),
+        staleFiles: EMPTY_STALE_FILES,
         selectedFilePath: 'src/components/App.test.tsx',
-        onGetRelatedNodes: fn().mockResolvedValue(FULL_RELATED),
+        onGetRelatedNodes: async () => FULL_RELATED,
         onNodeSelect: fn(),
         onReanalyze: fn(),
         onNodesChange: fn(),
@@ -287,9 +309,9 @@ export const TaaCDependenciesOnly: Story = {
     args: {
         nodes: [],
         edges: [],
-        staleFiles: new Set(),
+        staleFiles: EMPTY_STALE_FILES,
         selectedFilePath: 'src/components/App.test.tsx',
-        onGetRelatedNodes: fn().mockResolvedValue({ ...FULL_RELATED, dependents: [] }),
+        onGetRelatedNodes: async () => DEPS_ONLY_RELATED,
         onNodeSelect: fn(),
         onReanalyze: fn(),
         onNodesChange: fn(),
@@ -301,9 +323,9 @@ export const TaaCDependentsOnly: Story = {
     args: {
         nodes: [],
         edges: [],
-        staleFiles: new Set(),
+        staleFiles: EMPTY_STALE_FILES,
         selectedFilePath: 'src/components/App.test.tsx',
-        onGetRelatedNodes: fn().mockResolvedValue({ ...FULL_RELATED, dependencies: [] }),
+        onGetRelatedNodes: async () => DEPENDENTS_ONLY_RELATED,
         onNodeSelect: fn(),
         onReanalyze: fn(),
         onNodesChange: fn(),
@@ -315,9 +337,9 @@ export const TaaCIsolated: Story = {
     args: {
         nodes: [],
         edges: [],
-        staleFiles: new Set(),
+        staleFiles: EMPTY_STALE_FILES,
         selectedFilePath: 'src/components/App.test.tsx',
-        onGetRelatedNodes: fn().mockResolvedValue({ center: CENTER_NODE, dependencies: [], dependents: [] }),
+        onGetRelatedNodes: async () => ISOLATED_RELATED,
         onNodeSelect: fn(),
         onReanalyze: fn(),
         onNodesChange: fn(),
@@ -339,7 +361,7 @@ export const TaaCNonTestFileIgnored: Story = {
     args: {
         nodes: [],
         edges: [],
-        staleFiles: new Set(),
+        staleFiles: EMPTY_STALE_FILES,
         selectedFilePath: 'src/components/App.tsx',
         onGetRelatedNodes: fn(),
         onNodeSelect: fn(),
