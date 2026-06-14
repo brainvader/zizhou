@@ -9,7 +9,7 @@
  * 3. ソースノードとテストノードが混在して表示される
  * 4. 空状態のとき案内メッセージが表示される
  * 5. [CTX-22b] テストファイルが未選択のとき空グラフと案内メッセージが表示される（Empty State）
- * 6. [CTX-22b] テストファイルを選択すると onGetRelatedNodes が呼ばれグラフが表示される
+ * 6. [CTX-22b] テストファイルを選択すると依存ノードがグラフ表示され Subflow で囲まれる
  * 7. [CTX-22b] 依存先ノード（dependencies）が選択ノードの左側に配置される
  * 8. [CTX-22b] 利用先ノード（dependents）が選択ノードの右側に配置される
  * 9. [CTX-22b] 依存先のみのケースで右側が空になる
@@ -272,16 +272,26 @@ export const TaaCTestFileSelected: Story = {
         edges: [],
         staleFiles: EMPTY_STALE_FILES,
         selectedFilePath: 'src/components/App.test.tsx',
-        onGetRelatedNodes: async () => FULL_RELATED,
+        onGetRelatedNodes: fn(async () => FULL_RELATED),
         onNodeSelect: fn(),
         onReanalyze: fn(),
         onNodesChange: fn(),
     },
     play: async ({ canvasElement }: { canvasElement: HTMLElement }) => {
         const canvas = within(canvasElement)
+        // center ノード（テストファイル）が表示される
         await expect(
             await canvas.findByTestId('test-node-src-components-App.test.tsx', {}, { timeout: 3000 }),
         ).toBeVisible()
+        // dependencies が Subflow コンテナで囲まれる
+        await expect(
+            await canvas.findByTestId(
+                'context-container-source_context:taac-src-components-App.test.tsx',
+                {},
+                { timeout: 3000 },
+            ),
+        ).toBeInTheDocument()
+        // 空状態メッセージが消える
         await expect(canvas.queryByTestId('taac-empty-state')).not.toBeInTheDocument()
     },
 }
@@ -297,7 +307,7 @@ export const TaaCFullLayout: Story = {
         edges: [],
         staleFiles: EMPTY_STALE_FILES,
         selectedFilePath: 'src/components/App.test.tsx',
-        onGetRelatedNodes: async () => FULL_RELATED,
+        onGetRelatedNodes: fn(async () => FULL_RELATED),
         onNodeSelect: fn(),
         onReanalyze: fn(),
         onNodesChange: fn(),
@@ -311,7 +321,7 @@ export const TaaCDependenciesOnly: Story = {
         edges: [],
         staleFiles: EMPTY_STALE_FILES,
         selectedFilePath: 'src/components/App.test.tsx',
-        onGetRelatedNodes: async () => DEPS_ONLY_RELATED,
+        onGetRelatedNodes: fn(async () => DEPS_ONLY_RELATED),
         onNodeSelect: fn(),
         onReanalyze: fn(),
         onNodesChange: fn(),
@@ -325,7 +335,7 @@ export const TaaCDependentsOnly: Story = {
         edges: [],
         staleFiles: EMPTY_STALE_FILES,
         selectedFilePath: 'src/components/App.test.tsx',
-        onGetRelatedNodes: async () => DEPENDENTS_ONLY_RELATED,
+        onGetRelatedNodes: fn(async () => DEPENDENTS_ONLY_RELATED),
         onNodeSelect: fn(),
         onReanalyze: fn(),
         onNodesChange: fn(),
@@ -339,7 +349,7 @@ export const TaaCIsolated: Story = {
         edges: [],
         staleFiles: EMPTY_STALE_FILES,
         selectedFilePath: 'src/components/App.test.tsx',
-        onGetRelatedNodes: async () => ISOLATED_RELATED,
+        onGetRelatedNodes: fn(async () => ISOLATED_RELATED),
         onNodeSelect: fn(),
         onReanalyze: fn(),
         onNodesChange: fn(),

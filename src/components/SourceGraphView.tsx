@@ -40,7 +40,7 @@
  * @bom docs/bom/source-context.ts
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
     ReactFlow,
     ReactFlowProvider,
@@ -68,6 +68,7 @@ import { useCallbackRef } from '@/hooks/useCallbackRef'
 import { useStableValue } from '@/hooks/useStableValue'
 import { isSameSet, isSameContexts } from '@/lib/compare'
 import { buildContainerRects, enrichNode } from '@/lib/sourceGraphUtils'
+import type { SourceContext } from '@/bom/source-context'
 
 // ============================================================
 // nodeTypes はコンポーネント外で定義（再レンダリング時の remount 防止）
@@ -124,6 +125,8 @@ function SourceGraphViewInner({
     // ============================================================
 
     const isTaaCMode = onGetRelatedNodes != null
+    const onGetRelatedNodesRef = useRef(onGetRelatedNodes)
+    onGetRelatedNodesRef.current = onGetRelatedNodes
 
     const [relatedNodes, setRelatedNodes] = useState<RelatedNodes | null>(null)
 
@@ -132,16 +135,20 @@ function SourceGraphViewInner({
     }, [selectedFilePath])
 
     useEffect(() => {
-        if (!onGetRelatedNodes) return
+        if (!isTaaCMode) return
+        const fn = onGetRelatedNodesRef.current
+        if (!fn) return
         if (!selectedFilePath || !isTestFile(selectedFilePath)) return
 
         let cancelled = false
-        Promise.resolve(onGetRelatedNodes('', selectedFilePath)).then((data) => {
+        Promise.resolve(fn('', selectedFilePath)).then((data) => {
             if (!cancelled && data) setRelatedNodes(data)
         }).catch(() => { })
 
         return () => { cancelled = true }
-    }, [onGetRelatedNodes, selectedFilePath])
+        // selectedFilePath が変わったときだけ再実行。fn は ref 経由で常に最新を参照。
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedFilePath])
 
     // ============================================================
     // [CTX-22] コンテナノード生成
@@ -198,6 +205,44 @@ function SourceGraphViewInner({
     // [CTX-22b] TaaC モード: RelatedNodes → ReactFlow ノード変換
     // ============================================================
 
+    // relatedNodes.dependencies を1つの SourceContext として自動生成する。
+    // これにより Subflow コンテナが依存先ノード群を囲む。
+    const taaCContexts = useMemo((): SourceContext[] => {
+        if (!isTaaCMode || !relatedNodes || relatedNodes.dependencies.length === 0) return []
+        const centerPath = relatedNodes.center.data.filePath ?? relatedNodes.center.id
+        return [{
+            id: `source_context:taac-${centerPath.replace(/\//g, '-')}`,
+            name: centerPath.split('/').pop() ?? centerPath,
+            projectId: '',
+            nodeIds: relatedNodes.dependencies.map((n) => n.id),
+        }]
+    }, [isTaaCMode, relatedNodes])
+
+    const taaCContainerRects = useMemo(
+        () => buildContainerRects(taaCContexts, relatedNodes
+            ? [relatedNodes.center, ...relatedNodes.dependencies, ...relatedNodes.dependents]
+            : []),
+        [taaCContexts, relatedNodes],
+    )
+
+    const taaCContainerNodes = useMemo((): SourceContextContainerNode[] => {
+        return taaCContexts.flatMap((ctx) => {
+            const rect = taaCContainerRects.get(ctx.id)
+            if (!rect) return []
+            return [{
+                id: `context-container-${ctx.id}`,
+                type: 'contextContainer' as const,
+                position: { x: rect.x, y: rect.y },
+                style: { width: rect.width, height: rect.height },
+                data: { label: ctx.name, contextId: ctx.id },
+                selectable: false,
+                draggable: false,
+                deletable: false,
+                zIndex: -1,
+            }]
+        })
+    }, [taaCContexts, taaCContainerRects])
+
     const taaCNodes = useMemo((): (SourceNodeRfType | TestNodeType)[] => {
         if (!isTaaCMode || !relatedNodes) return []
         const positions = computeTaaCLayout(relatedNodes)
@@ -212,17 +257,17 @@ function SourceGraphViewInner({
             return enrichNode({ ...node, position: pos }, {
                 staleFiles: stableStaleFiles,
                 selectedFilePath,
-                contexts: stableContexts,
-                containerRects,
+                contexts: taaCContexts,
+                containerRects: taaCContainerRects,
                 onReanalyze: stableOnReanalyze,
                 onRunTest: stableOnRunTest,
             })
         })
-    }, [isTaaCMode, relatedNodes, stableStaleFiles, selectedFilePath, stableContexts, containerRects, stableOnReanalyze, stableOnRunTest])
+    }, [isTaaCMode, relatedNodes, stableStaleFiles, selectedFilePath, taaCContexts, taaCContainerRects, stableOnReanalyze, stableOnRunTest])
 
     const activeNodes = useMemo(
-        (): AllNodeType[] => isTaaCMode ? taaCNodes : baseNodes,
-        [isTaaCMode, taaCNodes, baseNodes],
+        (): AllNodeType[] => isTaaCMode ? [...taaCContainerNodes, ...taaCNodes] : baseNodes,
+        [isTaaCMode, taaCContainerNodes, taaCNodes, baseNodes],
     )
 
     // TaaC モード: テストファイル未選択 or 非テストファイル → 空
