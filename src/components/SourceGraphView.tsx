@@ -23,17 +23,24 @@
  * [CTX-13] CatalogMenu:
  *   - onPaneContextMenu をキャンバス右クリック時に呼ぶ
  *
+ * [CTX-22b] Test as a Context (TaaC):
+ *   - onGetRelatedNodes が渡されている場合は TaaC モードで動作する
+ *   - selectedFilePath がテストファイル（isTestFile）のとき onGetRelatedNodes を呼ぶ
+ *   - 取得した RelatedNodes を computeTaaCLayout で左中右に自動配置してグラフ表示する
+ *   - テストファイル未選択時は taac-empty-state を表示する
+ *   - テストファイル以外が selectedFilePath に渡されても onGetRelatedNodes は呼ばない
+ *
  * 無限ループ回避:
  *   - useNodesState / useEdgesState を使わない（controlled mode）
  *   - staleFiles / contexts は useStableValue で内容比較により参照を安定させる
  *   - onReanalyze / onRunTest は useCallbackRef で安定した参照にする
  *
- * @context CTX-21, CTX-22, CTX-13
+ * @context CTX-21, CTX-22, CTX-13, CTX-22b
  * @bom docs/bom/source-graph.ts
  * @bom docs/bom/source-context.ts
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
     ReactFlow,
     ReactFlowProvider,
@@ -53,6 +60,9 @@ import {
     type SourceNodeType as SourceNodeRfType,
     type SourceContextContainerNode,
     type TestNodeType,
+    type RelatedNodes,
+    isTestFile,
+    computeTaaCLayout,
 } from '@/bom/source-graph'
 import { useCallbackRef } from '@/hooks/useCallbackRef'
 import { useStableValue } from '@/hooks/useStableValue'
@@ -90,6 +100,7 @@ function SourceGraphViewInner({
     contexts = [],
     onRunTest,
     onPaneContextMenu,
+    onGetRelatedNodes,
 }: SourceGraphViewProps) {
     // ============================================================
     // コールバック安定化
@@ -107,6 +118,31 @@ function SourceGraphViewInner({
 
     const stableStaleFiles = useStableValue(staleFiles, isSameSet)
     const stableContexts = useStableValue(contexts, isSameContexts)
+
+    // ============================================================
+    // [CTX-22b] TaaC モード: RelatedNodes オンデマンド取得
+    // ============================================================
+
+    const isTaaCMode = onGetRelatedNodes != null
+    const onGetRelatedNodesRef = useRef(onGetRelatedNodes)
+    onGetRelatedNodesRef.current = onGetRelatedNodes  // レンダリングごとに同期（useEffect より確実）
+
+    const [relatedNodes, setRelatedNodes] = useState<RelatedNodes | null>(null)
+
+    useEffect(() => {
+        const fn = onGetRelatedNodesRef.current
+        if (!fn) return
+        if (!selectedFilePath || !isTestFile(selectedFilePath)) return
+
+        let cancelled = false
+        const result = fn('', selectedFilePath)
+        if (!result || typeof result.then !== 'function') return
+        result.then((data) => {
+            if (!cancelled) setRelatedNodes(data)
+        })
+
+        return () => { cancelled = true }
+    }, [isTaaCMode, selectedFilePath])
 
     // ============================================================
     // [CTX-22] コンテナノード生成
@@ -160,14 +196,46 @@ function SourceGraphViewInner({
     )
 
     // ============================================================
+    // [CTX-22b] TaaC モード: RelatedNodes → ReactFlow ノード変換
+    // ============================================================
+
+    const taaCNodes = useMemo((): (SourceNodeRfType | TestNodeType)[] => {
+        if (!isTaaCMode || !relatedNodes) return []
+        const positions = computeTaaCLayout(relatedNodes)
+        const allNodes = [
+            relatedNodes.center,
+            ...relatedNodes.dependencies,
+            ...relatedNodes.dependents,
+        ]
+        return allNodes.map((node) => {
+            const key = node.data.filePath ?? node.id
+            const pos = positions.get(key) ?? node.position
+            return enrichNode({ ...node, position: pos }, {
+                staleFiles: stableStaleFiles,
+                selectedFilePath,
+                contexts: stableContexts,
+                containerRects,
+                onReanalyze: stableOnReanalyze,
+                onRunTest: stableOnRunTest,
+            })
+        })
+    }, [isTaaCMode, relatedNodes, stableStaleFiles, selectedFilePath, stableContexts, containerRects, stableOnReanalyze, stableOnRunTest])
+
+    const activeNodes: AllNodeType[] = isTaaCMode ? taaCNodes : baseNodes
+
+    // TaaC モード: テストファイル未選択 or 非テストファイル → 空
+    const isTaaCEmpty = isTaaCMode && (!selectedFilePath || !isTestFile(selectedFilePath))
+    const isEmpty = isTaaCEmpty || (!isTaaCMode && nodesProp.length === 0)
+
+    // ============================================================
     // ドラッグ位置管理（controlled mode）
     // ============================================================
 
-    const [localNodes, setLocalNodes] = useState<AllNodeType[]>(baseNodes)
+    const [localNodes, setLocalNodes] = useState<AllNodeType[]>(activeNodes)
 
     useEffect(() => {
-        setLocalNodes(baseNodes)
-    }, [baseNodes])
+        setLocalNodes(activeNodes)
+    }, [activeNodes])
 
     const handleNodesChange = useCallback(
         (changes: NodeChange<AllNodeType>[]) => {
@@ -203,13 +271,11 @@ function SourceGraphViewInner({
         [stableOnNodeSelect],
     )
 
-    const isEmpty = nodesProp.length === 0
-
     return (
         <div style={{ width: '100%', height: '100%', position: 'relative' }}>
             {isEmpty && (
                 <div
-                    data-testid="source-graph-empty"
+                    data-testid={isTaaCMode ? 'taac-empty-state' : 'source-graph-empty'}
                     style={{
                         position: 'absolute',
                         inset: 0,
@@ -222,7 +288,9 @@ function SourceGraphViewInner({
                     }}
                 >
                     <span style={{ fontSize: 13, fontFamily: 'var(--font-mono, monospace)' }}>
-                        ファイルをクリックして解析を開始してください
+                        {isTaaCMode
+                            ? 'テストファイルを選択してください'
+                            : 'ファイルをクリックして解析を開始してください'}
                     </span>
                 </div>
             )}
