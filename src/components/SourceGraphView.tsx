@@ -40,7 +40,7 @@
  * @bom docs/bom/source-context.ts
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
     ReactFlow,
     ReactFlowProvider,
@@ -124,19 +124,30 @@ function SourceGraphViewInner({
     // ============================================================
 
     const isTaaCMode = onGetRelatedNodes != null
+    const onGetRelatedNodesRef = useRef(onGetRelatedNodes)
+    onGetRelatedNodesRef.current = onGetRelatedNodes
+
     const [relatedNodes, setRelatedNodes] = useState<RelatedNodes | null>(null)
 
     useEffect(() => {
-        if (!onGetRelatedNodes) return
+        setRelatedNodes(null)
+    }, [selectedFilePath])
+
+    useEffect(() => {
+        if (!isTaaCMode) return
+        const fn = onGetRelatedNodesRef.current
+        if (!fn) return
         if (!selectedFilePath || !isTestFile(selectedFilePath)) return
 
         let cancelled = false
-        Promise.resolve(onGetRelatedNodes('', selectedFilePath)).then((data) => {
+        Promise.resolve(fn('', selectedFilePath)).then((data) => {
             if (!cancelled && data) setRelatedNodes(data)
         }).catch(() => { })
 
         return () => { cancelled = true }
-    }, [isTaaCMode, selectedFilePath, onGetRelatedNodes])
+        // selectedFilePath が変わったときだけ再実行。fn は ref 経由で常に最新を参照。
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedFilePath])
 
     // ============================================================
     // [CTX-22] コンテナノード生成
@@ -215,7 +226,10 @@ function SourceGraphViewInner({
         })
     }, [isTaaCMode, relatedNodes, stableStaleFiles, selectedFilePath, stableContexts, containerRects, stableOnReanalyze, stableOnRunTest])
 
-    const activeNodes: AllNodeType[] = isTaaCMode ? taaCNodes : baseNodes
+    const activeNodes = useMemo(
+        (): AllNodeType[] => isTaaCMode ? taaCNodes : baseNodes,
+        [isTaaCMode, taaCNodes, baseNodes],
+    )
 
     // TaaC モード: テストファイル未選択 or 非テストファイル → 空
     const isTaaCEmpty = isTaaCMode && (!selectedFilePath || !isTestFile(selectedFilePath))
