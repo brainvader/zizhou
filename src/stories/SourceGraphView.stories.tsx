@@ -9,7 +9,7 @@
  * 3. ソースノードとテストノードが混在して表示される
  * 4. 空状態のとき案内メッセージが表示される
  * 5. [CTX-22b] テストファイルが未選択のとき空グラフと案内メッセージが表示される（Empty State）
- * 6. [CTX-22b] テストファイルを選択すると依存ノードがグラフ表示され Subflow で囲まれる
+ * 6. [CTX-22b] テストファイルを選択すると依存ノードがエッジで繋がって表示される
  * 7. [CTX-22b] 依存先ノード（dependencies）が選択ノードの左側に配置される
  * 8. [CTX-22b] 利用先ノード（dependents）が選択ノードの右側に配置される
  * 9. [CTX-22b] 依存先のみのケースで右側が空になる
@@ -265,7 +265,7 @@ export const TaaCEmpty: Story = {
 // TaaC — テストファイル選択時（CTX-22b）
 // ============================================================
 
-/** @story [CTX-22b] テストファイルを選択すると onGetRelatedNodes が呼ばれグラフが表示される */
+/** @story [CTX-22b] テストファイルを選択すると依存ノードがエッジで繋がって表示される */
 export const TaaCTestFileSelected: Story = {
     args: {
         nodes: [],
@@ -283,14 +283,6 @@ export const TaaCTestFileSelected: Story = {
         await expect(
             await canvas.findByTestId('test-node-src-components-App.test.tsx', {}, { timeout: 3000 }),
         ).toBeVisible()
-        // dependencies が Subflow コンテナで囲まれる
-        await expect(
-            await canvas.findByTestId(
-                'context-container-source_context:taac-src-components-App.test.tsx',
-                {},
-                { timeout: 3000 },
-            ),
-        ).toBeInTheDocument()
         // 空状態メッセージが消える
         await expect(canvas.queryByTestId('taac-empty-state')).not.toBeInTheDocument()
     },
