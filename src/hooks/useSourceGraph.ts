@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
 import type { Node } from '@xyflow/react'
 import type { SourceGraph } from '@/bom/source-graph'
+import { isTestFile } from '@/bom/source-graph'
 
 /**
  * useSourceGraph
@@ -17,7 +18,7 @@ import type { SourceGraph } from '@/bom/source-graph'
  *
  * @param projectId プロジェクト ID
  * @param rootPath  プロジェクトルートパス（get_changed_files に使用）
- * @context CTX-20, CTX-22
+ * @context CTX-20, CTX-22, CTX-22b
  */
 export function useSourceGraph(projectId: string, rootPath: string | undefined) {
     const [structureGraph, setStructureGraph] = useState<SourceGraph | null>(null)
@@ -78,6 +79,8 @@ export function useSourceGraph(projectId: string, rootPath: string | undefined) 
 
     const handleFileClick = useCallback(
         async (filePath: string) => {
+            // [CTX-22b] TaaC: テストファイル以外は SourceGraph を更新しない
+            if (!isTestFile(filePath)) return
             setSelectedFilePath(filePath)
             if (analyzedFiles.has(filePath)) return
             setIsAnalyzing(true)
