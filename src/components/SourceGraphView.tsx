@@ -40,7 +40,7 @@
  * @bom docs/bom/source-context.ts
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
     ReactFlow,
     ReactFlowProvider,
@@ -124,23 +124,19 @@ function SourceGraphViewInner({
     // ============================================================
 
     const isTaaCMode = onGetRelatedNodes != null
-    const onGetRelatedNodesRef = useRef(onGetRelatedNodes)
-    onGetRelatedNodesRef.current = onGetRelatedNodes  // レンダリングごとに同期（useEffect より確実）
-
     const [relatedNodes, setRelatedNodes] = useState<RelatedNodes | null>(null)
 
     useEffect(() => {
-        const fn = onGetRelatedNodesRef.current
-        if (!fn) return
+        if (!onGetRelatedNodes) return
         if (!selectedFilePath || !isTestFile(selectedFilePath)) return
 
         let cancelled = false
-        Promise.resolve(fn('', selectedFilePath)).then((data) => {
+        Promise.resolve(onGetRelatedNodes('', selectedFilePath)).then((data) => {
             if (!cancelled && data) setRelatedNodes(data)
-        }).catch(() => { /* fn() が undefined を返す場合は無視 */ })
+        }).catch(() => { })
 
         return () => { cancelled = true }
-    }, [isTaaCMode, selectedFilePath])
+    }, [isTaaCMode, selectedFilePath, onGetRelatedNodes])
 
     // ============================================================
     // [CTX-22] コンテナノード生成
