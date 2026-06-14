@@ -295,6 +295,35 @@ export async function invoke<T>(
             for (const fp of sourceFiles) {
                 await invoke('analyze_file', { projectId, filePath: fp })
             }
+            // [CTX-22b] TaaC: テストファイル → ソースファイルのエッジを登録する
+            const graph = _graphs.find(
+                (g) => g.project_id === projectId && g.kind === 'structure'
+            )
+            if (graph) {
+                const data = _graphData.get(graph.id) ?? { nodes: [], edges: [] }
+                const findNodeId = (fp: string) => data.nodes.find((n) => n.file_path === fp)?.id
+                const appTestId = findNodeId('src/components/App.test.tsx')
+                const appId = findNodeId('src/components/App.tsx')
+                const useStoreTestId = findNodeId('src/hooks/useStore.test.ts')
+                const useStoreId = findNodeId('src/hooks/useStore.ts')
+                if (appTestId && appId) {
+                    data.edges.push({
+                        id: `edge:mock-${_idCounter++}`,
+                        source: appTestId,
+                        target: appId,
+                        kind: 'imports',
+                    })
+                }
+                if (useStoreTestId && useStoreId) {
+                    data.edges.push({
+                        id: `edge:mock-${_idCounter++}`,
+                        source: useStoreTestId,
+                        target: useStoreId,
+                        kind: 'imports',
+                    })
+                }
+                _graphData.set(graph.id, data)
+            }
             return undefined as unknown as T
         }
 
