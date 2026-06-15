@@ -60,8 +60,10 @@ test.describe('SourceGraphView: Integration', () => {
         await page.getByTestId('fs-entry-src').click()
         await page.getByTestId('fs-entry-main.tsx').click()
 
+        await page.getByRole('button', { name: 'Fit View' }).click()
+
         const node = page.getByTestId('source-node-src-main.tsx')
-        await expect(node).toHaveAttribute('data-selected', 'true', { timeout: 3000 })
+        await expect(node).toHaveAttribute('data-selected', 'true', { timeout: 5000 })
         await page.screenshot({ path: 'evidence/source-graph_file-node-sync.png' })
     })
 

@@ -113,6 +113,10 @@ function SourceGraphViewInner({
     const stableOnRunTest = useCallbackRef(onRunTest)
     const stableOnPaneContextMenu = useCallbackRef(onPaneContextMenu)
 
+    // selectedFilePath の最新値を ref で追跡（handleNodesChange クロージャ用）
+    const selectedFilePathRef = useRef(selectedFilePath)
+    useEffect(() => { selectedFilePathRef.current = selectedFilePath }, [selectedFilePath])
+
     // ============================================================
     // staleFiles / contexts を内容比較で参照安定化
     // ============================================================
@@ -266,12 +270,22 @@ function SourceGraphViewInner({
     const [localNodes, setLocalNodes] = useState<AllNodeType[]>(activeNodes)
 
     useEffect(() => {
-        setLocalNodes(activeNodes)
+        setLocalNodes((prev) => {
+            // ポジションはprevから引き継ぎ、selected だけ activeNodes から反映する
+            const posMap = new Map(prev.map((n) => [n.id, n.position]))
+            return activeNodes.map((n) => ({
+                ...n,
+                position: posMap.get(n.id) ?? n.position,
+            }))
+        })
     }, [activeNodes])
 
     const handleNodesChange = useCallback(
         (changes: NodeChange<AllNodeType>[]) => {
-            setLocalNodes((prev) => applyNodeChanges(changes, prev) as AllNodeType[])
+            setLocalNodes((prev) => applyNodeChanges(
+                changes.filter((c) => c.type !== 'select'),
+                prev,
+            ) as AllNodeType[])
 
             const hasDragEnd = changes.some(
                 (c) => c.type === 'position' && c.dragging === false,
@@ -334,9 +348,11 @@ function SourceGraphViewInner({
                 onNodeClick={handleNodeClick}
                 onPaneContextMenu={(e) => e instanceof MouseEvent ? undefined : stableOnPaneContextMenu(e)}
                 nodeTypes={NODE_TYPES}
-                fitView
-                fitViewOptions={{ padding: 0.2 }}
+                defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
                 deleteKeyCode={null}
+                selectionOnDrag={false}
+                selectNodesOnDrag={false}
+                nodesFocusable={false}
             >
                 <Background />
                 <Controls />
