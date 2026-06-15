@@ -136,17 +136,16 @@ test.describe('CTX-22b: Test as a Context (TaaC)', () => {
             page.getByTestId('test-node-src-components-App.test.tsx'),
         ).toBeVisible({ timeout: 5000 })
 
-        // 別のテストファイルを選択
-        await page.getByTestId('fs-entry-src').click()
+        // src を折りたたんで再展開してから hooks へ
+        await page.getByTestId('fs-entry-src').click() // 折りたたむ
+        await page.getByTestId('fs-entry-src').click() // 再展開
         await page.getByTestId('fs-entry-hooks').click()
         await page.getByTestId('fs-entry-useStore.test.ts').click()
 
-        // 新しいグラフが表示される
         await expect(
             page.getByTestId('test-node-src-hooks-useStore.test.ts'),
         ).toBeVisible({ timeout: 5000 })
 
-        // 前のグラフは消える
         await expect(
             page.getByTestId('test-node-src-components-App.test.tsx'),
         ).not.toBeVisible()
