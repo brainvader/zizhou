@@ -21,6 +21,7 @@ import { useGraphList } from '@/hooks/useGraphList'
 import { useSourceGraph } from '@/hooks/useSourceGraph'
 import { useTestContexts } from '@/hooks/useTestContexts'
 import type { RelatedNodes } from '@/bom/source-graph'
+import { isTestFile } from '@/bom/source-graph'
 
 /**
  * ProjectDetailRoute
@@ -171,7 +172,11 @@ export const ProjectDetailRoute = () => {
                             onNodesChange={handleSourceNodesChange}
                             contexts={contexts}
                             onPaneContextMenu={handlePaneContextMenu}
-                            onGetRelatedNodes={handleGetRelatedNodes}
+                            onGetRelatedNodes={
+                                selectedFilePath && isTestFile(selectedFilePath)
+                                    ? handleGetRelatedNodes
+                                    : undefined
+                            }
                         />
                         {catalogMenu && (
                             <CatalogMenu
