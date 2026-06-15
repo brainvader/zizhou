@@ -424,9 +424,3 @@ export type GraphStorage = {
     /** プロジェクトの structure グラフを取得する（なければバックエンド側で自動作成） */
     getStructureGraph: (projectId: string) => Promise<GraphFile>
 }
-
-// ============================================================
-// UseGraphLoadOptions / UseGraphSaveOptions の DI 整理       [CTX-21]
-// 既存の onLoadGraph / onSaveGraph props は storage 経由に統合する。
-// storage は Pick<GraphStorage, '...'> で部分注入可能。
-// ============================================================

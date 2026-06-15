@@ -96,10 +96,17 @@ export const readDir = async (path: string) => {
         ],
         '/Users/user/projects/zizou-core/src': [
             { name: 'components', isFile: false, isDirectory: true, isSymlink: false },
+            { name: 'hooks', isFile: false, isDirectory: true, isSymlink: false },
             { name: 'main.tsx', isFile: true, isDirectory: false, isSymlink: false },
         ],
         '/Users/user/projects/zizou-core/src/components': [
+            { name: 'App.tsx', isFile: true, isDirectory: false, isSymlink: false },
+            { name: 'App.test.tsx', isFile: true, isDirectory: false, isSymlink: false },
             { name: 'FileTree.tsx', isFile: true, isDirectory: false, isSymlink: false },
+        ],
+        '/Users/user/projects/zizou-core/src/hooks': [
+            { name: 'useStore.ts', isFile: true, isDirectory: false, isSymlink: false },
+            { name: 'useStore.test.ts', isFile: true, isDirectory: false, isSymlink: false },
         ],
         '/Users/user/projects/zizou-core/graphs': [
             { name: 'graph-01.json', isFile: true, isDirectory: false, isSymlink: false },

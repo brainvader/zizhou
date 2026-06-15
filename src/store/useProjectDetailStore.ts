@@ -13,6 +13,8 @@ export type ProjectDetailStoreState = {
     initStatus: InitStatus
     projectRootPath: string
     isDetailHydrated: boolean
+    /** [CTX-22b] 最後に選択したテストファイルパス。TaaC グラフのキャッシュに使用。 */
+    selectedTestFilePath: string | null
 }
 
 export type ProjectDetailStoreActions = {
@@ -20,6 +22,8 @@ export type ProjectDetailStoreActions = {
     setInitStatus: (status: InitStatus) => void
     setProjectRootPath: (path: string) => void
     setDetailHydrated: (value: boolean) => void
+    /** [CTX-22b] 選択テストファイルパスを更新する。 */
+    setSelectedTestFilePath: (filePath: string | null) => void
 }
 
 export type ProjectDetailStore = ProjectDetailStoreState & ProjectDetailStoreActions
@@ -46,10 +50,12 @@ export const useProjectDetailStore = create<ProjectDetailStore>((set) => ({
     initStatus: 'checking',
     projectRootPath: '',
     isDetailHydrated: false,
+    selectedTestFilePath: null,
 
     // Actions
     setActiveGraphId: (id: string | null) => set({ activeGraphId: id }),
     setInitStatus: (status: InitStatus) => set({ initStatus: status }),
     setProjectRootPath: (path: string) => set({ projectRootPath: path }),
     setDetailHydrated: (value: boolean) => set({ isDetailHydrated: value }),
+    setSelectedTestFilePath: (filePath: string | null) => set({ selectedTestFilePath: filePath }),
 }))
