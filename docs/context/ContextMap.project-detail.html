@@ -1,39 +1,52 @@
 <!-- ============================================================
-            CTX-22: SOURCE CONTEXT [✓]
-            責務: Vitest テストファイルを解析し、SourceGraph 上にテストコンテキストを
-                  Subflow として自動表示する。テストノード選択時に関連ソースノード群を
-                  視覚的にグループ化し、LLM に渡すスコープを明示する。
+            CTX-22: TEST AS A CONTEXT (TaaC) [✓]
+            責務: Vitest テストファイルを解析し、FileTree でのテストファイル選択を
+                  トリガーに、関連ソースノード群を依存グラフとして SourceGraphView
+                  に表示する。LLM に渡すコンテキスト境界を spec ファイルが定義する。
 
             背景:
               LLM 支援コーディングでは「このファイル群の範囲で開発を閉じる」という
-              コンテクスト境界の明示が重要。
-              手動定義ではなく Vitest テストファイルから自動導出することで、
+              コンテキスト境界の明示が重要。全ファイルをグラフ表示してもスケールせず、
+              人間・LLM ともに処理しきれない。
+              spec ファイルの import 群 = コンテキストスコープという自然な対応により、
               テストを書くことがそのままコンテキスト定義になる。
+              テストファイルのないソースファイルはグラフに現れない。これは
+              「テストを書かないとスコープが定義できない」という設計上の圧力として機能する。
 
             コンテキストの定義:
               テストファイルの import 群 = コンテキストのスコープ（関与ファイル群）
-              describe 名              = コンテキスト名（Subflow ラベル）
+              describe 名              = コンテキスト名
 
               例:
-                // App.test.tsx
+                // App.spec.tsx
                 import { App } from '@/components/App'     ← スコープ
 
                 describe('App component tests', () => {   ← コンテキスト名
                     it('renders correctly', () => { ... })
                 })
 
-              テストノードをクリック
-                → import 解析済みの依存ノード群が Subflow で囲まれる
-                → describe 名が Subflow ラベルになる
+              FileTree でテストファイルを選択
+                → get_related_nodes で依存先・利用先を取得
+                → 選択ノード（中央）・dependencies（左）・dependents（右）を自動配置
 
             テストとコンテキストの対応:
-              describe = コンテキスト（どのノード群が関与するか = Subflow の範囲）
+              describe = コンテキスト（どのノード群が関与するか）
               it       = シナリオのステップ（CTX-23 でエッジアニメーションに対応予定）
 
-            SurrealDB データモデル:
-              source_context テーブル（SCHEMALESS）— 手動定義コンテキスト用（将来利用）
-                id, name, project_id, node_ids[]
+            表示ルール:
+              選択対象: *.test.ts / *.test.tsx / *.spec.ts / *.spec.tsx のみ
+              除外:     node_modules 配下
+              初期状態: 空（テストファイルが選択されるまで何も表示しない）
+              キャッシュ: 最後に選択したテストファイルの状態を維持
+              新規選択: 前の表示を置き換える
+              非テストファイル選択時: SourceGraph は変化しない
 
+            レイアウト:
+              [依存先ノード群]  →  [選択テストノード]  →  [利用先ノード群]
+                   左側                  中央                   右側
+              （テストがimportするもの）           （テストファイルをimportしているもの）
+
+            SurrealDB データモデル:
               test_file テーブル（SCHEMALESS）
                 id, project_id, file_path
 
@@ -44,100 +57,58 @@
                 id, suite_id, name, order
 
             Rust コマンド:
-              create_context / list_contexts / update_context / delete_context（実装済み）
               analyze_tests(project_id)         → test_file / test_suite / test_case を UPSERT
               list_test_suites(project_id)      → TestSuite[]
               list_test_cases(suite_id)         → TestCase[]
+              get_related_nodes(project_id, file_path) → RelatedNodes（center / dependencies / dependents）
 
             フロントエンド構成:
-              docs/bom/source-context.ts                   — SourceContext / ContextStorage /
-                                                             isBoundaryEdge / computeContainerRect /
-                                                             toRelativePosition
+              docs/bom/source-graph.ts                     — RelatedNodes / GetRelatedNodesFn /
+                                                             TaaCLayoutParams / isTestFile /
+                                                             computeTaaCLayout
               docs/bom/test-analysis.ts                    — TestFile / TestSuite / TestCase /
-                                                             TestStorage / TestSuiteAsContext
-              docs/bom/source-graph.ts                     — TestNodeData / TestNodeDisplayData /
+                                                             TestStorage
+              docs/bom/test-node.ts                        — TestNodeData / TestNodeDisplayData /
                                                              TestNodeType / TestNodeProps
-              src/components/nodes/SourceContextContainer.tsx — Subflow コンテナ
               src/components/nodes/TestNode.tsx             — テストノード描画（⚗ アイコン・紫系）
-              src/components/SourceGraphView.tsx            — contexts prop で Subflow 表示
-              src/services/ContextStorage.ts               — defaultContextStorage
-              src/services/TestStorage.ts                  — defaultTestStorage
-              src/routes/projects.$id.tsx                  — テストノード選択 → Subflow 自動表示
+              src/components/SourceGraphView.tsx            — onGetRelatedNodes prop で TaaC 動作
+              src/services/TestStorage.ts                   — defaultTestStorage
+              src/routes/projects.$id.tsx                   — FileTree 選択 → TaaC グラフ表示
 
             動作フロー:
               1. マウント時 / Reanalyze All 時に analyze_tests を呼ぶ
               2. テストファイルが nodeType='test' で structure グラフに登録される
               3. SourceGraphView がテストノードを TestNode コンポーネントで描画する
-              4. テストノードをクリックすると selectedFilePath が更新される
-              5. projects.$id.tsx が list_test_suites を呼び test_suite を取得する
-              6. test_suite.node_ids から SourceContext を生成して contexts にセット
-              7. SourceGraphView が contexts を受け取り Subflow を自動表示する
-              8. 通常ノードをクリックすると contexts がクリアされ Subflow が消える
+              4. FileTree でテストファイルを選択すると selectedFilePath が更新される
+              5. SourceGraphView が get_related_nodes を呼び RelatedNodes を取得する
+              6. computeTaaCLayout で依存先（左）・選択ノード（中央）・利用先（右）を配置する
+              7. テストファイル以外を選択すると SourceGraph は変化しない
+              8. テストファイル未選択時は空グラフ + 案内メッセージを表示する
 
             関連: CTX-21 (SourceGraph), CTX-23 (Test Simulation)
 
             ── 実装スコープ ──────────────────────────────────────────
-            [✓][Logic]   DB Schema            — source_context / test_file / test_suite /
-                                                test_case テーブルを SurrealDB に追加する
-            [✓][Logic]   Rust Commands        — create / list / update / delete_context を実装する
-            [✓][Logic]   BOM source-context   — docs/bom/source-context.ts に型定義・座標計算関数を追加する
-            [✓][Logic]   BOM test-analysis    — docs/bom/test-analysis.ts に型定義を追加する
-            [✓][Logic]   BOM source-graph     — TestNode 型を追加する
-            [✓][Logic]   ContextStorage       — src/services/ContextStorage.ts を実装する
+            [✓][Logic]   DB Schema            — test_file / test_suite / test_case テーブルを
+                                                SurrealDB に追加する
+            [✓][Logic]   Rust Commands        — analyze_tests / list_test_suites / list_test_cases /
+                                                get_related_nodes を実装する
+            [✓][Logic]   BOM source-graph     — RelatedNodes / isTestFile / computeTaaCLayout を追加する
+            [✓][Logic]   BOM test-analysis    — TestFile / TestSuite / TestCase / TestStorage を定義する
+            [✓][Logic]   BOM test-node        — TestNode 型を定義する
             [✓][Logic]   TestStorage          — src/services/TestStorage.ts を実装する
             [✓][Logic]   analyze_tests        — *.test.ts / *.spec.ts を tree-sitter で解析し UPSERT する
             [✓][Logic]   list_test_suites     — project_id で test_suite 一覧を返す
             [✓][Logic]   list_test_cases      — suite_id で test_case 一覧を返す
-            [✓][Feature] Subflow Display      — SourceContext を Subflow コンテナとして表示する
+            [✓][Logic]   get_related_nodes    — center / dependencies / dependents を返す
             [✓][Feature] TestNode Display     — テストノードを ⚗ アイコン・紫系で表示する
-            [✓][Feature] Test Context Subflow — テストノード選択 → 依存ノード群を Subflow で自動表示する
-            [✓][Logic]   Context Load         — マウント時に analyze_tests → list_test_suites で復元する
-            [ ][Feature] Boundary Edge        — コンテクスト境界をまたぐエッジを amber でハイライトする
+            [✓][Feature] TaaC Graph           — テストファイル選択 → 依存グラフを左中右で表示する
+            [✓][Feature] TaaC Empty State     — テストファイル未選択時に案内メッセージを表示する
+            [✓][Feature] FileTree TaaC Filter — テストファイル選択時のみ SourceGraph を更新する
+            [✓][Feature] Cache Last Selection — 最後に選択したテストファイルの状態を維持する
+            [ ][Feature] Boundary Edge        — コンテキスト境界をまたぐエッジを amber でハイライトする
             [ ][Feature] Context Load Optimize — 解析済みの場合は analyze_tests をスキップし
                                                 list_test_suites のみ呼ぶ
 ============================================================ -->
-
-<!-- ============================================================
-            CTX-22b: TEST AS A CONTEXT（TaaC）[✓]
-            責務: テストファイル選択時に関連ソースノードのみを SourceGraph に表示する。
-                  テストファイルが選択対象となり、それ以外のファイル選択ではグラフを変化させない。
- 
-            哲学: Test as a Context (TaaC)
-              テストファイルを書くことがコンテキスト定義と等価になる。
-              Context First = Test First Development。
- 
-              テストファイルのないソースファイルはグラフに現れない。
-              これは「テストを書かないとスコープが定義できない」という
-              設計上の圧力として機能する。
- 
-            表示ルール:
-              選択対象: *.test.ts / *.spec.ts のみ（FileTree で選択可能）
-              表示内容: 選択テストファイルの import 先ノード群（depth=1）
-                        + test_suite の node_ids に含まれるノード
-              除外:     node_modules 配下
-              初期状態: 空（テストファイルが選択されるまで何も表示しない）
-              キャッシュ: 最後に選択したテストファイルの状態を維持
-              新規選択: 前の表示を置き換える
- 
-            レイアウト:
-              [依存先ノード群]  →  [選択テストノード]  →  [利用先ノード群]
-                   左側                  中央                   右側
-              （テストがimportするもの）           （テストファイルをimportしているもの）
- 
-            FileTree の変更:
-              テストファイル以外のファイルをクリックしても SourceGraph は変化しない
-              テストファイルのみクリック可能（またはハイライト表示）
- 
-            関連: CTX-22 (Test Context Subflow), CTX-23 (Test Simulation)
- 
-            ── 実装スコープ ──────────────────────────────────────────
-            [✓][Logic]   get_related_nodes     — 選択ファイルの依存先・利用先を返す Rust コマンド
-            [✓][Feature] FileTree TaaC filter  — テストファイルのみ SourceGraph 選択対象にする
-            [✓][Feature] Graph on Demand       — テストファイル選択時のみグラフを更新する
-            [✓][Feature] Dependency Layout     — 依存先を左・利用先を右に自動配置する
-            [✓][Feature] Empty State           — 未選択時は空グラフを表示する
-            [✓][Feature] Cache Last Selection  — 最後の選択状態を維持する
-        ============================================================ -->
 
 <!-- ============================================================
             CTX-23: TEST SIMULATION [ ]
@@ -146,7 +117,7 @@
                   テスト実行結果を右ペインに表示しLLMへのコピーを提供する。
 
             背景:
-              CTX-22 でテストコンテキストが Subflow として可視化される。
+              CTX-22 でテストコンテキストが TaaC グラフとして可視化される。
               CTX-23 ではその中の it（テストケース）を実行単位として扱い、
               - データがノード間をどう流れるか をエッジアニメーションで示す
               - テスト実行結果を右ペインに表示する
@@ -211,7 +182,7 @@
               src/services/TestRunner.ts           — run_test_case / run_test_suite ラッパー
               src/components/NodeProperty.tsx      — テストノード選択時の結果表示・コピーボタン拡張
 
-            関連: CTX-22 (Source Context), CTX-21 (SourceGraph)
+            関連: CTX-22 (TaaC), CTX-21 (SourceGraph)
 
             ── 実装スコープ ──────────────────────────────────────────
             [ ][Logic]   BOM                  — docs/bom/test-simulation.ts に型定義を追加する
