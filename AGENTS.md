@@ -6,7 +6,31 @@
 
 機能をコンテキストに分解し、**そのコンテキストの実態はテストファイルである**。
 
-- **テストファイルが仕様書:** `*.test.tsx` の import 群がスコープを定義し、`describe` がコンテキスト名になる
+- **テストファイル = LLM へのコンテキスト:** spec ファイルを渡すだけで、LLM は import から実装対象を、describe / it から期待する振る舞いを把握できる
+
+```typescript
+/**
+ * このファイルを渡すだけで LLM は以下を把握できる：
+ * - 何を実装すべきか（import 群）
+ * - どう振る舞うべきか（describe / it）
+ */
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+
+import { SourceGraphView } from './SourceGraphView'
+import { useSourceGraph } from '../hooks/useSourceGraph'
+
+describe('ファイル選択でグラフを更新する', () => {
+  it('specファイルを選択するとグラフにノードが表示される', async () => {
+    const onGetRelatedNodes = vi.fn().mockResolvedValue({ nodes: [], edges: [] })
+    render(<SourceGraphView onGetRelatedNodes={onGetRelatedNodes} />)
+    await userEvent.click(screen.getByText('useSourceGraph.test.ts'))
+    expect(onGetRelatedNodes).toHaveBeenCalledWith('useSourceGraph.test.ts')
+  })
+})
+```
+
 - **型はテストが決める:** BOM という独立した設計フェーズは存在しない。型・インターフェースはテストを書く過程で自然に定まり、実装ファイルが所有・export する
 - **変更の起点はテスト:** 何かを変えたいなら、まずそのコンテキストのテストファイルを変える。テストが変われば何を実装すべきかが自明になる
 - **進捗の定義:** テストがグリーンになり、Storybook で人間が「意図通りだ」と認めた時
