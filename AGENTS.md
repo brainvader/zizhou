@@ -197,7 +197,7 @@ LLM はこれを読んでコンテキストを把握し、Vitest spec の生成�
 
 ## 6. テストファイルのひな型
 
-### 7-1. Vitest spec（`src/**/*.test.tsx`）
+### 6-1. Vitest spec（`src/**/*.test.tsx`）
 
 コンテキストの SSOT。import がスコープを定義し、describe が機能名・it が振る舞いを記述する。
 
@@ -225,7 +225,7 @@ describe('[機能名]', () => {
 })
 ```
 
-### 7-2. Storybook Story（`src/stories/*.stories.tsx`）
+### 6-2. Storybook Story（`src/stories/*.stories.tsx`）
 
 spec の describe / it と対応させる。視覚確認と play 関数によるインタラクション検証。
 
@@ -249,7 +249,7 @@ export const Default: Story = {
 };
 ```
 
-### 7-3. Playwright E2E（`tests/e2e/*.e2e.spec.ts`）
+### 6-3. Playwright E2E（`tests/e2e/*.e2e.spec.ts`）
 
 複数コンテキストをまたぐ統合シナリオのみ。単一コンテキスト内の検証はここに書かない。
 
@@ -265,7 +265,7 @@ test.describe("[統合シナリオ名]", () => {
 });
 ```
 
-## 8. 実行ワークフロー
+## 7. 実行ワークフロー
 
 ```mermaid
 flowchart TD
