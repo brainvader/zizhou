@@ -83,9 +83,9 @@ export function useSourceGraph(projectId: string, rootPath: string | undefined) 
 
     const handleFileClick = useCallback(
         async (filePath: string) => {
-            // [CTX-22] TaaC: テストファイル以外は SourceGraph を更新しない
-            setSelectedFilePath(filePath)
+            // [CTX-22] TaaC: テストファイル以外は selectedFilePath を更新しない
             if (!isTestFile(filePath)) return
+            setSelectedFilePath(filePath)
             if (analyzedFiles.has(filePath)) return
             setIsAnalyzing(true)
             try {

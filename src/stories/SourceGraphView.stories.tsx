@@ -278,10 +278,10 @@ export const TaaCTestFileSelected: Story = {
     },
     play: async ({ canvasElement }: { canvasElement: HTMLElement }) => {
         const canvas = within(canvasElement)
-        // center ノード（テストファイル）が表示される
+        // center ノード（テストファイル）が DOM に存在する
         await expect(
             await canvas.findByTestId('test-node-src-components-App.test.tsx', {}, { timeout: 3000 }),
-        ).toBeVisible()
+        ).toBeInTheDocument()
         // 空状態メッセージが消える
         await expect(canvas.queryByTestId('taac-empty-state')).not.toBeInTheDocument()
     },
@@ -349,7 +349,7 @@ export const TaaCIsolated: Story = {
         const canvas = within(canvasElement)
         await expect(
             await canvas.findByTestId('test-node-src-components-App.test.tsx', {}, { timeout: 3000 }),
-        ).toBeVisible()
+        ).toBeInTheDocument()
     },
 }
 

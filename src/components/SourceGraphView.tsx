@@ -124,7 +124,6 @@ function SourceGraphViewInner({
     const [relatedNodes, setRelatedNodes] = useState<RelatedNodes | null>(null)
 
     useEffect(() => {
-        if (!selectedFilePath || !isTestFile(selectedFilePath)) return
         setRelatedNodes(null)
     }, [selectedFilePath])
 
@@ -209,7 +208,7 @@ function SourceGraphViewInner({
     )
 
     // TaaC モード: テストファイル未選択 or 非テストファイル → 空
-    const isTaaCEmpty = isTaaCMode && !selectedFilePath
+    const isTaaCEmpty = isTaaCMode && (!selectedFilePath || !isTestFile(selectedFilePath))
     const isEmpty = isTaaCEmpty || (!isTaaCMode && nodesProp.length === 0)
 
     // ============================================================
