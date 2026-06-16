@@ -149,7 +149,7 @@ export const ProjectDetailRoute = () => {
                             edges={structureGraph?.edges ?? []}
                             staleFiles={staleFiles}
                             selectedFilePath={selectedFilePath}
-                            onNodeSelect={setSelectedFilePath}
+                            onNodeSelect={handleFileClick}
                             onReanalyze={handleReanalyzeSelected}
                             onNodesChange={handleSourceNodesChange}
                             onGetRelatedNodes={handleGetRelatedNodes}
