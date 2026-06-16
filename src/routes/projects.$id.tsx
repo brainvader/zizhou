@@ -17,7 +17,6 @@ import { FILE_TREE_PANEL, GRAPH_EDITOR_PANEL } from '@/bom/layout'
 import { useGraphList } from '@/hooks/useGraphList'
 import { useSourceGraph } from '@/hooks/useSourceGraph'
 import type { RelatedNodes } from '@/bom/source-graph'
-import { isTestFile } from '@/bom/source-graph'
 
 /**
  * ProjectDetailRoute
