@@ -52,7 +52,6 @@ export const ProjectDetailRoute = () => {
     const {
         structureGraph,
         selectedFilePath,
-        setSelectedFilePath,
         analyzedFiles,
         staleFiles,
         isAnalyzing,
@@ -61,6 +60,14 @@ export const ProjectDetailRoute = () => {
         handleReanalyzeAll,
         handleSourceNodesChange,
     } = useSourceGraph(id, project?.rootPath)
+
+    // FileTree ハイライト用（テストファイル以外も追跡）
+    const [highlightedFilePath, setHighlightedFilePath] = useState<string | null>(null)
+    const handleFileClickWithHighlight = useCallback((filePath: string) => {
+        console.log('[debug] handleFileClickWithHighlight', filePath)
+        setHighlightedFilePath(filePath)
+        handleFileClick(filePath)
+    }, [handleFileClick])
 
     // [CTX-22] TaaC: 選択テストファイルの依存先・利用先を取得する
     const handleGetRelatedNodes = useCallback(
@@ -127,8 +134,8 @@ export const ProjectDetailRoute = () => {
                         <div className="flex-1 min-h-0">
                             <FileTree
                                 rootPath={project?.rootPath}
-                                onFileClick={handleFileClick}
-                                selectedFilePath={selectedFilePath}
+                                onFileClick={handleFileClickWithHighlight}
+                                selectedFilePath={highlightedFilePath}
                                 staleFiles={staleFiles}
                                 analyzedFiles={analyzedFiles}
                             />
@@ -149,7 +156,7 @@ export const ProjectDetailRoute = () => {
                             edges={structureGraph?.edges ?? []}
                             staleFiles={staleFiles}
                             selectedFilePath={selectedFilePath}
-                            onNodeSelect={handleFileClick}
+                            onNodeSelect={handleFileClickWithHighlight}
                             onReanalyze={handleReanalyzeSelected}
                             onNodesChange={handleSourceNodesChange}
                             onGetRelatedNodes={handleGetRelatedNodes}

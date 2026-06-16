@@ -122,6 +122,8 @@ function SourceGraphViewInner({
     onGetRelatedNodesRef.current = onGetRelatedNodes
 
     const [relatedNodes, setRelatedNodes] = useState<RelatedNodes | null>(null)
+    // グラフ上のノード選択状態（ローカル管理）
+    const [selectedNodeFilePath, setSelectedNodeFilePath] = useState<string | null>(null)
 
     useEffect(() => {
         setRelatedNodes(null)
@@ -203,8 +205,14 @@ function SourceGraphViewInner({
     }, [isTaaCMode, relatedNodes])
 
     const activeNodes = useMemo(
-        (): AllNodeType[] => isTaaCMode ? taaCNodes : enrichedNodes,
-        [isTaaCMode, taaCNodes, enrichedNodes],
+        (): AllNodeType[] => {
+            const nodes = isTaaCMode ? taaCNodes : enrichedNodes
+            return nodes.map((n) => ({
+                ...n,
+                selected: (n as SourceNodeRfType | TestNodeType).data.filePath === selectedNodeFilePath,
+            }))
+        },
+        [isTaaCMode, taaCNodes, enrichedNodes, selectedNodeFilePath],
     )
 
     // TaaC モード: テストファイル未選択 or 非テストファイル → 空
@@ -259,7 +267,10 @@ function SourceGraphViewInner({
         (_event, node) => {
             if (node.type !== 'sourceNode' && node.type !== 'testNode') return
             const filePath = (node as SourceNodeRfType | TestNodeType).data.filePath
-            if (filePath) stableOnNodeSelect(filePath)
+            if (filePath) {
+                setSelectedNodeFilePath(filePath)
+                stableOnNodeSelect(filePath)
+            }
         },
         [stableOnNodeSelect],
     )
