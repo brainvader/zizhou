@@ -153,11 +153,7 @@ export const ProjectDetailRoute = () => {
                             onNodeSelect={setSelectedFilePath}
                             onReanalyze={handleReanalyzeSelected}
                             onNodesChange={handleSourceNodesChange}
-                            onGetRelatedNodes={
-                                selectedFilePath && isTestFile(selectedFilePath)
-                                    ? handleGetRelatedNodes
-                                    : undefined
-                            }
+                            onGetRelatedNodes={handleGetRelatedNodes}
                         />
                     </div>
                 </ResizablePanel>

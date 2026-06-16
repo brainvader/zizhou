@@ -82,8 +82,13 @@ test.describe('CTX-22b: Test as a Context (TaaC)', () => {
 
     test('テストファイル以外を選択してもグラフは更新されない', async ({ page }) => {
         // まずテストファイルを選択してグラフを表示
-        await page.getByTestId('fs-entry-src').click()
-        await page.getByTestId('fs-entry-components').click()
+        if (await page.getByTestId('fs-entry-App.test.tsx').isVisible()) {
+            // 既に展開済み
+        } else {
+            await page.getByTestId('fs-entry-src').click()
+            await page.getByTestId('fs-entry-components').click()
+        }
+        await expect(page.getByTestId('fs-entry-App.test.tsx')).toBeVisible({ timeout: 3000 })
         await page.getByTestId('fs-entry-App.test.tsx').click()
         await expect(
             page.getByTestId('test-node-src-components-App.test.tsx'),
