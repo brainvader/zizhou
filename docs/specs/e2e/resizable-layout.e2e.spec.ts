@@ -37,21 +37,6 @@ test.describe('ResizableLayout: Integration', () => {
         await page.screenshot({ path: 'evidence/resizable-layout_initial.png' })
     })
 
-    test.skip('should show NodeProperty on node selection', async ({ page }) => {
-        await expect(page.getByTestId('new-graph-btn')).toBeEnabled({ timeout: 10000 })
-        await page.getByTestId('new-graph-btn').click()
-        await page.waitForFunction(() => {
-            const el = document.querySelector('.react-flow__pane')
-            if (!el) return false
-            const { width, height } = el.getBoundingClientRect()
-            return width > 0 && height > 0
-        }, { timeout: 10000 })
-        await page.getByRole('button', { name: /ノード追加/ }).click()
-        await page.locator('.react-flow__node').first().click()
-        await expect(page.getByTestId('node-property')).toBeVisible({ timeout: 5000 })
-        await page.screenshot({ path: 'evidence/resizable-layout_initial.png' })
-    })
-
     test('should respect maxSize constraint for FileTree', async ({ page }) => {
         const fileTree = page.getByTestId('file-tree')
         const handle = page.locator('[data-separator]').first()
