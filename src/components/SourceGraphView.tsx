@@ -189,18 +189,19 @@ function SourceGraphViewInner({
     const taaCEdges = useMemo((): SourceEdge[] => {
         if (!isTaaCMode || !relatedNodes) return []
         const centerId = relatedNodes.center.id
-        const depEdges: SourceEdge[] = relatedNodes.dependencies.map((n) => ({
-            id: `taac-edge-${n.id}-${centerId}`,
-            source: n.id,
-            target: centerId,
-            kind: 'imports',
-        }))
-        const dntEdges: SourceEdge[] = relatedNodes.dependents.map((n) => ({
-            id: `taac-edge-${centerId}-${n.id}`,
-            source: centerId,
-            target: n.id,
-            kind: 'imports',
-        }))
+        const seen = new Set<string>()
+        const depEdges: SourceEdge[] = relatedNodes.dependencies.flatMap((n) => {
+            const id = `taac-edge-dep-${n.id}-${centerId}`
+            if (seen.has(id)) return []
+            seen.add(id)
+            return [{ id, source: n.id, target: centerId, kind: 'imports' }]
+        })
+        const dntEdges: SourceEdge[] = relatedNodes.dependents.flatMap((n) => {
+            const id = `taac-edge-dnt-${centerId}-${n.id}`
+            if (seen.has(id)) return []
+            seen.add(id)
+            return [{ id, source: centerId, target: n.id, kind: 'imports' }]
+        })
         return [...depEdges, ...dntEdges]
     }, [isTaaCMode, relatedNodes])
 
