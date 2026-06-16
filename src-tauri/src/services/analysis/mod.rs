@@ -120,14 +120,22 @@ fn extract_ts(
 
     let mut edges = vec![];
     for raw in raw_paths {
-        if !raw.starts_with("./") && !raw.starts_with("../") {
-            continue;
-        }
-        if let Some(resolved) = resolve_ts_import(root_path, &from_dir, &raw) {
-            edges.push(ImportEdge {
-                from: file_rel_path.to_string(),
-                to: resolved,
-            });
+        if raw.starts_with("./") || raw.starts_with("../") {
+            if let Some(resolved) = resolve_ts_import(root_path, &from_dir, &raw) {
+                edges.push(ImportEdge {
+                    from: file_rel_path.to_string(),
+                    to: resolved,
+                });
+            }
+        } else if let Some(stripped) = raw.strip_prefix("@/") {
+            // Vite alias: @/ → src/
+            let alias_rel = format!("./src/{}", stripped);
+            if let Some(resolved) = resolve_ts_import(root_path, &PathBuf::new(), &alias_rel) {
+                edges.push(ImportEdge {
+                    from: file_rel_path.to_string(),
+                    to: resolved,
+                });
+            }
         }
     }
     Ok(edges)
