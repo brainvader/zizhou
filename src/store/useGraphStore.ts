@@ -1,8 +1,7 @@
 import { create } from 'zustand'
 import { addEdge as rfAddEdge } from '@xyflow/react'
-import { nanoid } from 'nanoid'
 import type { Node, Edge } from '@xyflow/react'
-import type { GraphNodeData, GraphStore, CatalogEntry } from '@/bom/graph'
+import type { GraphNodeData, GraphStore } from '@/bom/graph'
 
 export const useGraphStore = create<GraphStore>((set) => ({
     // State
@@ -16,10 +15,6 @@ export const useGraphStore = create<GraphStore>((set) => ({
     setEdges: (edges: Edge[]) => set({ edges }),
     setSelectedNodeId: (id: string | null) => set({ selectedNodeId: id }),
 
-    // [CTX-5] Single Guard:
-    // ids.length === 1 → selectedNodeId も更新する
-    // ids.length === 0 → selectedNodeId を null にクリアする
-    // ids.length > 1   → selectedNodeId は変更しない（NodeProperty は Visibility Guard で非表示）
     setSelectedNodeIds: (ids: string[]) =>
         set((state) => ({
             selectedNodeIds: ids,
@@ -34,38 +29,11 @@ export const useGraphStore = create<GraphStore>((set) => ({
     addNode: (node: Node<GraphNodeData>) =>
         set((state) => ({ nodes: [...state.nodes, node] })),
 
-    // [CTX-9] CatalogEntry からノードを生成して nodes[] に追加する。
-    // - label:    entry.label
-    // - nodeType: entry.nodeType
-    // - service:  entry.service
-    // - provider: entry.provider
-    // - input:    { subcommand: entry.profile.subcommand }
-    addNodeFromCatalog: (entry: CatalogEntry, position: { x: number; y: number }) =>
-        set((state) => ({
-            nodes: [
-                ...state.nodes,
-                {
-                    id: nanoid(),
-                    type: 'editableNode',
-                    position,
-                    data: {
-                        label: entry.label,
-                        nodeType: entry.nodeType,
-                        service: entry.service,
-                        provider: entry.provider,
-                        input: { subcommand: entry.profile.subcommand },
-                    },
-                } satisfies Node<GraphNodeData>,
-            ],
-        })),
-
-    // [CTX-6] rfAddEdge は重複エッジを自動排除して新しい Edge[] を返す。
     addEdge: (connection) =>
         set((state) => ({ edges: rfAddEdge(connection, state.edges) })),
 
     loadGraph: (graph) =>
         set({
-            // type が未設定のノードは 'editableNode' に補完する（後方互換）
             nodes: graph.nodes.map((n) => ({
                 ...n,
                 type: n.type ?? 'editableNode',

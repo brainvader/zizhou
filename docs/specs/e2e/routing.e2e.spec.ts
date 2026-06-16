@@ -58,7 +58,7 @@ test.describe('CTX-5 ROUTING — Visual Story (Playwright)', () => {
         await page.screenshot({ path: `${EVIDENCE}/routing_step4_after_back.png`, fullPage: true })
     })
 
-    test.skip('direct navigation to /projects/:id renders project detail (CTX-11)', async ({ page }) => {
+    test.skip('direct navigation to /projects/:id renders project detail (CTX-11)', async () => {
         // TODO: SurrealDB embedded（実Tauri）環境でのみ検証可能。
         // インメモリモックはページリロードでデータが消えるため E2E では検証不可。
     })
