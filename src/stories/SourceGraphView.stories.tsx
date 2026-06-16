@@ -1,7 +1,6 @@
 /**
  * @context SourceGraphView / SourceNode / TestNode
- * @context CTX-22: Subflow Display / TestNode 統合表示
- * @context CTX-22b: Test as a Context (TaaC) — オンデマンドグラフ表示
+ * @context CTX-22: TestNode 統合表示 / Test as a Context (TaaC)
  * @bom docs/bom/source-graph.ts
  * @story
  * 1. ノードが表示される（基本表示確認）
