@@ -23,7 +23,7 @@
  * [CTX-13] CatalogMenu:
  *   - onPaneContextMenu をキャンバス右クリック時に呼ぶ
  *
- * [CTX-22b] Test as a Context (TaaC):
+ * [CTX-22] Test as a Context (TaaC):
  *   - onGetRelatedNodes が渡されている場合は TaaC モードで動作する
  *   - selectedFilePath がテストファイル（isTestFile）のとき onGetRelatedNodes を呼ぶ
  *   - 取得した RelatedNodes を computeTaaCLayout で左中右に自動配置してグラフ表示する
@@ -125,7 +125,7 @@ function SourceGraphViewInner({
     const stableContexts = useStableValue(contexts, isSameContexts)
 
     // ============================================================
-    // [CTX-22b] TaaC モード: RelatedNodes オンデマンド取得
+    // [CTX-22] TaaC モード: RelatedNodes オンデマンド取得
     // ============================================================
 
     const isTaaCMode = onGetRelatedNodes != null
@@ -206,11 +206,11 @@ function SourceGraphViewInner({
     )
 
     // ============================================================
-    // [CTX-22b] TaaC モード: RelatedNodes → ReactFlow ノード変換
+    // [CTX-22] TaaC モード: RelatedNodes → ReactFlow ノード変換
     // ============================================================
 
     // ============================================================
-    // [CTX-22b] TaaC モード: RelatedNodes → ReactFlow ノード／エッジ変換
+    // [CTX-22] TaaC モード: RelatedNodes → ReactFlow ノード／エッジ変換
     // ============================================================
 
     const taaCNodes = useMemo((): (SourceNodeRfType | TestNodeType)[] => {

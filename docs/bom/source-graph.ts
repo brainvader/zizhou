@@ -2,7 +2,6 @@
  * docs/bom/source-graph.ts
  *
  * @context CTX-21: Source Graph
- * @context CTX-22: contexts prop 追加（Subflow Display）
  * @context CTX-22: TestNode 型追加（テストファイルノード）
  * @context CTX-22b: TaaC 型追加（Test as a Context）
  *
@@ -16,16 +15,13 @@
  * 直接定義:
  *   SourceEdge / SourceEdgeKind         — エッジ型
  *   SourceGraph                         — グラフデータ型
- *   SourceContextContainerData /
- *   SourceContextContainerNode /
- *   SourceContextContainerProps         — Subflow コンテナノード型
  *   SourceGraphViewProps                — SourceGraphView コンポーネント Props
  *   GetSourceGraphFn                    — Props DI 関数型
- *   RelatedNodes                        — get_related_nodes 戻り値型 [CTX-22b]
- *   GetRelatedNodesFn                   — Props DI 関数型 [CTX-22b]
- *   TaaCLayoutParams / DEFAULT_TAAC_LAYOUT — レイアウト定数 [CTX-22b]
- *   isTestFile                          — テストファイル判定ユーティリティ [CTX-22b]
- *   computeTaaCLayout                   — TaaC 自動レイアウト計算 [CTX-22b]
+ *   RelatedNodes                        — get_related_nodes 戻り値型 [CTX-22]
+ *   GetRelatedNodesFn                   — Props DI 関数型 [CTX-22]
+ *   TaaCLayoutParams / DEFAULT_TAAC_LAYOUT — レイアウト定数 [CTX-22]
+ *   isTestFile                          — テストファイル判定ユーティリティ [CTX-22]
+ *   computeTaaCLayout                   — TaaC 自動レイアウト計算 [CTX-22]
  *
  * re-export:
  *   source-node.ts     — SourceNodeData / SourceNode / SourceNodeDisplayData /
@@ -36,8 +32,7 @@
  *                        AnalyzeFileFn / AnalyzeProjectFn / GetChangedFilesFn
  */
 
-import type { Node as RfNode, Edge as RfEdge, NodeProps, XYPosition } from '@xyflow/react'
-import type { SourceContext } from '@/bom/source-context'
+import type { Node as RfNode, Edge as RfEdge, XYPosition } from '@xyflow/react'
 import type { SourceNodeData } from '@/bom/source-node'
 
 // re-export
@@ -84,19 +79,7 @@ export type SourceGraph = {
 }
 
 // ============================================================
-// SourceContextContainer コンポーネント用型    [CTX-22]
-// ============================================================
-
-export type SourceContextContainerData = {
-    label: string
-    contextId: string
-}
-
-export type SourceContextContainerNode = RfNode<SourceContextContainerData, 'contextContainer'>
-export type SourceContextContainerProps = NodeProps<SourceContextContainerNode>
-
-// ============================================================
-// SourceGraphView コンポーネント Props         [CTX-21 / CTX-22 / CTX-22b]
+// SourceGraphView コンポーネント Props         [CTX-21 / CTX-22]
 // ============================================================
 
 export type SourceGraphViewProps = {
@@ -112,20 +95,12 @@ export type SourceGraphViewProps = {
     onNodeSelect?: (filePath: string) => void
     onReanalyze?: (filePath: string) => void
     onNodesChange?: (nodes: RfNode<SourceNodeData, string>[]) => void
-    /** [CTX-22] Subflow 表示対象の SourceContext 一覧。省略時は Subflow なし。 */
-    contexts?: SourceContext[]
-    /**
-     * [CTX-22] ▶ ボタン押下時コールバック。
-     * CTX-23 実装前は省略可（ボタン非表示）。
-     */
-    onRunTest?: (filePath: string) => void
     /**
      * [CTX-13] キャンバス右クリック時コールバック。CatalogMenu の表示に使用する。
      */
     onPaneContextMenu?: (event: React.MouseEvent) => void
     /**
-     * [CTX-22b] テストファイル選択時に依存関係を取得するコールバック。
-     * 省略時は TaaC モードを無効にして全ノードを表示する（後方互換）。
+     * [CTX-22] テストファイル選択時に依存関係を取得するコールバック。
      */
     onGetRelatedNodes?: GetRelatedNodesFn
 }
@@ -137,7 +112,7 @@ export type SourceGraphViewProps = {
 export type GetSourceGraphFn = (projectId: string) => Promise<SourceGraph>
 
 // ============================================================
-// RelatedNodes                                       [CTX-22b]
+// RelatedNodes                                       [CTX-22]
 // get_related_nodes Tauri コマンドの戻り値型。
 //
 // center:       選択テストファイル自身のノード（中央に配置）
@@ -169,7 +144,7 @@ export type GetRelatedNodesFn = (
 ) => Promise<RelatedNodes>
 
 // ============================================================
-// TaaCLayoutParams                                   [CTX-22b]
+// TaaCLayoutParams                                   [CTX-22]
 // TaaC 自動レイアウトのパラメータ。
 // 依存先(左) → 選択ノード(中央) → 利用先(右) の配置を制御する。
 // ============================================================
@@ -194,7 +169,7 @@ export const DEFAULT_TAAC_LAYOUT: TaaCLayoutParams = {
 }
 
 // ============================================================
-// isTestFile                                         [CTX-22b]
+// isTestFile                                         [CTX-22]
 // ============================================================
 
 /**
@@ -211,7 +186,7 @@ export function isTestFile(filePath: string): boolean {
 }
 
 // ============================================================
-// computeTaaCLayout                                  [CTX-22b]
+// computeTaaCLayout                                  [CTX-22]
 // ============================================================
 
 /**

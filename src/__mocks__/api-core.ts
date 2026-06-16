@@ -23,7 +23,7 @@
  * analyze_tests:         テストファイルを structure グラフに node_type='test' で登録する [CTX-22]
  * list_test_suites:      インメモリの test_suites[] を返す [CTX-22]
  * list_test_cases:       インメモリの test_cases[] を返す [CTX-22]
- * get_related_nodes:    選択ファイルの center / dependencies / dependents を返す [CTX-22b]
+ * get_related_nodes:    選択ファイルの center / dependencies / dependents を返す [CTX-22]
  */
 import { NODE_CATALOG } from '@/bom/graph'
 import type { CatalogEntry } from '@/bom/graph'
@@ -295,7 +295,7 @@ export async function invoke<T>(
             for (const fp of sourceFiles) {
                 await invoke('analyze_file', { projectId, filePath: fp })
             }
-            // [CTX-22b] TaaC: テストファイル → ソースファイルのエッジを登録する
+            // [CTX-22] TaaC: テストファイル → ソースファイルのエッジを登録する
             const graph = _graphs.find(
                 (g) => g.project_id === projectId && g.kind === 'structure'
             )
