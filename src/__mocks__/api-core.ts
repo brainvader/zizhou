@@ -345,7 +345,32 @@ export async function invoke<T>(
                     })
                 }
             }
+
+            // [CTX-22] TaaC: テストノード登録後にエッジを張る
+            const findNodeId = (fp: string) => data.nodes.find((n) => n.file_path === fp)?.id
+            for (const fp of testFiles) {
+                const fixture = suiteFixtures[fp]
+                if (!fixture) continue
+                const testNodeId = findNodeId(fp)
+                if (!testNodeId) continue
+                for (const srcFp of fixture.sourceFilePaths) {
+                    const srcNodeId = findNodeId(srcFp)
+                    if (!srcNodeId) continue
+                    const alreadyExists = data.edges.some(
+                        (e) => e.source === testNodeId && e.target === srcNodeId && e.kind === 'imports'
+                    )
+                    if (!alreadyExists) {
+                        data.edges.push({
+                            id: `edge:mock-${_idCounter++}`,
+                            source: testNodeId,
+                            target: srcNodeId,
+                            kind: 'imports',
+                        })
+                    }
+                }
+            }
             _graphData.set(graph.id, data)
+
             return undefined as unknown as T
         }
 

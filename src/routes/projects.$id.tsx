@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { FileTree } from '@/components/FileTree'
 import { SourceGraphView } from '@/components/SourceGraphView'
-import { NodeProperty } from '@/components/NodeProperty'
 import { ProjectDetailTopbar } from '@/components/ProjectDetailTopbar'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import {
@@ -14,11 +13,10 @@ import {
 } from '@/components/ui/resizable'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
-import { FILE_TREE_PANEL, GRAPH_EDITOR_PANEL, NODE_PROPERTY_PANEL } from '@/bom/layout'
+import { FILE_TREE_PANEL, GRAPH_EDITOR_PANEL } from '@/bom/layout'
 import { useGraphList } from '@/hooks/useGraphList'
 import { useSourceGraph } from '@/hooks/useSourceGraph'
 import type { RelatedNodes } from '@/bom/source-graph'
-import { isTestFile } from '@/bom/source-graph'
 
 /**
  * ProjectDetailRoute
@@ -154,25 +152,11 @@ export const ProjectDetailRoute = () => {
                             onNodeSelect={setSelectedFilePath}
                             onReanalyze={handleReanalyzeSelected}
                             onNodesChange={handleSourceNodesChange}
-                            onGetRelatedNodes={
-                                selectedFilePath && isTestFile(selectedFilePath)
-                                    ? handleGetRelatedNodes
-                                    : undefined
-                            }
+                            onGetRelatedNodes={handleGetRelatedNodes}
                         />
                     </div>
                 </ResizablePanel>
 
-                <ResizableHandle />
-
-                {/* CTX-3: NodeProperty */}
-                <ResizablePanel
-                    defaultSize={NODE_PROPERTY_PANEL.defaultSize}
-                    minSize={NODE_PROPERTY_PANEL.minSize}
-                    maxSize={NODE_PROPERTY_PANEL.maxSize}
-                >
-                    <NodeProperty />
-                </ResizablePanel>
             </ResizablePanelGroup>
 
             <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />

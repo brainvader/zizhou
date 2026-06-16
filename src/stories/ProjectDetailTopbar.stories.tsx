@@ -41,22 +41,9 @@ const WithDetailStore = ({
 
     return (
         <div data-init-status={initStatus}>
-            <ProjectGrid_Wrapper_Or_Component initStatus={initStatus} props={props} />
+            <ProjectDetailTopbar {...props} />
         </div>
     )
-}
-
-// コンポーネントに型安全に Props を渡すための補助レイヤー
-const ProjectGrid_Wrapper_Or_Component = ({
-    initStatus,
-    props
-}: {
-    initStatus: InitStatusType
-    props: React.ComponentProps<typeof ProjectDetailTopbar>
-}) => {
-    // 実際のコンポーネントに disabled 属性を外から強制挿入する仕組みが必要な場合や、
-    // 将来的なストア参照ロジックの追加に備えつつ、現在は型安全にプロパティを透過させます
-    return <ProjectDetailTopbar {...props} />
 }
 
 const meta: Meta<typeof ProjectDetailTopbar> = {
@@ -76,6 +63,7 @@ const mockProject = {
     id: 'proj-001',
     name: '地蔵 Core',
     description: 'グラフベースのプロジェクト管理OS。',
+    rootPath: '/projects/zizou-core',
 }
 
 // @story 状態 1-2: ready — ロゴ・breadcrumb・ボタンの表示確認
