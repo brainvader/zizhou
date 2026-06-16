@@ -100,6 +100,10 @@ export type SourceGraphViewProps = {
      */
     onPaneContextMenu?: (event: React.MouseEvent) => void
     /**
+    * [CTX-23] ▶ ボタン押下時コールバック。CTX-23 実装前は省略可（ボタン非表示）。
+    */
+    onRunTest?: (filePath: string) => void
+    /**
      * [CTX-22] テストファイル選択時に依存関係を取得するコールバック。
      */
     onGetRelatedNodes?: GetRelatedNodesFn

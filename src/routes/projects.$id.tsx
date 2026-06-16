@@ -19,7 +19,6 @@ import { useGraphStore } from '@/store/useGraphStore'
 import { FILE_TREE_PANEL, GRAPH_EDITOR_PANEL, NODE_PROPERTY_PANEL } from '@/bom/layout'
 import { useGraphList } from '@/hooks/useGraphList'
 import { useSourceGraph } from '@/hooks/useSourceGraph'
-import { useTestContexts } from '@/hooks/useTestContexts'
 import type { RelatedNodes } from '@/bom/source-graph'
 import { isTestFile } from '@/bom/source-graph'
 
@@ -69,9 +68,6 @@ export const ProjectDetailRoute = () => {
         handleSourceNodesChange,
     } = useSourceGraph(id, project?.rootPath)
 
-    // テストノード選択時の Subflow コンテキスト
-    const contexts = useTestContexts(id, selectedFilePath)
-
     const handlePaneContextMenu = useCallback(
         (event: React.MouseEvent) => {
             event.preventDefault()
@@ -80,7 +76,7 @@ export const ProjectDetailRoute = () => {
         [],
     )
 
-    // [CTX-22b] TaaC: 選択テストファイルの依存先・利用先を取得する
+    // [CTX-22] TaaC: 選択テストファイルの依存先・利用先を取得する
     const handleGetRelatedNodes = useCallback(
         (_projectId: string, filePath: string) =>
             invoke<RelatedNodes>('get_related_nodes', { projectId: id, filePath }),
@@ -170,7 +166,6 @@ export const ProjectDetailRoute = () => {
                             onNodeSelect={setSelectedFilePath}
                             onReanalyze={handleReanalyzeSelected}
                             onNodesChange={handleSourceNodesChange}
-                            contexts={contexts}
                             onPaneContextMenu={handlePaneContextMenu}
                             onGetRelatedNodes={
                                 selectedFilePath && isTestFile(selectedFilePath)
