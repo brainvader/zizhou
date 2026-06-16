@@ -16,10 +16,6 @@
  * get_changed_files:     変更ファイル一覧を返す [CTX-20]
  * analyze_file:          structure グラフにノードを追加する [CTX-20]
  * analyze_project:       全ソースファイル分のノードを追加する [CTX-20]
- * list_contexts:         インメモリの contexts[] を返す [CTX-22]
- * create_context:        インメモリに context を追加して返す [CTX-22]
- * update_context:        インメモリの context を更新して返す [CTX-22]
- * delete_context:        インメモリから context を削除する [CTX-22]
  * analyze_tests:         テストファイルを structure グラフに node_type='test' で登録する [CTX-22]
  * list_test_suites:      インメモリの test_suites[] を返す [CTX-22]
  * list_test_cases:       インメモリの test_cases[] を返す [CTX-22]
@@ -58,14 +54,6 @@ type MockEdge = {
     kind?: string | null
 }
 
-// [CTX-22]
-type MockContext = {
-    id: string
-    name: string
-    project_id: string
-    node_ids: string[]
-}
-
 // [CTX-22] Test Analysis
 type MockTestSuite = {
     id: string
@@ -84,7 +72,6 @@ type MockTestCase = {
 
 const _projects: MockProject[] = []
 const _graphs: MockGraph[] = []
-const _contexts: MockContext[] = []       // [CTX-22]
 const _testSuites: MockTestSuite[] = []   // [CTX-22]
 const _testCases: MockTestCase[] = []     // [CTX-22]
 
@@ -327,62 +314,6 @@ export async function invoke<T>(
             return undefined as unknown as T
         }
 
-        // ── CTX-22: SourceContext ────────────────────────────────────────
-
-        case 'list_contexts': {
-            const projectId = args?.projectId as string
-            return _contexts
-                .filter((c) => c.project_id === projectId)
-                .map((c) => ({
-                    id: c.id,
-                    name: c.name,
-                    projectId: c.project_id,
-                    nodeIds: c.node_ids,
-                })) as unknown as T
-        }
-
-        case 'create_context': {
-            const projectId = args?.projectId as string
-            const name = args?.name as string
-            const nodeIds = (args?.nodeIds as string[]) ?? []
-            const context: MockContext = {
-                id: `source_context:mock-${_idCounter++}`,
-                name,
-                project_id: projectId,
-                node_ids: nodeIds,
-            }
-            _contexts.push(context)
-            return {
-                id: context.id,
-                name: context.name,
-                projectId: context.project_id,
-                nodeIds: context.node_ids,
-            } as unknown as T
-        }
-
-        case 'update_context': {
-            const contextId = args?.contextId as string
-            const name = args?.name as string
-            const nodeIds = (args?.nodeIds as string[]) ?? []
-            const ctx = _contexts.find((c) => c.id === contextId)
-            if (!ctx) throw new Error(`[mock] context not found: ${contextId}`)
-            ctx.name = name
-            ctx.node_ids = nodeIds
-            return {
-                id: ctx.id,
-                name: ctx.name,
-                projectId: ctx.project_id,
-                nodeIds: ctx.node_ids,
-            } as unknown as T
-        }
-
-        case 'delete_context': {
-            const contextId = args?.contextId as string
-            const idx = _contexts.findIndex((c) => c.id === contextId)
-            if (idx >= 0) _contexts.splice(idx, 1)
-            return undefined as unknown as T
-        }
-
         // ── CTX-22: Test Analysis ────────────────────────────────────────
 
         case 'analyze_tests': {
@@ -493,7 +424,7 @@ export async function invoke<T>(
                 })) as unknown as T
         }
 
-        // ── CTX-22b: TaaC ────────────────────────────────────────────────
+        // ── CTX-22: TaaC ─────────────────────────────────────────────────
 
         case 'get_related_nodes': {
             const projectId = args?.projectId as string
