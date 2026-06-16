@@ -1,21 +1,16 @@
 //! lib.rs — Tauri エントリポイント（コマンド登録のみ）
 //!
-//! @context CTX-13: catalog_get_all / catalog_search コマンド
-//! @context CTX-14: execute_node コマンド
 //! @context CTX-SurrealDB-migration: list_projects / create_project / list_graphs / create_graph コマンド追加
 //! @context CTX-15: save_graph / load_graph コマンド追加
 //! @context CTX-19: list_fs_tree コマンド追加
 //! @context CTX-20: get_structure_graph / analyze_file / analyze_project / get_changed_files
-//! @context CTX-22: list_contexts / create_context / update_context / delete_context
-//! @context CTX-22: analyze_tests / list_test_suites / list_test_cases
-//! @context CTX-22b: get_related_nodes
+//! @context CTX-22: analyze_tests / list_test_suites / list_test_cases / get_related_nodes
 
 mod services;
 
 use serde::Serialize;
 use services::analysis::FS_EXCLUDES;
-use services::db::{thing_to_string, Db, NodeCatalog, ProjectInput, ProjectRecord};
-use services::executor::ExecuteResponse;
+use services::db::{thing_to_string, Db, ProjectInput, ProjectRecord};
 use services::graph::{LoadGraphResponse, SaveEdgeInput, SaveNodeInput};
 use services::vcs::{self, VcsProvider};
 use std::path::Path;
@@ -87,30 +82,6 @@ fn list_fs_tree(root_path: String) -> Result<Vec<FsNode>, String> {
         return Err(format!("not a directory: {root_path}"));
     }
     Ok(read_dir_recursive(root, root, 5))
-}
-
-// ============================================================
-// Tauri コマンド — Node Catalog
-// ============================================================
-
-#[tauri::command]
-async fn catalog_get_all(db: State<'_, Db>) -> Result<Vec<NodeCatalog>, String> {
-    db.select("node_catalog").await.map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn catalog_search(query: String, db: State<'_, Db>) -> Result<Vec<NodeCatalog>, String> {
-    let q = query.to_lowercase();
-    db.query(
-        "SELECT * FROM node_catalog
-         WHERE string::lowercase(label) CONTAINS $q
-            OR string::lowercase(service) CONTAINS $q",
-    )
-    .bind(("q", q))
-    .await
-    .map_err(|e| e.to_string())?
-    .take(0)
-    .map_err(|e| e.to_string())
 }
 
 // ============================================================
@@ -202,21 +173,6 @@ async fn load_graph(graph_id: String, db: State<'_, Db>) -> Result<LoadGraphResp
 }
 
 // ============================================================
-// Tauri コマンド — execute_node
-// ============================================================
-
-#[tauri::command]
-async fn execute_node(
-    db: State<'_, Db>,
-    service: String,
-    provider: String,
-    cwd: String,
-    input: serde_json::Value,
-) -> Result<ExecuteResponse, String> {
-    services::executor::execute_node(&db, &service, &provider, &cwd, &input).await
-}
-
-// ============================================================
 // Tauri コマンド — VCS / Analysis                     [CTX-20]
 // ============================================================
 
@@ -266,43 +222,6 @@ async fn analyze_project(project_id: String, db: State<'_, Db>) -> Result<(), St
         }
     }
     Ok(())
-}
-
-// ============================================================
-// Tauri コマンド — SourceContext                      [CTX-22]
-// ============================================================
-
-#[tauri::command]
-async fn list_contexts(
-    project_id: String,
-    db: State<'_, Db>,
-) -> Result<Vec<services::context::ContextResponse>, String> {
-    services::context::list_contexts(&db, &project_id).await
-}
-
-#[tauri::command]
-async fn create_context(
-    project_id: String,
-    name: String,
-    node_ids: Vec<String>,
-    db: State<'_, Db>,
-) -> Result<services::context::ContextResponse, String> {
-    services::context::create_context(&db, &project_id, &name, node_ids).await
-}
-
-#[tauri::command]
-async fn update_context(
-    context_id: String,
-    name: String,
-    node_ids: Vec<String>,
-    db: State<'_, Db>,
-) -> Result<services::context::ContextResponse, String> {
-    services::context::update_context(&db, &context_id, &name, node_ids).await
-}
-
-#[tauri::command]
-async fn delete_context(context_id: String, db: State<'_, Db>) -> Result<(), String> {
-    services::context::delete_context(&db, &context_id).await
 }
 
 // ============================================================
@@ -362,9 +281,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            catalog_get_all,
-            catalog_search,
-            execute_node,
             list_projects,
             create_project,
             list_graphs,
@@ -377,11 +293,6 @@ pub fn run() {
             get_structure_graph,
             analyze_file,
             analyze_project,
-            // [CTX-22] SourceContext
-            list_contexts,
-            create_context,
-            update_context,
-            delete_context,
             // [CTX-22] Test Analysis
             analyze_tests,
             list_test_suites,

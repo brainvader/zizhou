@@ -13,7 +13,7 @@ export type ProjectDetailStoreState = {
     initStatus: InitStatus
     projectRootPath: string
     isDetailHydrated: boolean
-    /** [CTX-22b] 最後に選択したテストファイルパス。TaaC グラフのキャッシュに使用。 */
+    /** [CTX-22] 最後に選択したテストファイルパス。TaaC グラフのキャッシュに使用。 */
     selectedTestFilePath: string | null
 }
 
@@ -22,7 +22,7 @@ export type ProjectDetailStoreActions = {
     setInitStatus: (status: InitStatus) => void
     setProjectRootPath: (path: string) => void
     setDetailHydrated: (value: boolean) => void
-    /** [CTX-22b] 選択テストファイルパスを更新する。 */
+    /** [CTX-22] 選択テストファイルパスを更新する。 */
     setSelectedTestFilePath: (filePath: string | null) => void
 }
 

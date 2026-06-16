@@ -1,21 +1,20 @@
 /**
  * @context SourceGraphView / SourceNode / TestNode
- * @context CTX-22: Subflow Display / TestNode 統合表示
- * @context CTX-22b: Test as a Context (TaaC) — オンデマンドグラフ表示
+ * @context CTX-22: TestNode 統合表示 / Test as a Context (TaaC)
  * @bom docs/bom/source-graph.ts
  * @story
  * 1. ノードが表示される（基本表示確認）
  * 2. ノードをクリックすると onNodeSelect が呼ばれる（Node→File 同期）
  * 3. ソースノードとテストノードが混在して表示される
  * 4. 空状態のとき案内メッセージが表示される
- * 5. [CTX-22b] テストファイルが未選択のとき空グラフと案内メッセージが表示される（Empty State）
- * 6. [CTX-22b] テストファイルを選択すると依存ノードがエッジで繋がって表示される
- * 7. [CTX-22b] 依存先ノード（dependencies）が選択ノードの左側に配置される
- * 8. [CTX-22b] 利用先ノード（dependents）が選択ノードの右側に配置される
- * 9. [CTX-22b] 依存先のみのケースで右側が空になる
- * 10. [CTX-22b] 利用先のみのケースで左側が空になる
- * 11. [CTX-22b] 依存先・利用先ともに 0 件のとき選択ノードのみ表示される
- * 12. [CTX-22b] テストファイル以外が selectedFilePath に渡されてもグラフは更新されない
+ * 5. [CTX-22] テストファイルが未選択のとき空グラフと案内メッセージが表示される（Empty State）
+ * 6. [CTX-22] テストファイルを選択すると依存ノードがエッジで繋がって表示される
+ * 7. [CTX-22] 依存先ノード（dependencies）が選択ノードの左側に配置される
+ * 8. [CTX-22] 利用先ノード（dependents）が選択ノードの右側に配置される
+ * 9. [CTX-22] 依存先のみのケースで右側が空になる
+ * 10. [CTX-22] 利用先のみのケースで左側が空になる
+ * 11. [CTX-22] 依存先・利用先ともに 0 件のとき選択ノードのみ表示される
+ * 12. [CTX-22] テストファイル以外が selectedFilePath に渡されてもグラフは更新されない
  *
  * SourceNode 単体テスト（stale/fresh/pending・↺ボタン・選択）→ SourceNode.stories.tsx
  * TestNode 単体テスト（stale/fresh/pending・↺/▶ボタン・選択）→ TestNode.stories.tsx
@@ -243,7 +242,7 @@ export const WithTestNodes: Story = {
 // TaaC — Empty State（CTX-22b）
 // ============================================================
 
-/** @story [CTX-22b] テストファイルが未選択のとき空グラフと案内メッセージが表示される */
+/** @story [CTX-22] テストファイルが未選択のとき空グラフと案内メッセージが表示される */
 export const TaaCEmpty: Story = {
     args: {
         nodes: [],
@@ -265,7 +264,7 @@ export const TaaCEmpty: Story = {
 // TaaC — テストファイル選択時（CTX-22b）
 // ============================================================
 
-/** @story [CTX-22b] テストファイルを選択すると依存ノードがエッジで繋がって表示される */
+/** @story [CTX-22] テストファイルを選択すると依存ノードがエッジで繋がって表示される */
 export const TaaCTestFileSelected: Story = {
     args: {
         nodes: [],
@@ -292,7 +291,7 @@ export const TaaCTestFileSelected: Story = {
 // TaaC — レイアウト確認（CTX-22b）
 // ============================================================
 
-/** @story [CTX-22b] 依存先ノード（dependencies）が選択ノードの左側に、利用先ノード（dependents）が右側に配置される */
+/** @story [CTX-22] 依存先ノード（dependencies）が選択ノードの左側に、利用先ノード（dependents）が右側に配置される */
 export const TaaCFullLayout: Story = {
     args: {
         nodes: [],
@@ -306,7 +305,7 @@ export const TaaCFullLayout: Story = {
     },
 }
 
-/** @story [CTX-22b] 依存先のみ（dependents が 0 件）のとき右側が空になる */
+/** @story [CTX-22] 依存先のみ（dependents が 0 件）のとき右側が空になる */
 export const TaaCDependenciesOnly: Story = {
     args: {
         nodes: [],
@@ -320,7 +319,7 @@ export const TaaCDependenciesOnly: Story = {
     },
 }
 
-/** @story [CTX-22b] 利用先のみ（dependencies が 0 件）のとき左側が空になる */
+/** @story [CTX-22] 利用先のみ（dependencies が 0 件）のとき左側が空になる */
 export const TaaCDependentsOnly: Story = {
     args: {
         nodes: [],
@@ -334,7 +333,7 @@ export const TaaCDependentsOnly: Story = {
     },
 }
 
-/** @story [CTX-22b] 依存先・利用先ともに 0 件のとき選択ノードのみ表示される */
+/** @story [CTX-22] 依存先・利用先ともに 0 件のとき選択ノードのみ表示される */
 export const TaaCIsolated: Story = {
     args: {
         nodes: [],
@@ -358,7 +357,7 @@ export const TaaCIsolated: Story = {
 // TaaC — テストファイル以外は無視（CTX-22b）
 // ============================================================
 
-/** @story [CTX-22b] テストファイル以外が selectedFilePath に渡されても onGetRelatedNodes は呼ばれず空グラフのまま */
+/** @story [CTX-22] テストファイル以外が selectedFilePath に渡されても onGetRelatedNodes は呼ばれず空グラフのまま */
 export const TaaCNonTestFileIgnored: Story = {
     args: {
         nodes: [],

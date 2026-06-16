@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { FileTree } from '@/components/FileTree'
 import { SourceGraphView } from '@/components/SourceGraphView'
-import { CatalogMenu } from '@/components/CatalogMenu'
 import { NodeProperty } from '@/components/NodeProperty'
 import { ProjectDetailTopbar } from '@/components/ProjectDetailTopbar'
 import { SettingsDialog } from '@/components/SettingsDialog'
@@ -15,18 +14,16 @@ import {
 } from '@/components/ui/resizable'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useProjectDetailStore } from '@/store/useProjectDetailStore'
-import { useGraphStore } from '@/store/useGraphStore'
 import { FILE_TREE_PANEL, GRAPH_EDITOR_PANEL, NODE_PROPERTY_PANEL } from '@/bom/layout'
 import { useGraphList } from '@/hooks/useGraphList'
 import { useSourceGraph } from '@/hooks/useSourceGraph'
-import { useTestContexts } from '@/hooks/useTestContexts'
 import type { RelatedNodes } from '@/bom/source-graph'
 import { isTestFile } from '@/bom/source-graph'
 
 /**
  * ProjectDetailRoute
  * "/projects/$id" ルートのコンポーネント。
- * CTX-Topbar / CTX-1 FileTree / CTX-2 GraphEditor / CTX-3 NodeProperty を組み込む。
+ * CTX-Topbar / CTX-1 FileTree / CTX-2 SourceGraphView / CTX-3 NodeProperty を組み込む。
  *
  * 3ペインは ResizablePanelGroup（shadcn/ui）で水平リサイズ可能。
  * パネルサイズの定数は docs/bom/layout.ts に集約。
@@ -42,9 +39,7 @@ export const ProjectDetailRoute = () => {
     const { graph: activeGraphId } = useSearch({ from: '/projects/$id' })
     const project = useProjectStore((s) => s.projects.find((p) => p.id === id))
     const setActiveGraphId = useProjectDetailStore((s) => s.setActiveGraphId)
-    const addNodeFromCatalog = useGraphStore((s) => s.addNodeFromCatalog)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-    const [catalogMenu, setCatalogMenu] = useState<{ x: number; y: number } | null>(null)
     const router = useRouter()
 
     // SurrealDB からグラフ一覧を取得し activeGraphId を注入する
@@ -69,18 +64,7 @@ export const ProjectDetailRoute = () => {
         handleSourceNodesChange,
     } = useSourceGraph(id, project?.rootPath)
 
-    // テストノード選択時の Subflow コンテキスト
-    const contexts = useTestContexts(id, selectedFilePath)
-
-    const handlePaneContextMenu = useCallback(
-        (event: React.MouseEvent) => {
-            event.preventDefault()
-            setCatalogMenu({ x: event.clientX, y: event.clientY })
-        },
-        [],
-    )
-
-    // [CTX-22b] TaaC: 選択テストファイルの依存先・利用先を取得する
+    // [CTX-22] TaaC: 選択テストファイルの依存先・利用先を取得する
     const handleGetRelatedNodes = useCallback(
         (_projectId: string, filePath: string) =>
             invoke<RelatedNodes>('get_related_nodes', { projectId: id, filePath }),
@@ -170,25 +154,12 @@ export const ProjectDetailRoute = () => {
                             onNodeSelect={setSelectedFilePath}
                             onReanalyze={handleReanalyzeSelected}
                             onNodesChange={handleSourceNodesChange}
-                            contexts={contexts}
-                            onPaneContextMenu={handlePaneContextMenu}
                             onGetRelatedNodes={
                                 selectedFilePath && isTestFile(selectedFilePath)
                                     ? handleGetRelatedNodes
                                     : undefined
                             }
                         />
-                        {catalogMenu && (
-                            <CatalogMenu
-                                x={catalogMenu.x}
-                                y={catalogMenu.y}
-                                onClose={() => setCatalogMenu(null)}
-                                onSelectEntry={(entry) => {
-                                    addNodeFromCatalog(entry, { x: catalogMenu.x, y: catalogMenu.y })
-                                    setCatalogMenu(null)
-                                }}
-                            />
-                        )}
                     </div>
                 </ResizablePanel>
 

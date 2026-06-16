@@ -806,7 +806,7 @@
 
 
         <!-- ============================================================
-            CTX-22: SOURCE CONTEXT
+             CTX-22: TEST AS A CONTEXT (TaaC)
             → 定義は ContextMap_project-detail.html を参照
         ============================================================ -->
 
@@ -816,8 +816,8 @@
 
             CTX-23: CONTEXT PACKAGING
               責務: SourceContext に含まれるファイル内容を LLM 向け Markdown に集約する
-              手段: context.node_ids → filePath → ファイル内容読み込み → Markdown 整形 → クリップボード / ファイル保存
-              関連: CTX-22 (SourceContext)
+              手段: test_suite.node_ids → filePath → ファイル内容読み込み → Markdown 整形 → クリップボード / ファイル保存
+              関連: CTX-22 (TaaC)
 
             CTX-24: STATIC SIMULATION
               責務: 型レベルでデータがグラフを流れるかを検証する

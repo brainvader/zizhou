@@ -19,14 +19,14 @@ import { useProjectDetailStore } from '@/store/useProjectDetailStore'
  *
  * @param projectId プロジェクト ID
  * @param rootPath  プロジェクトルートパス（get_changed_files に使用）
- * @context CTX-20, CTX-22, CTX-22b
+ * @context CTX-20, CTX-22
  */
 export function useSourceGraph(projectId: string, rootPath: string | undefined) {
     const [structureGraph, setStructureGraph] = useState<SourceGraph | null>(null)
     const [changedFiles, setChangedFiles] = useState<string[]>([])
     const [isAnalyzing, setIsAnalyzing] = useState(false)
 
-    // [CTX-22b] selectedTestFilePath を Zustand で管理（ページ内遷移でキャッシュ）
+    // [CTX-22] selectedTestFilePath を Zustand で管理（ページ内遷移でキャッシュ）
     const selectedFilePath = useProjectDetailStore((s) => s.selectedTestFilePath)
     const setSelectedFilePath = useProjectDetailStore((s) => s.setSelectedTestFilePath)
 
@@ -83,7 +83,7 @@ export function useSourceGraph(projectId: string, rootPath: string | undefined) 
 
     const handleFileClick = useCallback(
         async (filePath: string) => {
-            // [CTX-22b] TaaC: テストファイル以外は SourceGraph を更新しない
+            // [CTX-22] TaaC: テストファイル以外は SourceGraph を更新しない
             setSelectedFilePath(filePath)
             if (!isTestFile(filePath)) return
             if (analyzedFiles.has(filePath)) return

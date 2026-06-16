@@ -11,33 +11,27 @@
  *   - ↺ボタン押下時に onReanalyze(filePath) を呼ぶ
  *   - ノード位置変更時に onNodesChange(nodes) を呼ぶ（Position Persist）
  *
- * [CTX-22] Subflow Display:
- *   - contexts prop を受け取り SourceContext ごとにコンテナノードを生成する
- *   - computeContainerRect でコンテナの位置・サイズを算出する
- *   - toRelativePosition で子ノードの座標を親相対に変換する
- *
  * [CTX-22] TestNode:
  *   - nodeType === 'test' のノードを TestNode コンポーネントで描画する
  *   - onRunTest を TestNodeDisplayData に注入する（CTX-23 で接続）
  *
- * [CTX-13] CatalogMenu:
- *   - onPaneContextMenu をキャンバス右クリック時に呼ぶ
- *
- * [CTX-22b] Test as a Context (TaaC):
+ * [CTX-22] Test as a Context (TaaC):
  *   - onGetRelatedNodes が渡されている場合は TaaC モードで動作する
  *   - selectedFilePath がテストファイル（isTestFile）のとき onGetRelatedNodes を呼ぶ
  *   - 取得した RelatedNodes を computeTaaCLayout で左中右に自動配置してグラフ表示する
  *   - テストファイル未選択時は taac-empty-state を表示する
  *   - テストファイル以外が selectedFilePath に渡されても onGetRelatedNodes は呼ばない
  *
+ * [CTX-13] CatalogMenu:
+ *   - onPaneContextMenu をキャンバス右クリック時に呼ぶ
+ *
  * 無限ループ回避:
  *   - useNodesState / useEdgesState を使わない（controlled mode）
- *   - staleFiles / contexts は useStableValue で内容比較により参照を安定させる
+ *   - staleFiles は useStableValue で内容比較により参照を安定させる
  *   - onReanalyze / onRunTest は useCallbackRef で安定した参照にする
  *
- * @context CTX-21, CTX-22, CTX-13, CTX-22b
+ * @context CTX-21, CTX-22, CTX-13
  * @bom docs/bom/source-graph.ts
- * @bom docs/bom/source-context.ts
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -53,12 +47,10 @@ import {
 import '@xyflow/react/dist/style.css'
 import { SourceNode } from '@/components/nodes/SourceNode'
 import { TestNode } from '@/components/nodes/TestNode'
-import { SourceContextContainer } from '@/components/nodes/SourceContextContainer'
 import {
     type SourceGraphViewProps,
     type SourceNode as SourceNodeType,
     type SourceNodeType as SourceNodeRfType,
-    type SourceContextContainerNode,
     type TestNodeType,
     type RelatedNodes,
     type SourceEdge,
@@ -67,8 +59,8 @@ import {
 } from '@/bom/source-graph'
 import { useCallbackRef } from '@/hooks/useCallbackRef'
 import { useStableValue } from '@/hooks/useStableValue'
-import { isSameSet, isSameContexts } from '@/lib/compare'
-import { buildContainerRects, enrichNode } from '@/lib/sourceGraphUtils'
+import { isSameSet } from '@/lib/compare'
+import { enrichNode } from '@/lib/sourceGraphUtils'
 
 // ============================================================
 // nodeTypes はコンポーネント外で定義（再レンダリング時の remount 防止）
@@ -77,14 +69,13 @@ import { buildContainerRects, enrichNode } from '@/lib/sourceGraphUtils'
 const NODE_TYPES = {
     sourceNode: SourceNode,
     testNode: TestNode,
-    contextContainer: SourceContextContainer,
 } as const
 
 // ============================================================
 // AllNodeType — ReactFlow に渡すノードの Union 型
 // ============================================================
 
-type AllNodeType = SourceNodeRfType | TestNodeType | SourceContextContainerNode
+type AllNodeType = SourceNodeRfType | TestNodeType
 
 // ============================================================
 // SourceGraphViewInner — ReactFlowProvider の内側
@@ -98,7 +89,6 @@ function SourceGraphViewInner({
     onNodeSelect,
     onReanalyze,
     onNodesChange: onNodesChangeProp,
-    contexts = [],
     onRunTest,
     onPaneContextMenu,
     onGetRelatedNodes,
@@ -118,14 +108,13 @@ function SourceGraphViewInner({
     useEffect(() => { selectedFilePathRef.current = selectedFilePath }, [selectedFilePath])
 
     // ============================================================
-    // staleFiles / contexts を内容比較で参照安定化
+    // staleFiles を内容比較で参照安定化
     // ============================================================
 
     const stableStaleFiles = useStableValue(staleFiles, isSameSet)
-    const stableContexts = useStableValue(contexts, isSameContexts)
 
     // ============================================================
-    // [CTX-22b] TaaC モード: RelatedNodes オンデマンド取得
+    // [CTX-22] TaaC モード: RelatedNodes オンデマンド取得
     // ============================================================
 
     const isTaaCMode = onGetRelatedNodes != null
@@ -155,65 +144,27 @@ function SourceGraphViewInner({
     }, [selectedFilePath])
 
     // ============================================================
-    // [CTX-22] コンテナノード生成
-    // ============================================================
-
-    const containerRects = useMemo(
-        () => buildContainerRects(stableContexts, nodesProp),
-        [stableContexts, nodesProp],
-    )
-
-    const containerNodes = useMemo((): SourceContextContainerNode[] => {
-        return stableContexts.flatMap((ctx) => {
-            const rect = containerRects.get(ctx.id)
-            if (!rect) return []
-            return [{
-                id: `context-container-${ctx.id}`,
-                type: 'contextContainer' as const,
-                position: { x: rect.x, y: rect.y },
-                style: { width: rect.width, height: rect.height },
-                data: { label: ctx.name, contextId: ctx.id },
-                selectable: false,
-                draggable: false,
-                deletable: false,
-                zIndex: -1,
-            }]
-        })
-    }, [stableContexts, containerRects])
-
-    // ============================================================
-    // enrichedNodes
+    // enrichedNodes（通常モード）
     // ============================================================
 
     const enrichedNodes = useMemo(
-        (): (SourceNodeRfType | TestNodeType)[] =>
+        (): AllNodeType[] =>
             nodesProp.map((node) =>
                 enrichNode(node, {
                     staleFiles: stableStaleFiles,
                     selectedFilePath,
-                    contexts: stableContexts,
-                    containerRects,
                     onReanalyze: stableOnReanalyze,
                     onRunTest: stableOnRunTest,
                 }),
             ),
-        [nodesProp, stableStaleFiles, selectedFilePath, stableContexts, containerRects, stableOnReanalyze, stableOnRunTest],
-    )
-
-    const baseNodes = useMemo(
-        (): AllNodeType[] => [...containerNodes, ...enrichedNodes],
-        [containerNodes, enrichedNodes],
+        [nodesProp, stableStaleFiles, selectedFilePath, stableOnReanalyze, stableOnRunTest],
     )
 
     // ============================================================
-    // [CTX-22b] TaaC モード: RelatedNodes → ReactFlow ノード変換
+    // [CTX-22] TaaC モード: RelatedNodes → ReactFlow ノード／エッジ変換
     // ============================================================
 
-    // ============================================================
-    // [CTX-22b] TaaC モード: RelatedNodes → ReactFlow ノード／エッジ変換
-    // ============================================================
-
-    const taaCNodes = useMemo((): (SourceNodeRfType | TestNodeType)[] => {
+    const taaCNodes = useMemo((): AllNodeType[] => {
         if (!isTaaCMode || !relatedNodes) return []
         const positions = computeTaaCLayout(relatedNodes)
         const allNodes = [
@@ -227,15 +178,12 @@ function SourceGraphViewInner({
             return enrichNode({ ...node, position: pos }, {
                 staleFiles: stableStaleFiles,
                 selectedFilePath,
-                contexts: [],
-                containerRects: new Map(),
                 onReanalyze: stableOnReanalyze,
                 onRunTest: stableOnRunTest,
             })
         })
     }, [isTaaCMode, relatedNodes, stableStaleFiles, selectedFilePath, stableOnReanalyze, stableOnRunTest])
 
-    // dependencies → center、center → dependents のエッジを自動生成する
     const taaCEdges = useMemo((): SourceEdge[] => {
         if (!isTaaCMode || !relatedNodes) return []
         const centerId = relatedNodes.center.id
@@ -255,8 +203,8 @@ function SourceGraphViewInner({
     }, [isTaaCMode, relatedNodes])
 
     const activeNodes = useMemo(
-        (): AllNodeType[] => isTaaCMode ? taaCNodes : baseNodes,
-        [isTaaCMode, taaCNodes, baseNodes],
+        (): AllNodeType[] => isTaaCMode ? taaCNodes : enrichedNodes,
+        [isTaaCMode, taaCNodes, enrichedNodes],
     )
 
     // TaaC モード: テストファイル未選択 or 非テストファイル → 空
@@ -271,7 +219,6 @@ function SourceGraphViewInner({
 
     useEffect(() => {
         setLocalNodes((prev) => {
-            // ポジションはprevから引き継ぎ、selected だけ activeNodes から反映する
             const posMap = new Map(prev.map((n) => [n.id, n.position]))
             return activeNodes.map((n) => ({
                 ...n,

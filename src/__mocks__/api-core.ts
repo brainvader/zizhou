@@ -2,9 +2,6 @@
  * @tauri-apps/api/core のテスト用モック。
  * VITE_PLAYWRIGHT=true のとき vite.config.ts の alias で差し替えられる。
  *
- * catalog_get_all:       NODE_CATALOG を返す（SurrealDB の初期データと同等）
- * catalog_search:        query で label / service を filter して返す
- * execute_node:          即時 success:true を返す（E2E では実際の CLI を呼ばない）[CTX-14]
  * list_projects:         インメモリの projects[] を返す
  * create_project:        インメモリに project を追加して返す
  * list_graphs:           インメモリの graphs[] を返す
@@ -16,18 +13,11 @@
  * get_changed_files:     変更ファイル一覧を返す [CTX-20]
  * analyze_file:          structure グラフにノードを追加する [CTX-20]
  * analyze_project:       全ソースファイル分のノードを追加する [CTX-20]
- * list_contexts:         インメモリの contexts[] を返す [CTX-22]
- * create_context:        インメモリに context を追加して返す [CTX-22]
- * update_context:        インメモリの context を更新して返す [CTX-22]
- * delete_context:        インメモリから context を削除する [CTX-22]
  * analyze_tests:         テストファイルを structure グラフに node_type='test' で登録する [CTX-22]
  * list_test_suites:      インメモリの test_suites[] を返す [CTX-22]
  * list_test_cases:       インメモリの test_cases[] を返す [CTX-22]
- * get_related_nodes:    選択ファイルの center / dependencies / dependents を返す [CTX-22b]
+ * get_related_nodes:     選択ファイルの center / dependencies / dependents を返す [CTX-22]
  */
-import { NODE_CATALOG } from '@/bom/graph'
-import type { CatalogEntry } from '@/bom/graph'
-import type { ExecuteResponse } from '@/bom/execute'
 
 // ── インメモリストア ──────────────────────────────────────────────────────
 
@@ -39,9 +29,6 @@ type MockNode = {
     label: string
     node_type?: string | null
     status?: string | null
-    service?: string | null
-    provider?: string | null
-    input?: Record<string, unknown> | null
     description?: string | null
     position_x: number
     position_y: number
@@ -56,14 +43,6 @@ type MockEdge = {
     target: string
     // [CTX-20]
     kind?: string | null
-}
-
-// [CTX-22]
-type MockContext = {
-    id: string
-    name: string
-    project_id: string
-    node_ids: string[]
 }
 
 // [CTX-22] Test Analysis
@@ -84,9 +63,8 @@ type MockTestCase = {
 
 const _projects: MockProject[] = []
 const _graphs: MockGraph[] = []
-const _contexts: MockContext[] = []       // [CTX-22]
-const _testSuites: MockTestSuite[] = []   // [CTX-22]
-const _testCases: MockTestCase[] = []     // [CTX-22]
+const _testSuites: MockTestSuite[] = []
+const _testCases: MockTestCase[] = []
 
 // graph_id → { nodes, edges } のインメモリグラフストア
 const _graphData: Map<string, { nodes: MockNode[]; edges: MockEdge[] }> = new Map()
@@ -94,9 +72,6 @@ const _graphData: Map<string, { nodes: MockNode[]; edges: MockEdge[] }> = new Ma
 let _idCounter = 1
 
 // ── [CTX-20] 変更ファイルフィクスチャ ─────────────────────────────────────
-// E2E テストで stale 判定を検証するための固定値。
-// projects.$id.tsx が invoke('get_changed_files') で取得する。
-
 const _changedFiles: string[] = ['src/main.tsx']
 
 // ── ヘルパー ──────────────────────────────────────────────────────────────
@@ -110,9 +85,6 @@ function toGraphFileNodes(nodes: MockNode[]) {
             label: n.label,
             ...(n.node_type != null ? { nodeType: n.node_type } : {}),
             ...(n.status != null ? { status: n.status } : {}),
-            ...(n.service !== undefined ? { service: n.service } : {}),
-            ...(n.provider !== undefined ? { provider: n.provider } : {}),
-            ...(n.input != null ? { input: n.input } : {}),
             ...(n.description != null ? { description: n.description } : {}),
             // [CTX-20]
             ...(n.file_path != null ? { filePath: n.file_path } : {}),
@@ -126,7 +98,6 @@ function toGraphFileEdges(edges: MockEdge[]) {
         id: e.id,
         source: e.source,
         target: e.target,
-        // [CTX-20]
         ...(e.kind != null ? { kind: e.kind } : {}),
     }))
 }
@@ -138,28 +109,6 @@ export async function invoke<T>(
     args?: Record<string, unknown>
 ): Promise<T> {
     switch (command) {
-
-        case 'catalog_get_all':
-            return NODE_CATALOG as unknown as T
-
-        case 'catalog_search': {
-            const query = ((args?.query as string) ?? '').toLowerCase()
-            const results: CatalogEntry[] = NODE_CATALOG.filter(
-                (e) =>
-                    e.label.toLowerCase().includes(query) ||
-                    e.service.toLowerCase().includes(query)
-            )
-            return results as unknown as T
-        }
-
-        case 'execute_node': {
-            const response: ExecuteResponse = {
-                success: true,
-                output: { stdout: '[mock] executed successfully', stderr: '' },
-                error: null,
-            }
-            return response as unknown as T
-        }
 
         case 'list_projects':
             return [..._projects] as unknown as T
@@ -225,7 +174,6 @@ export async function invoke<T>(
 
         case 'get_structure_graph': {
             const projectId = args?.projectId as string
-            // 既存の structure グラフを探す。なければ作成。
             let graph = _graphs.find(
                 (g) => g.project_id === projectId && g.kind === 'structure'
             )
@@ -253,7 +201,6 @@ export async function invoke<T>(
         case 'analyze_file': {
             const projectId = args?.projectId as string
             const filePath = args?.filePath as string
-            // structure グラフを取得 or 作成
             let graph = _graphs.find(
                 (g) => g.project_id === projectId && g.kind === 'structure'
             )
@@ -267,7 +214,6 @@ export async function invoke<T>(
                 _graphs.push(graph)
             }
             const data = _graphData.get(graph.id) ?? { nodes: [], edges: [] }
-            // 既存ノードを探す
             const existing = data.nodes.find((n) => n.file_path === filePath)
             if (existing) {
                 existing.analyzed = 'fresh'
@@ -290,12 +236,11 @@ export async function invoke<T>(
 
         case 'analyze_project': {
             const projectId = args?.projectId as string
-            // 固定ファイルリストで一括解析をシミュレート
             const sourceFiles = ['src/main.tsx', 'src/components/App.tsx', 'src/hooks/useStore.ts']
             for (const fp of sourceFiles) {
                 await invoke('analyze_file', { projectId, filePath: fp })
             }
-            // [CTX-22b] TaaC: テストファイル → ソースファイルのエッジを登録する
+            // [CTX-22] TaaC: テストファイル → ソースファイルのエッジを登録する
             const graph = _graphs.find(
                 (g) => g.project_id === projectId && g.kind === 'structure'
             )
@@ -327,73 +272,14 @@ export async function invoke<T>(
             return undefined as unknown as T
         }
 
-        // ── CTX-22: SourceContext ────────────────────────────────────────
-
-        case 'list_contexts': {
-            const projectId = args?.projectId as string
-            return _contexts
-                .filter((c) => c.project_id === projectId)
-                .map((c) => ({
-                    id: c.id,
-                    name: c.name,
-                    projectId: c.project_id,
-                    nodeIds: c.node_ids,
-                })) as unknown as T
-        }
-
-        case 'create_context': {
-            const projectId = args?.projectId as string
-            const name = args?.name as string
-            const nodeIds = (args?.nodeIds as string[]) ?? []
-            const context: MockContext = {
-                id: `source_context:mock-${_idCounter++}`,
-                name,
-                project_id: projectId,
-                node_ids: nodeIds,
-            }
-            _contexts.push(context)
-            return {
-                id: context.id,
-                name: context.name,
-                projectId: context.project_id,
-                nodeIds: context.node_ids,
-            } as unknown as T
-        }
-
-        case 'update_context': {
-            const contextId = args?.contextId as string
-            const name = args?.name as string
-            const nodeIds = (args?.nodeIds as string[]) ?? []
-            const ctx = _contexts.find((c) => c.id === contextId)
-            if (!ctx) throw new Error(`[mock] context not found: ${contextId}`)
-            ctx.name = name
-            ctx.node_ids = nodeIds
-            return {
-                id: ctx.id,
-                name: ctx.name,
-                projectId: ctx.project_id,
-                nodeIds: ctx.node_ids,
-            } as unknown as T
-        }
-
-        case 'delete_context': {
-            const contextId = args?.contextId as string
-            const idx = _contexts.findIndex((c) => c.id === contextId)
-            if (idx >= 0) _contexts.splice(idx, 1)
-            return undefined as unknown as T
-        }
-
         // ── CTX-22: Test Analysis ────────────────────────────────────────
 
         case 'analyze_tests': {
             const projectId = args?.projectId as string
-            // 固定テストファイルリストでシミュレート
             const testFiles = [
                 'src/components/App.test.tsx',
                 'src/hooks/useStore.test.ts',
             ]
-            // テストファイルごとの固定フィクスチャ
-            // node_ids は対応するソースファイルパスで解決する
             const suiteFixtures: Record<string, { name: string; sourceFilePaths: string[] }> = {
                 'src/components/App.test.tsx': {
                     name: 'App component tests',
@@ -405,7 +291,6 @@ export async function invoke<T>(
                 },
             }
 
-            // structure グラフを取得 or 作成
             let graph = _graphs.find(
                 (g) => g.project_id === projectId && g.kind === 'structure'
             )
@@ -421,7 +306,6 @@ export async function invoke<T>(
             const data = _graphData.get(graph.id) ?? { nodes: [], edges: [] }
 
             for (const fp of testFiles) {
-                // structure グラフにテストノードを登録（node_type = 'test'）
                 const existing = data.nodes.find((n) => n.file_path === fp)
                 if (existing) {
                     existing.node_type = 'test'
@@ -440,7 +324,6 @@ export async function invoke<T>(
                     })
                 }
 
-                // test_suite を登録（既存の場合は node_ids を再解決）
                 const testFileId = `test_file:mock-${projectId}-${fp.replace(/\//g, '-')}`
                 const fixture = suiteFixtures[fp]
                 const nodeIds = fixture
@@ -451,7 +334,6 @@ export async function invoke<T>(
 
                 const suiteExists = _testSuites.find((s) => s.test_file_id === testFileId)
                 if (suiteExists) {
-                    // analyze_project 後に再呼び出された場合に node_ids を更新する
                     suiteExists.node_ids = nodeIds
                 } else {
                     _testSuites.push({
@@ -469,7 +351,6 @@ export async function invoke<T>(
 
         case 'list_test_suites': {
             const projectId = args?.projectId as string
-            // project に紐づく test_file_id を含む suite を返す
             return _testSuites
                 .filter((s) => s.test_file_id.includes(projectId))
                 .map((s) => ({
@@ -493,19 +374,17 @@ export async function invoke<T>(
                 })) as unknown as T
         }
 
-        // ── CTX-22b: TaaC ────────────────────────────────────────────────
+        // ── CTX-22: TaaC ─────────────────────────────────────────────────
 
         case 'get_related_nodes': {
             const projectId = args?.projectId as string
             const filePath = args?.filePath as string
 
-            // structure グラフを取得
             const graph = _graphs.find(
                 (g) => g.project_id === projectId && g.kind === 'structure'
             )
             const data = graph ? (_graphData.get(graph.id) ?? { nodes: [], edges: [] }) : { nodes: [], edges: [] }
 
-            // center ノードを取得
             const centerNode = data.nodes.find((n) => n.file_path === filePath)
             if (!centerNode) {
                 throw new Error(`[mock] get_related_nodes: node not found for file_path: ${filePath}`)
@@ -523,7 +402,6 @@ export async function invoke<T>(
                 },
             })
 
-            // dependencies: centerNode が source のエッジの target ノード
             const depNodeIds = data.edges
                 .filter((e) => e.source === centerNode.id && e.kind === 'imports')
                 .map((e) => e.target)
@@ -531,7 +409,6 @@ export async function invoke<T>(
                 .filter((n) => depNodeIds.includes(n.id))
                 .map(toRfNode)
 
-            // dependents: centerNode が target のエッジの source ノード
             const dntNodeIds = data.edges
                 .filter((e) => e.target === centerNode.id && e.kind === 'imports')
                 .map((e) => e.source)
