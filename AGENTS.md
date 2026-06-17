@@ -197,7 +197,7 @@ LLM はこれを読んでコンテキストを把握し、Vitest spec の生成�
 
 ## 6. テストファイルのひな型
 
-### 6-1. Vitest spec（`src/**/*.test.tsx`）
+### 6-1. Vitest test（`src/**/*.test.tsx`）
 
 コンテキストの SSOT。import がスコープを定義し、describe が機能名・it が振る舞いを記述する。
 
@@ -212,6 +212,8 @@ import { ComponentName } from './ComponentName'
 import { useHookName } from '../hooks/useHookName'
 
 // ── モック ──────────────────────────────────────────────────
+// レンダリングを持つ外部UIライブラリ（ReactFlow 等）は vi.mock(...) でモックする。
+// ロジック・状態遷移の検証に集中し、ライブラリ自体の動作検証は行わない。
 const { mockFn } = vi.hoisted(() => ({ mockFn: vi.fn() }))
 vi.mock('../hooks/useExternalHook', () => ({ useExternalHook: () => mockFn }))
 
