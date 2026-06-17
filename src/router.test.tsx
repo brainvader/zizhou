@@ -30,7 +30,7 @@ import {
     RouterProvider,
     Link,
 } from '@tanstack/react-router';
-import type { Project } from '../../docs/bom/project';
+import type { Project } from '@/bom/project'
 
 // =============================================================================
 // Slot 3: モック・セットアップ (Test Setup)
