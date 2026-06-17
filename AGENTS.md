@@ -343,6 +343,7 @@ Step 1 に戻り、次のコンテキストを対話的に定義する。
 
 - コード変更は **unified diff（patch）形式** で提供する（トークン削減のため）
 - patch 適用: `git apply --ignore-whitespace {feature-name}.patch`
+- patch は必ずファイルとしてダウンロードして適用する。コピーボタン経由では末尾空行が切り捨てられ corrupt patch エラーになる
 - **注意:** Windows 環境では CRLF 問題で `git apply` が失敗することがある。その場合は完全ファイル出力に切り替える
 - 新規ファイルは patch が存在しないため完全ファイルで提供する
 - 1ファイル・1ステップずつ提供し、ビルド／テスト確認後に次へ進む
