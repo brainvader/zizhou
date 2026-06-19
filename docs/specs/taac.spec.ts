@@ -15,8 +15,8 @@
  */
 
 import { test, expect } from 'vitest'
-import { isTestFile, computeTaaCLayout, DEFAULT_TAAC_LAYOUT } from '../../docs/bom/source-graph'
-import type { RelatedNodes } from '../../docs/bom/source-graph'
+import { isTestFile, computeTaaCLayout, DEFAULT_TAAC_LAYOUT } from '../../src/bom/source-graph'
+import type { RelatedNodes } from '../../src/bom/source-graph'
 
 // ============================================================
 // フィクスチャ
