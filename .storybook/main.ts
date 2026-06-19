@@ -27,7 +27,7 @@ const config: StorybookConfig = {
       plugins: [tailwindcss()],
       resolve: {
         alias: {
-          '@/bom': resolve(__dirname, '../docs/bom'),
+          '@/bom': resolve(__dirname, '../src/bom'),
           '@': resolve(__dirname, '../src'),
         },
       },

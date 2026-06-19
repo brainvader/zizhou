@@ -197,7 +197,7 @@ LLM はこれを読んでコンテキストを把握し、Vitest spec の生成�
 
 ## 6. テストファイルのひな型
 
-### 6-1. Vitest spec（`src/**/*.test.tsx`）
+### 6-1. Vitest test（`src/**/*.test.tsx`）
 
 コンテキストの SSOT。import がスコープを定義し、describe が機能名・it が振る舞いを記述する。
 
@@ -212,6 +212,8 @@ import { ComponentName } from './ComponentName'
 import { useHookName } from '../hooks/useHookName'
 
 // ── モック ──────────────────────────────────────────────────
+// レンダリングを持つ外部UIライブラリ（ReactFlow 等）は vi.mock(...) でモックする。
+// ロジック・状態遷移の検証に集中し、ライブラリ自体の動作検証は行わない。
 const { mockFn } = vi.hoisted(() => ({ mockFn: vi.fn() }))
 vi.mock('../hooks/useExternalHook', () => ({ useExternalHook: () => mockFn }))
 
@@ -341,6 +343,7 @@ Step 1 に戻り、次のコンテキストを対話的に定義する。
 
 - コード変更は **unified diff（patch）形式** で提供する（トークン削減のため）
 - patch 適用: `git apply --ignore-whitespace {feature-name}.patch`
+- patch は必ずファイルとしてダウンロードして適用する。コピーボタン経由では末尾空行が切り捨てられ corrupt patch エラーになる
 - **注意:** Windows 環境では CRLF 問題で `git apply` が失敗することがある。その場合は完全ファイル出力に切り替える
 - 新規ファイルは patch が存在しないため完全ファイルで提供する
 - 1ファイル・1ステップずつ提供し、ビルド／テスト確認後に次へ進む

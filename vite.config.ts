@@ -33,7 +33,7 @@ export default defineConfig({
         { find: '@tauri-apps/api/core', replacement: path.resolve(__dirname, './src/__mocks__/api-core.ts') },
         { find: '@tauri-apps/api/path', replacement: path.resolve(__dirname, './src/__mocks__/api-path.ts') },
       ] : []),
-      { find: '@/bom', replacement: path.resolve(__dirname, './docs/bom') },
+      { find: '@/bom', replacement: path.resolve(__dirname, './src/bom') },
       { find: '@', replacement: path.resolve(__dirname, './src') },
     ],
   },
@@ -44,9 +44,9 @@ export default defineConfig({
         test: {
           name: 'unit',
           environment: 'jsdom',
-          setupFiles: ['./tests/setup.ts'],
+          setupFiles: ['./src/setup.ts'],
           globals: true,
-          exclude: ['**/e2e/**', '**/*.e2e.spec.ts', '**/node_modules/**'],
+          exclude: ['**/*.spec.ts', '**/node_modules/**'],
         },
       },
       {
