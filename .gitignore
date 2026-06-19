@@ -33,3 +33,6 @@ coverage/
 
 # git patch
 *.patch
+
+# script
+**/script.sh
