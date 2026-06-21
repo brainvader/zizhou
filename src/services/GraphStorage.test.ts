@@ -26,7 +26,7 @@ describe('GraphStorage インターフェースを満たす', () => {
         mockInvoke.mockResolvedValue(undefined)
         await defaultGraphStorage.saveGraph(
             'graph:001',
-            [{ id: 'n1', type: 'editableNode', position: { x: 10, y: 20 }, data: { label: 'A' } }],
+            [{ id: 'n1', type: 'sourceNode', position: { x: 10, y: 20 }, data: { label: 'A' } }],
             [{ id: 'e1', source: 'n1', target: 'n2' }]
         )
         expect(mockInvoke).toHaveBeenCalledWith('save_graph', {
