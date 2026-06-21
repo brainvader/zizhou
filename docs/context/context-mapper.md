@@ -2,7 +2,7 @@
 name: context-mapping
 description:
   アプリのUI構成を示すHTMLファイルを用いて、AIにアプリの概要と画面構成を説明するためのガイドライン。
-  - **目的:** 画面構成のイメージを示す「ContextMap.html」を用いて、AIにアプリの概要と画面構成を説明する。
+  - **目的:** 画面構成のイメージを示す「ContextMap.html」をデザインカンプとして作成し、Vitestテストファイルと対応させる。
 ---
 
 # context-mapping
@@ -15,22 +15,26 @@ description:
 
 ---
 
+## 基本方針
+
+- **ContextMap.html はデザインカンプ** — 表示要素でUIを表現し、コメントでコンテキストを定義する
+- **Vitest テストファイルがコンテキストのSSOT** — `import` がスコープを、`describe`/`it` が振る舞いを定義する
+- **ContextMap はテストの目次** — 各コンポーネントのコメントに `describe`/`it` を列挙し、`[✓]`/`[ ]` でチェックする
+- **CTX番号による管理は不要** — テストファイルのパスで対応を示す
+
+---
+
 ## Logic / Procedure
 
-### 1. Context Identification
+### 1. HTML構造の作成
 
-ユーザーの記述から、独立してテスト・開発可能な「エリア（コンテクスト）」を特定する。
-
-- セマンティックなHTMLタグ（`nav`, `main`, `aside`, `footer`, `header`）で構造化する
-- 各エリアに `id="ctx-[name]"` を付与する
-- 各エリアの責務を HTMLコメントで明記する
+セマンティックなHTMLタグ（`nav`, `main`, `aside`, `footer`, `header`）で画面構造を作る。
+各要素の `id` はコンポーネント名をケバブケースにしたものを使う。
 
 ```html
-<!-- ============================================================
-     CTX-N: [NAME]
-     責務: [このエリアが担う役割]
-     [その他、実装上重要な制約や注意点があれば記述する]
-============================================================ -->
+<header id="topbar">...</header>
+<main id="project-grid">...</main>
+<dialog id="settings-dialog">...</dialog>
 ```
 
 ---
@@ -45,217 +49,93 @@ description:
 <!-- ============================================================
      GLOBAL STORE
      複数のコンテキストをまたいで共有すべき状態のみを定義する。
-     routing を router ライブラリに委譲する場合は持たない。
-     永続化の方針もコメントで明記する。
+     routing は router ライブラリに委譲するため持たない。
 ============================================================ -->
 <script id="global-store" type="application/json">
   { "activeProjectId": null }
 </script>
 ```
 
-**注意:**
-
-- 完全にローカルで動作するアプリや、コンテキスト間で共有すべき状態がない場合は省略してよい
-- routing を TanStack Router 等に委譲する場合は `global-store` に持たない
-- SSOTはZustand等のstateライブラリ。`global-store` のJSONは実装時にパースしない
-
 #### Local State（`script.local-state`）
 
-各コンテキスト内に閉じる状態は `<head>` 内に定義する。`data-context` で対応するコンテキストと紐付ける。
+各コンポーネント内に閉じる状態は `<head>` 内に定義する。`data-context` で対応するidと紐付ける。
 
 ```html
-<!-- data-context に対応するコンテキストの id を指定する -->
-<script data-context="ctx-[name]" class="local-state" type="application/json">
+<!-- [component-id] のローカル状態 -->
+<script data-context="project-grid" class="local-state" type="application/json">
   {
-    "isDialogOpen": false,
-    "form": { "name": "", "description": "" },
-    "errors": { "name": null }
+    "isNewProjectDialogOpen": false,
+    "form": { "name": "", "description": "", "rootPath": "" },
+    "errors": { "name": null, "rootPath": null }
   }
 </script>
 ```
-
-**コンテキストタグとの対応関係:**
-
-`<head>` 内の `local-state` スクリプトと `<body>` 内のUI要素は、同じ値を持つキーで紐付けられる。
-
-```
-<head>
-  <script data-context="ctx-main" class="local-state"> ← 定義側
-<body>
-  <main id="ctx-main">                                 ← UI側
-```
-
-- 定義側: `script[data-context="ctx-main"]`
-- UI側: `#ctx-main`
-- 紐付けキー: `"ctx-main"`（両者で一致する）
-
-UI要素側（`<body>`）は `id` のみでよい。`data-context` の重複付与は不要。
-構造タグは `id` で一意に識別できるため。
-
-**パーサーによる取得方法:**
-
-```js
-// UI要素からその local-state を取得する
-const ui = document.getElementById("ctx-main");
-const state = document.querySelector(
-  `script.local-state[data-context="${ui.id}"]`,
-);
-const localState = JSON.parse(state.textContent);
-
-// 逆引き: local-state から対応するUI要素を取得する
-const scripts = document.querySelectorAll("script.local-state");
-scripts.forEach((script) => {
-  const ctxId = script.dataset.context;
-  const ui = document.getElementById(ctxId);
-  const localState = JSON.parse(script.textContent);
-});
-```
-
-**定義のコツ:**
-
-- `form` と `errors` はセットで定義する。ZodによるバリデーションでAIがエラー表示のロジックを組み込みやすくなる
-- 未選択・未入力の初期状態は `null` で明示する。条件付きレンダリング（Empty State）の実装漏れを防げる
-
-```html
-<script data-context="ctx-[name]" class="local-state" type="application/json">
-  {
-    "selectedProjectId": null,
-    "isDialogOpen": false,
-    "form": { "name": "", "description": "" },
-    "errors": { "name": null }
-  }
-</script>
-```
-
-**注意:**
-
-- `<script>` に `id` は付与しない。HTMLの仕様上 `id` はページ内で一意でなければならず、UI要素の `id` と重複するため
-- `local-state` を持たないコンテキストにはスクリプトタグを作らない
-
-#### 拡張フィールド（必要な場合のみ追加する）
-
-| フィールド        | 用途                             | 追加条件                       |
-| ----------------- | -------------------------------- | ------------------------------ |
-| `uiDataFlows`     | コンテキスト間のデータフロー定義 | 複数コンテキストが連動する場合 |
-| `agent`           | LLMのモデル・設定                | LLMを使う場合                  |
-| `actionRegistry`  | LLMが呼び出せる関数の定義        | LLMにツールを使わせる場合      |
-| `operationPolicy` | 操作の危険度分類                 | 外部DBへの書き込みを伴う場合   |
 
 ---
 
 ### 3. Stack の定義
 
-技術スタックは `<head>` 内にコメントとして記述する。実行時データではないため `<script>` タグは使わない。
+技術スタックは `<head>` 内にコメントとして記述する。
 
 ```html
 <!-- ============================================================
      STACK
      runtime:  [例: Tauri 2]
      frontend: [例: React 18 + TypeScript]
-     bundler:  [例: Vite]
-     styling:  [例: Tailwind CSS v4 + shadcn/ui]
      router:   [例: TanStack Router（routing の SSOT）]
      state:    [例: Zustand]
-     persist:  [例: Tauri fs プラグイン]
-     testing:  [例: Vitest + RTL + Playwright]
+     db:       [例: SurrealDB embedded]
+     testing:  [例: Vitest + RTL + Storybook + Playwright]
      package:  [例: pnpm]
 ============================================================ -->
 ```
 
 ---
 
-### 4. Data Flow の定義（必要な場合）
+### 4. describe/it コメントの記述
 
-コンテキスト間にデータの流れがある場合、`uiDataFlows` として `global-store` 内に明示する。
-**UIイベント起点のフローのみ**を記述する。DBアクセスは各コンテキストの責務コメントに記述する。
+各コンポーネントに対応するHTML要素のそばに、テストファイルのパスと `describe`/`it` を列挙する。
+テストがグリーンになったら `[✓]`、未実装は `[ ]`。
 
-```json
-"uiDataFlows": [
-  {
-    "from":    "[送信元コンテキストID]",
-    "to":      "[送信先コンテキストID]",
-    "data":    "[送信するデータ]",
-    "trigger": "[発火条件]"
-  }
-]
+```html
+<!-- src/components/FileTree.tsx
+  describe: ファイルツリーを閲覧・選択する
+    [✓] rootPath 配下のエントリがツリー表示される
+    [✓] ディレクトリをクリックすると子エントリが遅延ロードされ展開される
+    [ ] 新しい機能の説明
+-->
+<nav id="file-tree">
+  <!-- モックアップ -->
+</nav>
 ```
+
+**ルール:**
+
+- `describe` はユーザーの行動を軸にした日本語で記述する（例: 「ファイルツリーを閲覧・選択する」）
+- `it` はVitestのテストファイルの文言と1対1で対応させる
+- 未実装のコンポーネントはファイルパスのみ記述し、`[ ]` で列挙する
 
 ---
 
-### 5. Feature Extraction
+### 5. Overlay（Dialog / Modal）の配置
 
-各コンテキストの役割を `[Feature]` / `[Logic]` の形式でHTMLコメントとして記述する。
-UIに書き込まない（表示が崩れ、ContextMapとしての視認性が損なわれるため）。
-AIはHTMLコメントも読める。
+`position: fixed` が親要素の `overflow` に封じられないよう、**必ず `</body>` 直前**に配置する。
 
 ```html
-<!--
-  [Feature] [機能名]    — ユーザーが観測できる振る舞い。具体的な操作と結果を書く
-  [Logic]   [ロジック名] — STACKに基づく具体的な内部処理。使用するライブラリ・APIを明記する
+<!-- src/components/SettingsDialog.tsx
+  describe: 設定を確認・閉じる
+    [✓] open=true のとき「Settings」タイトルと「閉じる」ボタンが表示される
+    [✓] open=false のときコンテンツが表示されない
+    [✓] 「閉じる」ボタンをクリックすると onOpenChange(false) が呼ばれる
 -->
+<div class="dialog-overlay">
+  <dialog
+    style="all:unset; display:flex; flex-direction:column; box-sizing:border-box;"
+  >
+    <!-- モックアップ -->
+  </dialog>
+</div>
 ```
-
-**`[Feature]` と `[Logic]` の書き分け:**
-
-- `[Feature]` はユーザー視点で観測できる振る舞いを記述する
-- `[Logic]` は STACKコメントに書いた技術を具体的に反映する。ライブラリ名・API名を明記することでAIが適切な実装を推論できる
-
-```html
-<!--
-  STACKに router: TanStack Router と書いたなら:
-  [Logic] Routing — TanStack Router の <Link> でラップする
-
-  STACKに persist: Tauri fs プラグイン と書いたなら:
-  [Logic] Persist — Tauri fs で projects.json に書き出す
-
-  STACKに state: Zustand と書いたなら:
-  [Logic] Submit  — Zustand の addProject() を呼び出す
--->
-```
-
-**Spec との関係:**
-
-- `[Feature]` / `[Logic]` は BOM・Spec の `@story` の種になる
-- 未承認のContextMapに依存するFeatureは、そのSpecが存在しないため自動的に実装されない
-- 将来追加される機能はContextMapが承認されてから追記する
-
----
-
-### 6. HTML Construction
-
-- セマンティックなHTMLタグ（`nav`, `main`, `aside`等）で構造化する
-- 主要なUIのモックアップ（ダミーデータ・ボタン等）を埋め込み、実装イメージを伝える
-- CSSはContextMapの視認性のために最低限定義する（実装への制約ではない）
-
-#### Overlay（Dialog / Modal）の配置
-
-`position: fixed` が親要素の `overflow` に封じられないよう、**必ず `</body>` 直前**（構造タグの外）に配置する。
-
-```html
-  <!-- ============================================================
-       CTX-N: [DIALOG NAME]
-       責務: [トリガーとなる操作・表示条件]
-  ============================================================ -->
-  <div class="overlay">
-    <!-- <dialog> 要素はブラウザデフォルトスタイルを all:unset でリセットする -->
-    <dialog style="all:unset; display:flex; flex-direction:column; box-sizing:border-box;">
-
-      <!-- モックアップ -->
-
-      <!--
-        [Feature] [機能名]    — 説明
-        [Logic]   [ロジック名] — 説明
-      -->
-    </dialog>
-  </div>
-
-</body>
-```
-
-**`<dialog>` 要素の注意点:**
-
-- ブラウザ標準の `<dialog>` は `margin: auto` 等のデフォルトスタイルを持つため `all: unset` でリセットする
-- React実装時は `isDialogOpen && <Dialog/>` の条件付きレンダリングで制御する
 
 ---
 
@@ -263,9 +143,9 @@ AIはHTMLコメントも読める。
 
 `ContextMap.html`:
 
-- ブラウザで表示可能なプロトタイプ
-- 各コンテキストの責務コメント
-- `[Feature]` / `[Logic]` による機能リスト（HTMLコメント形式）
+- ブラウザで表示可能なデザインカンプ
+- 各コンポーネントの `describe`/`it` コメント（テストの目次）
+- `[✓]`/`[ ]` による実装状況のチェックリスト
 - `<head>` 内の `script#global-store` および `script.local-state` による状態定義
 - STACKコメントによる技術スタック定義
 
@@ -286,79 +166,67 @@ AIはHTMLコメントも読める。
          frontend: React 18 + TypeScript
          router:   TanStack Router（routing の SSOT）
          state:    Zustand
-         testing:  Vitest + RTL + Playwright
+         testing:  Vitest + RTL + Storybook + Playwright
          package:  pnpm
     ============================================================ -->
 
     <!-- ============================================================
          GLOBAL STORE
          複数のコンテキストをまたいで共有すべき状態のみを定義する。
-         routing は TanStack Router に委譲するため持たない。
     ============================================================ -->
     <script id="global-store" type="application/json">
-      { "activeProjectId": null }
+      { "projects": [] }
     </script>
 
-    <!-- ctx-main の local-state（local-stateを持つコンテキストのみ定義する） -->
-    <script data-context="ctx-main" class="local-state" type="application/json">
-      { "isDialogOpen": false }
+    <!-- project-grid のローカル状態 -->
+    <script
+      data-context="project-grid"
+      class="local-state"
+      type="application/json"
+    >
+      {
+        "isNewProjectDialogOpen": false,
+        "form": { "name": "", "description": "", "rootPath": "" },
+        "errors": { "name": null, "rootPath": null }
+      }
     </script>
 
     <style>
-      .context-area {
-        border: 1px dashed #ccc;
-        padding: 20px;
-        margin: 10px;
-      }
+      /* デザインカンプ用スタイル */
     </style>
   </head>
   <body>
-    <!-- ============================================================
-         CTX-1: SIDEBAR
-         責務: ナビゲーション・ルーティング更新
-    ============================================================ -->
-    <nav id="ctx-sidebar" class="context-area">
-      <h2>Navigation</h2>
+    <!-- src/components/Topbar.tsx
+      describe: 設定を開く
+        [✓] ロゴ・タイトル・バージョンが表示される
+        [✓] Settings ボタンが表示される
+        [✓] Settings ボタンをクリックすると onSettingsClick が呼ばれる
+    -->
+    <header id="topbar">
       <!-- モックアップ -->
+    </header>
 
-      <!--
-        [Feature] Project List     — プロジェクト一覧を表示し、選択可能にする
-        [Logic]   Selection Update — クリック時に global-store の activeProjectId を更新する
-      -->
-    </nav>
-
-    <!-- ============================================================
-         CTX-2: MAIN
-         責務: 選択中のプロジェクトの詳細を表示する
-    ============================================================ -->
-    <main id="ctx-main" class="context-area">
-      <h2>Main Content</h2>
+    <!-- src/components/ProjectGrid.tsx
+      describe: プロジェクトを一覧・作成する
+        [✓] projects が空のとき「＋ new project」ボタンのみ表示される
+        [✓] projects があるときカードが表示される
+        [✓] 「＋ new project」をクリックするとダイアログが開く
+        [ ] 新しい機能の説明
+    -->
+    <main id="project-grid">
       <!-- モックアップ -->
-
-      <!--
-        [Feature] Project Detail — 選択中のプロジェクトの詳細をカード形式で表示する
-        [Feature] Data Form      — データの追加・削除ができるフォームを置く
-      -->
     </main>
 
-    <!-- ============================================================
-         CTX-3: NEW ITEM DIALOG
-         責務: 新規アイテム作成フォーム
-         トリガー: 「＋ 追加」ボタンクリック
-         注意: </body> 直前に配置（position:fixed のため）
-    ============================================================ -->
-    <div class="overlay">
+    <!-- src/components/SettingsDialog.tsx
+      describe: 設定を確認・閉じる
+        [✓] open=true のとき「Settings」タイトルと「閉じる」ボタンが表示される
+        [✓] 「閉じる」ボタンをクリックすると onOpenChange(false) が呼ばれる
+    -->
+    <div class="dialog-overlay">
       <dialog
         style="all:unset; display:flex; flex-direction:column; box-sizing:border-box;"
       >
         <!-- モックアップ -->
-
-        <!--
-          [Feature] Create Item — name を入力して「作成」でリストに追加する
-          [Feature] Cancel      — 「キャンセル」でダイアログを閉じる
-          [Logic]   Validation  — name が空のとき送信しない（Zod）
-          [Logic]   ID生成      — id は nanoid() で生成する
-        -->
       </dialog>
     </div>
   </body>
@@ -369,55 +237,14 @@ AIはHTMLコメントも読める。
 
 ## Notes
 
-**アプリの性質に応じて取捨選択する:**
-
-- シンプルなローカルアプリ → `global-store` は最小限またはなし
-- LLMを使うアプリ → `agent`・`actionRegistry` 等を `global-store` に追加
-- 外部DBへの書き込みを伴うアプリ → `operationPolicy` を `global-store` に追加
-- コンテキスト間の連動が多いアプリ → `uiDataFlows` を追加
-
 **曖昧でよいもの:**
 
-- 型定義の詳細（LLMが推論する）
-- バックエンドの実装詳細（Specで定義する）
-- 将来追加される機能（育ってから追加する）
+- 型定義の詳細（Vitestのテストを書く過程で自然に定まる）
+- 将来追加される機能（`[ ]` で列挙しておき、実装時に `[✓]` にする）
 
----
+**Vitestとの関係:**
 
-## Context Status
-
-各コンテキストおよび Feature/Logic の実装状態を ContextMap.html のコメントで管理する。
-
-| ステータス | 表記  | 意味                    |
-| ---------- | ----- | ----------------------- |
-| 未着手     | `[ ]` | デフォルト状態          |
-| 実装済み   | `[○]` | コード実装完了          |
-| 承認済み   | `[✓]` | Playwright 検品パス済み |
-
-**記法:**
-
-CTX レベル:
-\```html
-
-<!-- ============================================================
-     CTX-1: TOPBAR [✓]
-     責務: アプリ識別・グローバルアクション
-============================================================ -->
-
-\```
-
-Feature / Logic レベル:
-\```html
-
-<!--
-  [✓][Feature] Settings    — アイコンボタンクリックで Settings ダイアログを開く
-  [✓][Logic]   Open Dialog — onSettingsClick 経由で isSettingsOpen を true にする
--->
-
-\```
-
-**運用ルール:**
-
-- 実装着手時に `[ ]` → `[○]` に更新する
-- Playwright 検品パス時に `[○]` → `[✓]` に更新する
-- CTX レベルの `[✓]` は配下の全 Feature/Logic が `[✓]` であることを意味する
+- ContextMapは「テストの目次」であり、Vitestテストファイルがコンテキストのオリジナル
+- ContextMapを先に作り、それをもとにVitestテストを生成する
+- テストがグリーンになったら ContextMap の `[ ]` を `[✓]` に更新する
+- 仕様変更時はVitestテストを先に変更し、ContextMapを追従させる
