@@ -33,7 +33,7 @@
         </script>
 
         <!-- ctx-project-grid のローカル状態 -->
-        <script data-context="ctx-project-grid" class="local-state" type="application/json">
+        <script data-context="project-grid" class="local-state" type="application/json">
             {
                 "isNewProjectDialogOpen": false,
                 "form": { "name": "", "description": "", "rootPath": "" },
@@ -117,7 +117,7 @@
                 background: #2a4a35;
             }
 
-            #ctx-topbar {
+            #topbar {
                 height: 52px;
                 background: var(--card);
                 border-bottom: 1px solid var(--border);
@@ -248,7 +248,7 @@
                 background: var(--accent);
             }
 
-            #ctx-project-grid {
+            #project-grid {
                 flex: 1;
                 overflow-y: auto;
                 padding: 22px;
@@ -256,11 +256,11 @@
                 flex-direction: column;
             }
 
-            #ctx-project-grid::-webkit-scrollbar {
+            #project-grid::-webkit-scrollbar {
                 width: 3px;
             }
 
-            #ctx-project-grid::-webkit-scrollbar-thumb {
+            #project-grid::-webkit-scrollbar-thumb {
                 background: var(--border);
                 border-radius: 2px;
             }
@@ -390,13 +390,13 @@
         </div>
 
         <!-- src/components/Topbar.tsx
-            describe: Topbar
+            describe: 設定を開く
               [✓] ロゴ・タイトル・バージョンが表示される
               [✓] Settings ボタンが表示される
               [✓] Settings ボタンをクリックすると onSettingsClick が呼ばれる
               [✓] onSettingsClick が未指定でもクリックでエラーが発生しない
         -->
-        <header id="ctx-topbar">
+        <header id="topbar">
             <div class="logo">
                 <div class="logo-kanji-wrap">
                     <span class="logo-kanji">地蔵</span>
@@ -412,7 +412,7 @@
         </header>
 
         <!-- src/components/ProjectGrid.tsx
-            describe: ProjectGrid
+            describe: プロジェクトを一覧・作成する
               [✓] projects が空のとき「＋ new project」ボタンのみ表示される
               [✓] projects があるときカードが表示される
               [✓] isHydrated が false のとき「＋ new project」は disabled になる
@@ -421,7 +421,7 @@
               [✓] onCreateProject 成功後にダイアログが閉じる
               [✓] onCreateProject 失敗時はダイアログが閉じない
         -->
-        <main id="ctx-project-grid">
+        <main id="project-grid">
             <div class="grid">
                 <div class="card">
                     <div class="card-title">地蔵 Core</div>
@@ -454,18 +454,18 @@
 
         <!-- src/components/ProjectGrid.tsx（New Project Dialog）
              src/components/RootPathInput.tsx
-            describe: New Project Dialog
+            describe: 新しいプロジェクトを作成する
               [✓] name 空で「作成」を押すとバリデーションエラーが表示される
               [✓] onCreateProject 成功後にダイアログが閉じる
               [✓] onCreateProject 失敗時はダイアログが閉じない
-            describe: RootPathInput
+            describe: プロジェクトのルートパスを選択する
               [✓] onOpenDirectory が文字列を返したとき onChange にパスが渡される
               [✓] onOpenDirectory が null を返したとき onChange は呼ばれない
               [✓] onOpenDirectory が未指定でも 📁 ボタンのクリックでエラーが発生しない
               [✓] rootPath が空のとき「＋ new project」は disabled になる
         -->
         <div class="dialog-overlay">
-            <dialog id="ctx-new-project-dialog"
+            <dialog id="new-project-dialog"
                 style="all:unset; display:flex; flex-direction:column; gap:20px; background:#13161a; border:1px solid #242830; border-radius:9px; padding:24px; width:420px; box-shadow:0 8px 32px #00000080;">
 
                 <div class="dialog-title">New Project</div>
@@ -502,13 +502,13 @@
         </div>
 
         <!-- src/components/SettingsDialog.tsx
-            describe: SettingsDialog
+            describe: 設定を確認・閉じる
               [✓] open=true のとき「Settings」タイトルと「閉じる」ボタンが表示される
               [✓] open=false のときコンテンツが表示されない
               [✓] 「閉じる」ボタンをクリックすると onOpenChange(false) が呼ばれる
         -->
         <div class="dialog-overlay">
-            <dialog id="ctx-settings-dialog" class="dialog" open
+            <dialog id="settings-dialog" class="dialog" open
                 style="all:unset; display:flex; flex-direction:column; gap:20px; background:#13161a; border:1px solid #242830; border-radius:9px; padding:24px; width:400px; box-shadow:0 8px 32px #00000080;">
 
                 <div class="dialog-title">Settings</div>
@@ -520,7 +520,7 @@
         </div>
 
         <!-- src/router.tsx
-            describe: Routing
+            describe: 画面を遷移する
               [✓] "/" を開くと IndexRoute がレンダリングされる
               [✓] "/projects/$id" を開くと ProjectDetailRoute がレンダリングされる
               [✓] 不明なルートは NotFound を表示する
