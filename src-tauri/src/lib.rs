@@ -1,10 +1,5 @@
 //! lib.rs — Tauri エントリポイント（コマンド登録のみ）
 //!
-//! @context CTX-SurrealDB-migration: list_projects / create_project / list_graphs / create_graph コマンド追加
-//! @context CTX-15: save_graph / load_graph コマンド追加
-//! @context CTX-19: list_fs_tree コマンド追加
-//! @context CTX-20: get_structure_graph / analyze_file / analyze_project / get_changed_files
-//! @context CTX-22: analyze_tests / list_test_suites / list_test_cases / get_related_nodes
 
 mod services;
 
@@ -17,7 +12,7 @@ use std::path::Path;
 use tauri::{Manager, State};
 
 // ============================================================
-// list_fs_tree 用の型定義                             [CTX-19]
+// list_fs_tree 用の型定義
 // ============================================================
 
 #[derive(Debug, Serialize)]
@@ -72,7 +67,7 @@ fn read_dir_recursive(
 }
 
 // ============================================================
-// Tauri コマンド — FS Tree                            [CTX-19]
+// Tauri コマンド — FS Tree
 // ============================================================
 
 #[tauri::command]
@@ -137,7 +132,7 @@ async fn create_project(
 }
 
 // ============================================================
-// Tauri コマンド — Graph                              [CTX-15]
+// Tauri コマンド — Graph
 // ============================================================
 
 #[tauri::command]
@@ -173,7 +168,7 @@ async fn load_graph(graph_id: String, db: State<'_, Db>) -> Result<LoadGraphResp
 }
 
 // ============================================================
-// Tauri コマンド — VCS / Analysis                     [CTX-20]
+// Tauri コマンド — VCS / Analysis
 // ============================================================
 
 #[tauri::command]
@@ -225,7 +220,7 @@ async fn analyze_project(project_id: String, db: State<'_, Db>) -> Result<(), St
 }
 
 // ============================================================
-// Tauri コマンド — Test Analysis                      [CTX-22]
+// Tauri コマンド — Test Analysis
 // ============================================================
 
 #[tauri::command]
@@ -288,12 +283,11 @@ pub fn run() {
             save_graph,
             load_graph,
             list_fs_tree,
-            // [CTX-20]
             get_changed_files,
             get_structure_graph,
             analyze_file,
             analyze_project,
-            // [CTX-22] Test Analysis
+            // Test Analysis
             analyze_tests,
             list_test_suites,
             list_test_cases,
