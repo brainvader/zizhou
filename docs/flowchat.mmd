@@ -1,0 +1,24 @@
+flowchart TD
+    A["(人間 + LLM）<br/>ContextMap.html<br/>対話的にコンテキストを生成"]
+    B["（LLM）<br/>Vitest spec<br/>import = スコープ / describe = 境界"]
+    C["（人間）<br/>spec レビュー<br/>承認 = コンテキスト定義の完了"]
+    D["（LLM）<br/>実装<br/>spec の import が実装対象をすべて示す"]
+    E["（人間）<br/>pnpm vitest run"]
+    F["（LLM）<br/>Story 生成"]
+    G["（人間）<br/>pnpm storybook"]
+    H{"複数コンテキストの統合が必要？"}
+    I["（LLM）<br/>E2E spec 生成<br/>統合シナリオのみ"]
+    K["（人間）<br/>pnpm playwright test"]
+    J(["CTX に ✓ <br/>→ 次のコンテキストへ"])
+
+    A --> B --> C
+    C -- NG --> B
+    C -- OK --> D --> E
+    E -- "失敗<br/>結果を LLM に渡す" --> D
+    E -- グリーン --> F --> G
+    G -- NG --> F
+    G -- OK / 実装完了 --> H
+    H -- No --> J
+    H -- Yes --> I --> K
+    K -- 失敗 --> I
+    K -- OK --> J

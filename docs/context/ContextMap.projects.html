@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8" />
+        <title>ContextMap: 地蔵 — Projects</title>
+
+        <!-- ============================================================
+            STACK
+            runtime:  Tauri 2
+            frontend: React 18 + TypeScript
+            router:   TanStack Router（routing の SSOT）
+            state:    Zustand
+            db:       SurrealDB embedded (kv-surrealkv)
+            testing:  Vitest + RTL + Playwright + Storybook
+            package:  pnpm
+        ============================================================ -->
+
+        <!-- ============================================================
+            GLOBAL STORE
+            複数のコンテキストをまたいで共有すべき状態のみを定義する。
+            routing は TanStack Router に委譲するため持たない。
+        ============================================================ -->
+        <script id="global-store" type="application/json">
+            {
+                "projects": [
+                    { "id": "project:abc01", "name": "地蔵 Core",       "description": "グラフベースのプロジェクト管理OS。",                           "rootPath": "/Users/user/projects/zizhou" },
+                    { "id": "project:abc02", "name": "Graph Renderer",  "description": "ノード・エッジの依存関係を可視化するビューエンジン。",           "rootPath": "/Users/user/projects/graph-renderer" },
+                    { "id": "project:abc03", "name": "HITL Gate",       "description": "Human-in-the-loop の承認フロー制御モジュール。",               "rootPath": "/Users/user/projects/hitl-gate" },
+                    { "id": "project:abc04", "name": "Spec Extractor",  "description": "実装完了時にコードと同期した仕様書を自動生成する。",             "rootPath": "/Users/user/projects/spec-extractor" },
+                    { "id": "project:abc05", "name": "Auth Module",     "description": "Tauriキーチェーン連携によるローカルファースト認証。",           "rootPath": "/Users/user/projects/auth-module" }
+                ]
+            }
+        </script>
+
+        <!-- project-grid のローカル状態 -->
+        <script data-context="project-grid" class="local-state" type="application/json">
+            {
+                "isNewProjectDialogOpen": false,
+                "form": { "name": "", "description": "", "rootPath": "" },
+                "errors": { "name": null, "rootPath": null }
+            }
+        </script>
+
+        <style>
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            :root {
+                --background: #0d0f11;
+                --foreground: #e8e6e3;
+                --card: #13161a;
+                --card-hover: #1a1e24;
+                --border: #242830;
+                --muted-foreground: #6b7280;
+                --accent: #1e2229;
+                --primary: #c0392b;
+                --primary-foreground: #fff;
+                --primary-soft: #7a1f16;
+                --primary-glow: #c0392b44;
+                --radius: 6px;
+                --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+                --font-serif: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+            }
+
+            html,
+            body {
+                height: 100%;
+                background: var(--background);
+                color: var(--foreground);
+                font-family: var(--font-sans);
+                font-size: 13px;
+            }
+
+            body {
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            .titlebar {
+                height: 28px;
+                background: var(--card);
+                border-bottom: 1px solid var(--border);
+                display: flex;
+                align-items: center;
+                padding: 0 14px;
+                flex-shrink: 0;
+                user-select: none;
+            }
+
+            .dots {
+                display: flex;
+                gap: 6px;
+            }
+
+            .dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+            }
+
+            .dot.r {
+                background: #6b2a2a;
+            }
+
+            .dot.y {
+                background: #6b5a2a;
+            }
+
+            .dot.g {
+                background: #2a4a35;
+            }
+
+            #topbar {
+                height: 52px;
+                background: var(--card);
+                border-bottom: 1px solid var(--border);
+                display: flex;
+                align-items: center;
+                padding: 0 22px;
+                gap: 16px;
+                flex-shrink: 0;
+                box-shadow: inset 0 1px 0 #c0392b28;
+            }
+
+            .logo {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+
+            .logo-kanji-wrap {
+                position: relative;
+                display: inline-block;
+            }
+
+            .logo-kanji {
+                font-family: var(--font-serif);
+                font-size: 20px;
+                font-weight: 400;
+                color: var(--foreground);
+                letter-spacing: 0.15em;
+                line-height: 1;
+            }
+
+            .logo-kanji-wrap::after {
+                content: '';
+                position: absolute;
+                bottom: -3px;
+                left: 0;
+                right: 0;
+                height: 2px;
+                background: var(--primary);
+                border-radius: 1px;
+                opacity: 0.8;
+            }
+
+            .logo-sep {
+                width: 1px;
+                height: 18px;
+                background: var(--border);
+            }
+
+            .logo-sub {
+                display: flex;
+                flex-direction: column;
+                gap: 1px;
+            }
+
+            .logo-romaji {
+                font-family: var(--font-mono);
+                font-size: 9px;
+                color: var(--muted-foreground);
+                letter-spacing: 0.25em;
+                text-transform: uppercase;
+            }
+
+            .logo-ver {
+                font-family: var(--font-mono);
+                font-size: 8px;
+                color: #454a52;
+                letter-spacing: 0.15em;
+            }
+
+            .topbar-spacer {
+                flex: 1;
+            }
+
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                border-radius: var(--radius);
+                font-family: var(--font-sans);
+                font-size: 12px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.15s;
+                border: 1px solid transparent;
+            }
+
+            .btn-primary {
+                background: var(--primary);
+                color: var(--primary-foreground);
+                padding: 6px 16px;
+                height: 32px;
+                border-color: var(--primary-soft);
+            }
+
+            .btn-primary:hover {
+                background: #d44030;
+                box-shadow: 0 0 14px var(--primary-glow);
+            }
+
+            .btn-ghost {
+                background: transparent;
+                color: var(--muted-foreground);
+                width: 32px;
+                height: 32px;
+                font-size: 16px;
+            }
+
+            .btn-ghost:hover {
+                background: var(--accent);
+                color: var(--foreground);
+                border-color: var(--border);
+            }
+
+            .btn-outline {
+                background: transparent;
+                color: var(--foreground);
+                border: 1px solid var(--border);
+                padding: 6px 16px;
+                height: 32px;
+                border-radius: var(--radius);
+                font-size: 12px;
+                cursor: pointer;
+            }
+
+            .btn-outline:hover {
+                background: var(--accent);
+            }
+
+            #project-grid {
+                flex: 1;
+                overflow-y: auto;
+                padding: 22px;
+                display: flex;
+                flex-direction: column;
+            }
+
+            #project-grid::-webkit-scrollbar {
+                width: 3px;
+            }
+
+            #project-grid::-webkit-scrollbar-thumb {
+                background: var(--border);
+                border-radius: 2px;
+            }
+
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(256px, 1fr));
+                gap: 10px;
+            }
+
+            .card {
+                background: var(--card);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                padding: 16px 18px;
+                height: 96px;
+                cursor: pointer;
+                transition: all 0.15s;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .card:hover {
+                background: var(--card-hover);
+                border-color: #2e333d;
+            }
+
+            .card.new {
+                border-style: dashed;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .card-title {
+                font-size: 13px;
+                font-weight: 500;
+                color: var(--foreground);
+            }
+
+            .card-description {
+                font-size: 11px;
+                color: var(--muted-foreground);
+                line-height: 1.5;
+            }
+
+            .card-root-path {
+                font-family: var(--font-mono);
+                font-size: 9px;
+                color: #454a52;
+                letter-spacing: 0.05em;
+                margin-top: auto;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .new-text {
+                font-size: 11px;
+                color: var(--muted-foreground);
+                letter-spacing: 0.05em;
+            }
+
+            .dialog-overlay {
+                position: fixed;
+                inset: 0;
+                background: #00000066;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .dialog-title {
+                font-size: 14px;
+                font-weight: 600;
+                color: var(--foreground);
+                letter-spacing: 0.02em;
+            }
+
+            .dialog-field {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .dialog-label {
+                font-size: 11px;
+                color: var(--muted-foreground);
+                letter-spacing: 0.05em;
+            }
+
+            .dialog-input {
+                background: var(--background);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                padding: 8px 10px;
+                font-size: 12px;
+                color: var(--foreground);
+                font-family: var(--font-sans);
+                outline: none;
+            }
+
+            .dialog-input:focus {
+                border-color: var(--primary);
+            }
+
+            .dialog-error {
+                font-size: 11px;
+                color: var(--primary);
+            }
+
+            .dialog-footer {
+                display: flex;
+                justify-content: flex-end;
+                gap: 8px;
+            }
+        </style>
+    </head>
+    <body>
+
+        <div class="titlebar">
+            <div class="dots">
+                <div class="dot r"></div>
+                <div class="dot y"></div>
+                <div class="dot g"></div>
+            </div>
+        </div>
+
+        <!-- src/components/Topbar.tsx
+            describe: 設定を開く
+              [✓] ロゴ・タイトル・バージョンが表示される
+              [✓] Settings ボタンが表示される
+              [✓] Settings ボタンをクリックすると onSettingsClick が呼ばれる
+              [✓] onSettingsClick が未指定でもクリックでエラーが発生しない
+        -->
+        <header id="topbar">
+            <div class="logo">
+                <div class="logo-kanji-wrap">
+                    <span class="logo-kanji">地蔵</span>
+                </div>
+                <div class="logo-sep"></div>
+                <div class="logo-sub">
+                    <span class="logo-romaji">Zizou</span>
+                    <span class="logo-ver">Protocol v9.0</span>
+                </div>
+            </div>
+            <div class="topbar-spacer"></div>
+            <button class="btn btn-ghost" title="Settings">⚙</button>
+        </header>
+
+        <!-- src/components/ProjectGrid.tsx
+            describe: プロジェクトを一覧・作成する
+              [✓] projects が空のとき「＋ new project」ボタンのみ表示される
+              [✓] projects があるときカードが表示される
+              [✓] isHydrated が false のとき「＋ new project」は disabled になる
+              [✓] 「＋ new project」をクリックするとダイアログが開く
+              [✓] name 空で「作成」を押すとバリデーションエラーが表示される
+              [✓] onCreateProject 成功後にダイアログが閉じる
+              [✓] onCreateProject 失敗時はダイアログが閉じない
+        -->
+        <main id="project-grid">
+            <div class="grid">
+                <div class="card">
+                    <div class="card-title">地蔵 Core</div>
+                    <div class="card-description">グラフベースのプロジェクト管理OS。</div>
+                    <div class="card-root-path">~/projects/zizhou</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Graph Renderer</div>
+                    <div class="card-description">ノード・エッジの依存関係を可視化するビューエンジン。</div>
+                    <div class="card-root-path">~/projects/graph-renderer</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">HITL Gate</div>
+                    <div class="card-description">Human-in-the-loop の承認フロー制御モジュール。</div>
+                    <div class="card-root-path">~/projects/hitl-gate</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Spec Extractor</div>
+                    <div class="card-description">実装完了時にコードと同期した仕様書を自動生成する。</div>
+                    <div class="card-root-path">~/projects/spec-extractor</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Auth Module</div>
+                    <div class="card-description">Tauriキーチェーン連携によるローカルファースト認証。</div>
+                    <div class="card-root-path">~/projects/auth-module</div>
+                </div>
+                <div class="card new"><span class="new-text">＋ new project</span></div>
+            </div>
+        </main>
+
+        <!-- src/components/ProjectGrid.tsx（New Project Dialog）
+             src/components/RootPathInput.tsx
+            describe: 新しいプロジェクトを作成する
+              [✓] name 空で「作成」を押すとバリデーションエラーが表示される
+              [✓] onCreateProject 成功後にダイアログが閉じる
+              [✓] onCreateProject 失敗時はダイアログが閉じない
+            describe: プロジェクトのルートパスを選択する
+              [✓] onOpenDirectory が文字列を返したとき onChange にパスが渡される
+              [✓] onOpenDirectory が null を返したとき onChange は呼ばれない
+              [✓] onOpenDirectory が未指定でも 📁 ボタンのクリックでエラーが発生しない
+              [✓] rootPath が空のとき「＋ new project」は disabled になる
+        -->
+        <div class="dialog-overlay">
+            <dialog id="new-project-dialog"
+                style="all:unset; display:flex; flex-direction:column; gap:20px; background:#13161a; border:1px solid #242830; border-radius:9px; padding:24px; width:420px; box-shadow:0 8px 32px #00000080;">
+
+                <div class="dialog-title">New Project</div>
+
+                <div class="dialog-field">
+                    <label class="dialog-label">name *</label>
+                    <input class="dialog-input" type="text" placeholder="My Awesome App" />
+                    <span class="dialog-error">name は必須です</span>
+                </div>
+
+                <div class="dialog-field">
+                    <label class="dialog-label">description</label>
+                    <input class="dialog-input" type="text" placeholder="このプロジェクトの説明（任意）" />
+                </div>
+
+                <div class="dialog-field">
+                    <label class="dialog-label">root path *</label>
+                    <div style="display:flex; gap:6px;">
+                        <input class="dialog-input" style="flex:1;" type="text"
+                            placeholder="/Users/user/projects/my-app" />
+                        <button class="btn-outline" style="white-space:nowrap; padding:0 12px; font-size:14px;"
+                            title="フォルダを選択">
+                            📁
+                        </button>
+                    </div>
+                    <span class="dialog-error">root path は必須です</span>
+                </div>
+
+                <div class="dialog-footer">
+                    <button class="btn-outline">キャンセル</button>
+                    <button class="btn btn-primary">作成</button>
+                </div>
+            </dialog>
+        </div>
+
+        <!-- src/components/SettingsDialog.tsx
+            describe: 設定を確認・閉じる
+              [✓] open=true のとき「Settings」タイトルと「閉じる」ボタンが表示される
+              [✓] open=false のときコンテンツが表示されない
+              [✓] 「閉じる」ボタンをクリックすると onOpenChange(false) が呼ばれる
+        -->
+        <div class="dialog-overlay">
+            <dialog id="settings-dialog" class="dialog" open
+                style="all:unset; display:flex; flex-direction:column; gap:20px; background:#13161a; border:1px solid #242830; border-radius:9px; padding:24px; width:400px; box-shadow:0 8px 32px #00000080;">
+
+                <div class="dialog-title">Settings</div>
+
+                <div class="dialog-footer">
+                    <button class="btn-outline">閉じる</button>
+                </div>
+            </dialog>
+        </div>
+
+        <!-- src/router.tsx
+            describe: 画面を遷移する
+              [✓] "/" を開くと IndexRoute がレンダリングされる
+              [✓] "/projects/$id" を開くと ProjectDetailRoute がレンダリングされる
+              [✓] 不明なルートは NotFound を表示する
+              [✓] ProjectGrid の各カードは "/projects/$id" へのリンクになっている
+              [✓] "/" に直接アクセスしても ProjectGrid が表示される
+        -->
+
+    </body>
+</html>

@@ -1,32 +1,66 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import path from "node:path";
+import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
+import { playwright } from "@vitest/browser-playwright";
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
+const isPlaywright = process.env.VITE_PLAYWRIGHT === 'true';
 
-// https://vite.dev/config/
-export default defineConfig(async () => ({
-  plugins: [react()],
-
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent Vite from obscuring rust errors
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,
     strictPort: true,
     host: host || false,
     hmr: host
-      ? {
-          protocol: "ws",
-          host,
-          port: 1421,
-        }
+      ? { protocol: "ws", host, port: 1421 }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
     },
   },
-}));
+  // Playwright 環境で 504 Outdated Optimize Dep を防ぐため強制プリバンドル
+  optimizeDeps: {
+    force: isPlaywright,
+  },
+  resolve: {
+    alias: [
+      ...(isPlaywright ? [
+        { find: '@tauri-apps/plugin-fs', replacement: path.resolve(__dirname, './src/__mocks__/plugin-fs.ts') },
+        { find: '@tauri-apps/api/core', replacement: path.resolve(__dirname, './src/__mocks__/api-core.ts') },
+        { find: '@tauri-apps/api/path', replacement: path.resolve(__dirname, './src/__mocks__/api-path.ts') },
+      ] : []),
+      { find: '@/bom', replacement: path.resolve(__dirname, './src/bom') },
+      { find: '@', replacement: path.resolve(__dirname, './src') },
+    ],
+  },
+  test: {
+    projects: [
+      {
+        extends: './vite.config.ts',
+        test: {
+          name: 'unit',
+          environment: 'jsdom',
+          setupFiles: ['./src/setup.ts'],
+          globals: true,
+          exclude: ['**/*.spec.ts', '**/node_modules/**'],
+        },
+      },
+      {
+        plugins: [storybookTest({ configDir: './.storybook' })],
+        test: {
+          name: 'storybook',
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [{ browser: 'chromium' }],
+          },
+        },
+      },
+    ],
+  },
+});
