@@ -21,7 +21,7 @@ import type { AnalyzedDisplay } from '@/bom/source-graph'
 // computeAnalyzedDisplay ロジック検証
 // ============================================================
 
-describe('computeAnalyzedDisplay', () => {
+describe('ノードの表示状態を算出する', () => {
     const changed = new Set(['src/foo.ts', 'src/bar.ts'])
 
     test('fresh + filePath in changedFiles → stale', () => {

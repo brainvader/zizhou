@@ -40,7 +40,7 @@ beforeEach(() => {
     )
 })
 
-describe('useSourceGraph', () => {
+describe('ソースグラフのデータを管理する', () => {
     it('マウント時に get_structure_graph / get_changed_files / analyze_tests が呼ばれる', async () => {
         renderHook(() => useSourceGraph('proj-001', '/projects/zizhou'))
 
