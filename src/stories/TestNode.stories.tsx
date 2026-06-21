@@ -1,17 +1,3 @@
-/**
- * @context TestNode
- * @bom docs/bom/source-graph.ts (TestNodeProps, TestNodeDisplayData)
- * @story
- * 1. fresh 状態で紫系ボーダー・背景が表示される
- * 2. stale 状態で amber ボーダー・背景が表示される
- * 3. pending 状態でグレーボーダー・背景が表示される
- * 4. selected=true のとき青リングが表示される
- * 5. suiteCount バッジが表示される
- * 6. suiteCount が 0 のときバッジが表示されない
- * 7. ↺ ボタンをクリックすると onReanalyze(filePath) が呼ばれる
- * 8. onRunTest が渡されたとき ▶ ボタンが表示されクリックで呼ばれる
- * 9. onRunTest がないとき ▶ ボタンが表示されない
- */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, userEvent, within } from 'storybook/test'
 import { ReactFlowProvider } from '@xyflow/react'
@@ -138,56 +124,3 @@ export const NoSuiteCount: Story = {
 // インタラクション
 // ============================================================
 
-/** @story ↺ ボタンをクリックすると onReanalyze が呼ばれる */
-export const ReanalyzeButton: Story = {
-    args: {
-        label: 'App.test.tsx',
-        filePath: 'src/App.test.tsx',
-        displayStatus: 'stale',
-        suiteCount: 2,
-        onReanalyze: fn(),
-    },
-    play: async ({ canvasElement, args }: { canvasElement: HTMLElement; args: any }) => {
-        const canvas = within(canvasElement)
-        const btn = await canvas.findByTestId('reanalyze-test-node-src-App.test.tsx')
-        await expect(btn).toBeVisible()
-        await userEvent.click(btn)
-        await expect(args.onReanalyze).toHaveBeenCalledWith('src/App.test.tsx')
-    },
-}
-
-/** @story onRunTest が渡されたとき ▶ ボタンが表示されクリックで呼ばれる */
-export const RunButton: Story = {
-    args: {
-        label: 'App.test.tsx',
-        filePath: 'src/App.test.tsx',
-        displayStatus: 'fresh',
-        suiteCount: 2,
-        onReanalyze: fn(),
-        onRunTest: fn(),
-    },
-    play: async ({ canvasElement, args }: { canvasElement: HTMLElement; args: any }) => {
-        const canvas = within(canvasElement)
-        const btn = await canvas.findByTestId('run-test-node-src-App.test.tsx')
-        await expect(btn).toBeVisible()
-        await userEvent.click(btn)
-        await expect(args.onRunTest).toHaveBeenCalledWith('src/App.test.tsx')
-    },
-}
-
-/** @story onRunTest がないとき ▶ ボタンが表示されない */
-export const NoRunButton: Story = {
-    args: {
-        label: 'App.test.tsx',
-        filePath: 'src/App.test.tsx',
-        displayStatus: 'fresh',
-        suiteCount: 2,
-        onReanalyze: fn(),
-    },
-    play: async ({ canvasElement }: { canvasElement: HTMLElement }) => {
-        const canvas = within(canvasElement)
-        await expect(
-            canvas.queryByTestId('run-test-node-src-App.test.tsx')
-        ).not.toBeInTheDocument()
-    },
-}

@@ -17,7 +17,7 @@ const FIXTURE: Record<string, FsEntry[]> = {
 
 const mockReadDir = vi.fn(async (path: string): Promise<FsEntry[]> => FIXTURE[path] ?? [])
 
-describe('FileTree', () => {
+describe('ファイルツリーを閲覧・選択する', () => {
     it('rootPath 配下のエントリがツリー表示される', async () => {
         render(<FileTree rootPath={ROOT} onReadDir={mockReadDir} />)
         await waitFor(() => expect(screen.getByText('src')).toBeInTheDocument())

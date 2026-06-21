@@ -1,15 +1,3 @@
-/**
- * @context CTX-16: RootPathInput — ディレクトリ選択付きパス入力コンポーネント
- * @bom     docs/bom/project.ts
- * @story
- * 1. 空状態: プレースホルダーとフォルダボタンが表示される
- * 2. 値あり: 入力済みのパスが表示される
- * 3. エラーあり: エラーメッセージが表示される
- * 4. フォルダボタンクリックで onOpenDirectory が呼ばれ、返ったパスが反映される
- * 5. onOpenDirectory が null を返したとき onChange は呼ばれない
- * 6. テキスト入力で onChange が呼ばれる
- * @output src/components/RootPathInput.tsx
- */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, userEvent } from 'storybook/test'
 import { RootPathInput } from '@/components/RootPathInput'

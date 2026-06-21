@@ -33,7 +33,7 @@ const makeProps = (overrides: Partial<TestNodeProps['data']> = {}): TestNodeProp
     zIndex: 0,
 })
 
-describe('TestNode', () => {
+describe('テストノードを操作する', () => {
     it('ラベルが表示される', () => {
         render(<TestNode {...makeProps()} />)
         expect(screen.getByText('App.test.tsx')).toBeInTheDocument()

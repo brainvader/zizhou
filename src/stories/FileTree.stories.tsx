@@ -1,23 +1,3 @@
-/**
- * @context CTX-19 / FileTree
- * @context CTX-20 / Structure Graph 連携
- * @bom     docs/bom/file-tree.ts
- * @story
- * CTX-19:
- *   1. rootPath 配下のディレクトリ・ファイルがツリー表示される
- *   2. ディレクトリをクリックすると子エントリが遅延ロードされ展開される
- *   3. 展開済みディレクトリを再クリックすると折りたたまれる
- *   4. rootPath が未設定のとき「root path が未設定です」が表示される
- *   5. ローディング中は「Loading…」が表示される
- *   6. readDir 失敗時はエラーメッセージが表示される
- * CTX-20:
- *   7. 構造グラフに登録済みのファイルに data-analyzed が付く
- *   8. stale ファイルに data-stale が付き、analyzed のみのファイルとは区別される
- *   9. selectedFilePath のファイルに data-selected が付く
- *  10. ファイルクリックで onFileClick が rootPath 相対パスで呼ばれる
- *  11. analyzed + stale + selected の3属性が同時に立つ
- *  12. ディレクトリクリックでは onFileClick は呼ばれない
- */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, userEvent } from 'storybook/test'
 import { FileTree } from '@/components/FileTree'

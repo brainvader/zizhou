@@ -1,198 +1,385 @@
-<!-- ============================================================
-            CTX-22: TEST AS A CONTEXT (TaaC) [✓]
-            責務: Vitest テストファイルを解析し、FileTree でのテストファイル選択を
-                  トリガーに、関連ソースノード群を依存グラフとして SourceGraphView
-                  に表示する。LLM に渡すコンテキスト境界を spec ファイルが定義する。
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ContextMap: 地蔵 — Project Detail</title>
 
-            背景:
-              LLM 支援コーディングでは「このファイル群の範囲で開発を閉じる」という
-              コンテキスト境界の明示が重要。全ファイルをグラフ表示してもスケールせず、
-              人間・LLM ともに処理しきれない。
-              spec ファイルの import 群 = コンテキストスコープという自然な対応により、
-              テストを書くことがそのままコンテキスト定義になる。
-              テストファイルのないソースファイルはグラフに現れない。これは
-              「テストを書かないとスコープが定義できない」という設計上の圧力として機能する。
-
-            コンテキストの定義:
-              テストファイルの import 群 = コンテキストのスコープ（関与ファイル群）
-              describe 名              = コンテキスト名
-
-              例:
-                // App.spec.tsx
-                import { App } from '@/components/App'     ← スコープ
-
-                describe('App component tests', () => {   ← コンテキスト名
-                    it('renders correctly', () => { ... })
-                })
-
-              FileTree でテストファイルを選択
-                → get_related_nodes で依存先・利用先を取得
-                → 選択ノード（中央）・dependencies（左）・dependents（右）を自動配置
-
-            テストとコンテキストの対応:
-              describe = コンテキスト（どのノード群が関与するか）
-              it       = シナリオのステップ（CTX-23 でエッジアニメーションに対応予定）
-
-            表示ルール:
-              選択対象: *.test.ts / *.test.tsx / *.spec.ts / *.spec.tsx のみ
-              除外:     node_modules 配下
-              初期状態: 空（テストファイルが選択されるまで何も表示しない）
-              キャッシュ: 最後に選択したテストファイルの状態を維持
-              新規選択: 前の表示を置き換える
-              非テストファイル選択時: SourceGraph は変化しない
-
-            レイアウト:
-              [依存先ノード群]  →  [選択テストノード]  →  [利用先ノード群]
-                   左側                  中央                   右側
-              （テストがimportするもの）           （テストファイルをimportしているもの）
-
-            SurrealDB データモデル:
-              test_file テーブル（SCHEMALESS）
-                id, project_id, file_path
-
-              test_suite テーブル（SCHEMALESS）← describe に対応
-                id, test_file_id, parent_suite_id（ネスト対応）, name, node_ids[]
-
-              test_case テーブル（SCHEMALESS） ← it / test に対応
-                id, suite_id, name, order
-
-            Rust コマンド:
-              analyze_tests(project_id)         → test_file / test_suite / test_case を UPSERT
-              list_test_suites(project_id)      → TestSuite[]
-              list_test_cases(suite_id)         → TestCase[]
-              get_related_nodes(project_id, file_path) → RelatedNodes（center / dependencies / dependents）
-
-            フロントエンド構成:
-              docs/bom/source-graph.ts                     — RelatedNodes / GetRelatedNodesFn /
-                                                             TaaCLayoutParams / isTestFile /
-                                                             computeTaaCLayout
-              docs/bom/test-analysis.ts                    — TestFile / TestSuite / TestCase /
-                                                             TestStorage
-              docs/bom/test-node.ts                        — TestNodeData / TestNodeDisplayData /
-                                                             TestNodeType / TestNodeProps
-              src/components/nodes/TestNode.tsx             — テストノード描画（⚗ アイコン・紫系）
-              src/components/SourceGraphView.tsx            — onGetRelatedNodes prop で TaaC 動作
-              src/services/TestStorage.ts                   — defaultTestStorage
-              src/routes/projects.$id.tsx                   — FileTree 選択 → TaaC グラフ表示
-
-            動作フロー:
-              1. マウント時 / Reanalyze All 時に analyze_tests を呼ぶ
-              2. テストファイルが nodeType='test' で structure グラフに登録される
-              3. SourceGraphView がテストノードを TestNode コンポーネントで描画する
-              4. FileTree でテストファイルを選択すると selectedFilePath が更新される
-              5. SourceGraphView が get_related_nodes を呼び RelatedNodes を取得する
-              6. computeTaaCLayout で依存先（左）・選択ノード（中央）・利用先（右）を配置する
-              7. テストファイル以外を選択すると SourceGraph は変化しない
-              8. テストファイル未選択時は空グラフ + 案内メッセージを表示する
-
-            関連: CTX-21 (SourceGraph), CTX-23 (Test Simulation)
-
-            ── 実装スコープ ──────────────────────────────────────────
-            [✓][Logic]   DB Schema            — test_file / test_suite / test_case テーブルを
-                                                SurrealDB に追加する
-            [✓][Logic]   Rust Commands        — analyze_tests / list_test_suites / list_test_cases /
-                                                get_related_nodes を実装する
-            [✓][Logic]   BOM source-graph     — RelatedNodes / isTestFile / computeTaaCLayout を追加する
-            [✓][Logic]   BOM test-analysis    — TestFile / TestSuite / TestCase / TestStorage を定義する
-            [✓][Logic]   BOM test-node        — TestNode 型を定義する
-            [✓][Logic]   TestStorage          — src/services/TestStorage.ts を実装する
-            [✓][Logic]   analyze_tests        — *.test.ts / *.spec.ts を tree-sitter で解析し UPSERT する
-            [✓][Logic]   list_test_suites     — project_id で test_suite 一覧を返す
-            [✓][Logic]   list_test_cases      — suite_id で test_case 一覧を返す
-            [✓][Logic]   get_related_nodes    — center / dependencies / dependents を返す
-            [✓][Feature] TestNode Display     — テストノードを ⚗ アイコン・紫系で表示する
-            [✓][Feature] TaaC Graph           — テストファイル選択 → 依存グラフを左中右で表示する
-            [✓][Feature] TaaC Empty State     — テストファイル未選択時に案内メッセージを表示する
-            [✓][Feature] FileTree TaaC Filter — テストファイル選択時のみ SourceGraph を更新する
-            [✓][Feature] Cache Last Selection — 最後に選択したテストファイルの状態を維持する
-            [ ][Feature] Boundary Edge        — コンテキスト境界をまたぐエッジを amber でハイライトする
-            [ ][Feature] Context Load Optimize — 解析済みの場合は analyze_tests をスキップし
-                                                list_test_suites のみ呼ぶ
-============================================================ -->
-
-<!-- ============================================================
-            CTX-23: TEST SIMULATION [ ]
-            責務: Vitest の it（テストケース）をグラフ上でシミュレーションし、
-                  データフローをエッジアニメーションで可視化する。
-                  テスト実行結果を右ペインに表示しLLMへのコピーを提供する。
-
-            背景:
-              CTX-22 でテストコンテキストが TaaC グラフとして可視化される。
-              CTX-23 ではその中の it（テストケース）を実行単位として扱い、
-              - データがノード間をどう流れるか をエッジアニメーションで示す
-              - テスト実行結果を右ペインに表示する
-              - 失敗ログをワンクリックでコピーし LLM にペーストできる
-
-            シミュレーションの概念:
-              describe = コンテキスト（Subflow の範囲・登場ノード群）
-              it       = シナリオステップ（エッジ上を流れるデータの単位）
-
-              例:
-                describe('FileTree → SourceGraph 連携') {
-                    it('ファイルをクリックする')
-                        FileTree →[selectedFilePath]→ useStore   ← エッジアニメーション
-                    it('ノードがハイライトされる')
-                        useStore →[staleFiles]→ SourceGraphView  ← エッジアニメーション
-                }
-
-            実行単位:
-              Vitest の最小実行単位は it（= test）。
-              ▶ ボタンの粒度:
-                テストノード（ファイル）▶  → ファイル全体実行
-                describe ▶               → describe 単位実行（--testNamePattern 前方一致）
-                it ▶                     → it 単位実行（--testNamePattern 完全一致）
-
-            右ペイン表示（NodeProperty 拡張）:
-              テストノード選択時:
-                - test_suite / test_case 一覧を表示
-                - 各 it の横に ▶ ボタン
-                - 実行結果（passed ✓ / failed ✗）をインラインで表示
-                - 失敗時は Vitest の生ログを表示
-                - 📋 コピーボタン → 生ログをクリップボードにコピー
-                  （そのまま LLM にペーストして修正依頼できる）
-
-            コピー内容（生ログ）:
-              Vitest --reporter=verbose の出力をそのまま使用。
-              AIによる加工・要約は行わない（トークン消費防止・LLMが生ログを直接解釈できる）。
-
-              例:
-                FAIL src/components/FileTree.test.ts
-                ✗ ファイルをクリックすると選択される
-
-                AssertionError: expected 'selected' received undefined
-                  at FileTree.test.ts:12:5
-
-            エッジアニメーション:
-              it の定義順にエッジを順次ハイライト（フローアニメーション）。
-              実行結果が passed → 緑、failed → 赤でエッジを着色。
-
-            Tauri コマンド（新規）:
-              run_test_case(project_id, test_case_id) → TestResult
-              run_test_suite(project_id, suite_id)    → TestResult[]
-              run_test_file(project_id, file_path)    → TestResult[]
-
-              TestResult:
-                test_case_id: string
-                passed:       bool
-                log:          string   ← Vitest の生ログ
-                duration_ms:  number
-
-            フロントエンド構成:
-              docs/bom/test-simulation.ts          — TestResult / TestRunnerProps 型定義
-              src/services/TestRunner.ts           — run_test_case / run_test_suite ラッパー
-              src/components/NodeProperty.tsx      — テストノード選択時の結果表示・コピーボタン拡張
-
-            関連: CTX-22 (TaaC), CTX-21 (SourceGraph)
-
-            ── 実装スコープ ──────────────────────────────────────────
-            [ ][Logic]   BOM                  — docs/bom/test-simulation.ts に型定義を追加する
-            [ ][Logic]   run_test_case        — it 単位で Vitest を実行し生ログを返す
-            [ ][Logic]   run_test_suite       — describe 単位で Vitest を実行する
-            [ ][Logic]   run_test_file        — ファイル単位で Vitest を実行する
-            [ ][Logic]   TestRunner           — src/services/TestRunner.ts を実装する
-            [ ][Feature] Run Buttons          — テストノード / describe / it の横に ▶ ボタンを表示する
-            [ ][Feature] Result Display       — 右ペインに実行結果（passed/failed + 生ログ）を表示する
-            [ ][Feature] Copy Button          — 生ログをクリップボードにコピーする 📋 ボタン
-            [ ][Feature] Edge Animation       — it の順序に沿ってエッジをアニメーションする
-            [ ][Feature] Result Color         — passed → 緑 / failed → 赤 でエッジ・ノードを着色する
+    <!-- ============================================================
+            STACK
+            runtime:  Tauri 2
+            frontend: React 18 + TypeScript
+            router:   TanStack Router（routing の SSOT）
+            state:    Zustand
+            db:       SurrealDB embedded (kv-surrealkv)
+            testing:  Vitest + RTL + Playwright + Storybook
+            package:  pnpm
         ============================================================ -->
+
+    <!-- ============================================================
+            GLOBAL STORE
+            複数のコンテキストをまたいで共有すべき状態のみを定義する。
+        ============================================================ -->
+    <script id="global-store" type="application/json">
+            {
+                "activeGraphId": null,
+                "selectedTestFilePath": null,
+                "projectRootPath": "/Users/user/projects/zizhou"
+            }
+        </script>
+
+    <!-- project-detail のローカル状態 -->
+    <script data-context="project-detail" class="local-state" type="application/json">
+            {
+                "isSettingsOpen": false,
+                "staleFiles": [],
+                "analyzedFiles": []
+            }
+        </script>
+
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --background: #0d0f11;
+        --foreground: #e8e6e3;
+        --card: #13161a;
+        --border: #242830;
+        --muted-foreground: #6b7280;
+        --accent: #1e2229;
+        --primary: #c0392b;
+        --primary-foreground: #fff;
+        --radius: 6px;
+        --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+        --font-serif: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+      }
+
+      html,
+      body {
+        height: 100%;
+        background: var(--background);
+        color: var(--foreground);
+        font-family: var(--font-sans);
+        font-size: 13px;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .titlebar {
+        height: 28px;
+        background: var(--card);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        flex-shrink: 0;
+      }
+
+      .dots {
+        display: flex;
+        gap: 6px;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+
+      .dot.r {
+        background: #6b2a2a;
+      }
+
+      .dot.y {
+        background: #6b5a2a;
+      }
+
+      .dot.g {
+        background: #2a4a35;
+      }
+
+      #project-detail-topbar {
+        height: 44px;
+        background: var(--card);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        gap: 12px;
+        flex-shrink: 0;
+      }
+
+      .topbar-project-name {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--muted-foreground);
+        letter-spacing: 0.1em;
+      }
+
+      .topbar-spacer {
+        flex: 1;
+      }
+
+      .btn-ghost {
+        background: transparent;
+        border: none;
+        color: var(--muted-foreground);
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius);
+      }
+
+      .btn-ghost:hover {
+        background: var(--accent);
+        color: var(--foreground);
+      }
+
+      #main-layout {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+      }
+
+      #file-tree {
+        width: 220px;
+        border-right: 1px solid var(--border);
+        overflow-y: auto;
+        padding: 12px 8px;
+        flex-shrink: 0;
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+
+      .tree-entry {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        color: var(--muted-foreground);
+      }
+
+      .tree-entry:hover {
+        background: var(--accent);
+        color: var(--foreground);
+      }
+
+      .tree-entry.selected {
+        background: var(--accent);
+        color: var(--foreground);
+      }
+
+      .tree-entry.stale {
+        color: #f59e0b;
+      }
+
+      .tree-entry.analyzed {
+        color: #6ee7b7;
+      }
+
+      .tree-entry.test {
+        color: #a78bfa;
+      }
+
+      .tree-entry.dir {
+        font-weight: 500;
+        color: var(--foreground);
+      }
+
+      #source-graph {
+        flex: 1;
+        position: relative;
+        background: var(--background);
+        overflow: hidden;
+      }
+
+      .graph-empty {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted-foreground);
+        font-size: 12px;
+        letter-spacing: 0.05em;
+      }
+
+      .graph-node {
+        position: absolute;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 8px 12px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        min-width: 140px;
+      }
+
+      .graph-node.test {
+        border-color: #7c3aed;
+        color: #a78bfa;
+      }
+
+      .graph-node.stale {
+        border-color: #d97706;
+      }
+
+      .graph-node.selected {
+        border-color: var(--primary);
+      }
+    </style>
+  </head>
+  <body>
+
+    <div class="titlebar">
+      <div class="dots">
+        <div class="dot r"></div>
+        <div class="dot y"></div>
+        <div class="dot g"></div>
+      </div>
+    </div>
+
+    <!-- src/components/ProjectDetailTopbar.tsx
+            describe: プロジェクト詳細画面のアクションを操作する
+              [✓] プロジェクト名が表示される
+              [✓] New Graph ボタンクリックで onCreateGraph が projectId と name で呼ばれる
+              [✓] onCreateGraph 完了後に onNavigate が graphId で呼ばれる
+              [✓] onCreateGraph 失敗時に toast.error が呼ばれ onNavigate は呼ばれない
+              [✓] isDetailHydrated=false のとき New Graph ボタンは disabled になる
+        -->
+    <header id="project-detail-topbar">
+      <span class="topbar-project-name">地蔵 Core</span>
+      <div class="topbar-spacer"></div>
+      <button class="btn-ghost" title="New Graph">＋</button>
+      <button class="btn-ghost" title="Settings">⚙</button>
+    </header>
+
+    <div id="main-layout">
+
+      <!-- src/components/FileTree.tsx
+                describe: ファイルツリーを閲覧・選択する
+                  [✓] rootPath 配下のエントリがツリー表示される
+                  [✓] ディレクトリをクリックすると子エントリが遅延ロードされ展開される
+                  [✓] 展開済みディレクトリを再クリックすると折りたたまれる
+                  [✓] rootPath が未設定のとき「root path が未設定です」が表示される
+                  [✓] readDir 失敗時はエラーメッセージが表示される
+                  [✓] ファイルクリックで onFileClick が rootPath 相対パスで呼ばれる
+                  [✓] selectedFilePath のファイルに data-selected が付く
+                  [✓] staleFiles に含まれるファイルに data-stale が付く
+                  [✓] analyzedFiles に含まれるファイルに data-analyzed が付く
+                  [✓] ディレクトリクリックでは onFileClick は呼ばれない
+            -->
+      <nav id="file-tree">
+        <div class="tree-entry dir">▼ src</div>
+        <div class="tree-entry analyzed" style="padding-left:24px;">App.tsx</div>
+        <div class="tree-entry test selected" style="padding-left:24px;">App.test.tsx</div>
+        <div class="tree-entry stale" style="padding-left:24px;">main.tsx</div>
+        <div class="tree-entry dir" style="padding-left:16px;">▶ components</div>
+        <div class="tree-entry dir" style="padding-left:16px;">▶ hooks</div>
+      </nav>
+
+      <!-- src/components/SourceGraphView.tsx
+                describe: テストファイルを選択して依存グラフを確認する
+                  [✓] テストファイル未選択のとき taac-empty-state が表示される
+                  [✓] テストファイル以外が selectedFilePath に渡されても onGetRelatedNodes は呼ばれない
+                  [✓] テストファイルを選択すると onGetRelatedNodes が呼ばれる
+                  [✓] onGetRelatedNodes なしのとき source-graph-empty が表示される
+
+                src/components/nodes/SourceNode.tsx
+                describe: ソースノードの状態を確認する
+                  [✓] ラベルが表示される
+                  [✓] filePath と onReanalyze があるとき ↺ ボタンが表示される
+                  [✓] ↺ ボタンをクリックすると onReanalyze(filePath) が呼ばれる
+                  [✓] onReanalyze がないとき ↺ ボタンが表示されない
+                  [✓] displayStatus=stale のとき "stale" ラベルが表示される
+                  [✓] displayStatus=pending のとき "pending" ラベルが表示される
+                  [✓] displayStatus=fresh のときステータスラベルが表示されない
+                  [✓] selected=true のとき data-selected 属性が付く
+
+                src/components/nodes/TestNode.tsx
+                describe: テストノードを操作する
+                  [✓] ラベルが表示される
+                  [✓] suiteCount が 1 以上のときバッジが表示される
+                  [✓] suiteCount が 0 のときバッジが表示されない
+                  [✓] ↺ ボタンをクリックすると onReanalyze(filePath) が呼ばれる
+                  [✓] onRunTest が渡されたとき ▶ ボタンが表示されクリックで呼ばれる
+                  [✓] selected=true のとき data-selected 属性が付く
+            -->
+      <main id="source-graph">
+        <!-- TaaC モード: テストファイル選択時 -->
+        <div class="graph-node test" style="left:400px; top:180px;">App.test.tsx ⚗</div>
+        <div class="graph-node" style="left:160px; top:140px;">App.tsx</div>
+        <div class="graph-node stale" style="left:160px; top:240px;">main.tsx</div>
+        <div class="graph-node" style="left:640px; top:180px;">index.ts</div>
+
+        <!-- テストファイル未選択時の空状態 -->
+        <!-- <div class="graph-empty">テストファイルを選択してください</div> -->
+      </main>
+
+    </div>
+
+    <!-- src/hooks/useSourceGraph.ts
+            describe: ソースグラフのデータを管理する
+              [✓] マウント時に get_structure_graph / get_changed_files / analyze_tests が呼ばれる
+              [✓] structureGraph が返される
+              [✓] analyzedFiles は structureGraph のノードの filePath の集合になる
+              [✓] staleFiles は changedFiles と analyzedFiles の積集合になる
+              [✓] handleFileClick はテストファイルのみ setSelectedFilePath を呼ぶ
+              [✓] handleFileClick はテストファイル以外では setSelectedFilePath を呼ばない
+              [✓] handleReanalyzeAll は analyze_project / analyze_tests / get_structure_graph を呼ぶ
+
+            src/bom/source-graph.ts
+            describe: TaaC レイアウトを計算する
+              [✓] isTestFile: .test.ts を true と判定する
+              [✓] isTestFile: .spec.ts を true と判定する
+              [✓] isTestFile: 通常の .ts は false と判定する
+              [✓] computeTaaCLayout: center は (centerX, centerY) に配置される
+              [✓] computeTaaCLayout: dependencies は center より左に配置される
+              [✓] computeTaaCLayout: dependents は center より右に配置される
+              [✓] computeTaaCLayout: 全ノードの座標が Map に含まれる
+              [✓] computeTaaCLayout: 依存先・利用先が 0 件でも center の座標は変わらない
+              [✓] computeTaaCLayout: 複数の dependencies は verticalSpacing で等間隔に並ぶ
+
+            src/bom/source-analysis.ts
+            describe: ノードの表示状態を算出する
+              [✓] fresh + filePath in changedFiles → stale
+              [✓] fresh + filePath not in changedFiles → fresh
+              [✓] pending → pending
+              [✓] undefined analyzed → pending
+              [✓] fresh + filePath undefined → fresh（filePath なしは stale にならない）
+              [✓] empty changedFiles → always fresh when analyzed=fresh
+
+            src/components/SourceGraphView.tsx
+            describe: テストファイルを選択して依存グラフを確認する
+              [ ] Boundary Edge — コンテキスト境界をまたぐエッジを amber でハイライトする
+              [ ] Context Load Optimize — 解析済みの場合は analyze_tests をスキップする
+
+            src/components/nodes/TestNode.tsx
+            src/services/TestRunner.ts
+            describe: テストを実行して結果を確認する
+              [ ] テストノード / describe / it の横に ▶ ボタンが表示される
+              [ ] ▶ ボタンをクリックするとテストが実行される
+              [ ] 右ペインに実行結果（passed/failed + 生ログ）が表示される
+              [ ] 生ログをクリップボードにコピーする 📋 ボタンが表示される
+              [ ] it の順序に沿ってエッジがアニメーションする
+              [ ] passed のとき緑・failed のとき赤でエッジ・ノードが着色される
+        -->
+
+  </body>
+</html>

@@ -1,14 +1,3 @@
-/**
- * @context ProjectDetailTopbar
- * @bom docs/bom/graph.ts, docs/bom/project.ts
- * @story
- * 1. ロゴ（地蔵 / Zizou / Protocol v8.10）が表示される
- * 2. breadcrumb にプロジェクト名が表示される
- * 3. プロジェクトが存在しない場合 breadcrumb は表示されない
- * 4. initStatus が 'ready' のとき New Graph ボタンは有効
- * 5. initStatus が 'checking' のとき New Graph ボタンは disabled
- * 6. Settings ボタンクリックで onSettingsClick が発火する
- */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, userEvent, screen } from 'storybook/test'
 import { ProjectDetailTopbar } from '@/components/ProjectDetailTopbar'

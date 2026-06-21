@@ -10,8 +10,6 @@ import type { TestStorage, TestSuite, TestCase } from '@/bom/test-analysis'
  * Props DI 用に TestStorage 型を export しており、テスト・Storybook では
  * `{ ...defaultTestStorage, listTestSuites: mockFn }` で部分上書き可能。
  *
- * @context CTX-22
- * @bom     docs/bom/test-analysis.ts TestStorage
  */
 export const defaultTestStorage: TestStorage = {
     /**

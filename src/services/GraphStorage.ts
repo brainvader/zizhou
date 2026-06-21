@@ -29,8 +29,6 @@ import {
  * ネストしたオブジェクト（save_graph の nodes[] 内部など）はそのまま
  * snake_case (position_x / node_type) で渡す必要がある。
  *
- * @context CTX-21
- * @bom     docs/bom/graph.ts GraphStorage
  */
 
 // ============================================================
@@ -61,6 +59,8 @@ function toSaveNodeInput(node: Node<GraphNodeData>): SaveNodeInput {
     return {
         id: node.id,
         label: node.data.label,
+        // Fixit: node_type は Rust 側の SaveNodeInput に残っているが現在未使用。
+        // フロント側から意味のある値を送るか、Rust/SurrealDB 側から削除するかを決める。
         node_type: null,
         status: node.data.status ?? null,
         service: null,

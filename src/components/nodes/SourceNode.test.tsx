@@ -31,7 +31,7 @@ const makeProps = (overrides: Partial<SourceNodeProps['data']> = {}): SourceNode
     zIndex: 0,
 })
 
-describe('SourceNode', () => {
+describe('ソースノードの状態を確認する', () => {
     it('ラベルが表示される', () => {
         render(<SourceNode {...makeProps()} />)
         expect(screen.getByText('App.tsx')).toBeInTheDocument()

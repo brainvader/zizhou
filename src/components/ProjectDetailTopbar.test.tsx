@@ -69,7 +69,7 @@ beforeEach(() => {
     vi.clearAllMocks()
 })
 
-describe('ProjectDetailTopbar: New Graph logic', () => {
+describe('プロジェクト詳細画面のアクションを操作する', () => {
     it('logic: New Graph クリックで onCreateGraph が projectId と name で呼ばれる', async () => {
         mockCreateGraph.mockResolvedValue({ id: 'test-graph-id' })
         setup()

@@ -25,7 +25,7 @@ const CENTER: RelatedNodes['center'] = {
 
 const RELATED: RelatedNodes = { center: CENTER, dependencies: [], dependents: [] }
 
-describe('SourceGraphView', () => {
+describe('テストファイルを選択して依存グラフを確認する', () => {
     it('テストファイル未選択のとき taac-empty-state が表示される', async () => {
         render(
             <SourceGraphView
