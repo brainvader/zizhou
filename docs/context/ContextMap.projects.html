@@ -307,7 +307,6 @@
                 line-height: 1.5;
             }
 
-            /* [CTX-16] root_path バッジ（カード下部） */
             .card-root-path {
                 font-family: var(--font-mono);
                 font-size: 9px;
@@ -325,7 +324,6 @@
                 letter-spacing: 0.05em;
             }
 
-            /* dialog */
             .dialog-overlay {
                 position: fixed;
                 inset: 0;
@@ -391,11 +389,13 @@
             </div>
         </div>
 
-        <!-- ============================================================
-            CTX-1: TOPBAR [✓]
-            責務: アプリ識別・グローバルアクション（Settings）
-            注意: サイドバーなし。Settings はアイコンボタン一つ。
-        ============================================================ -->
+        <!-- src/components/Topbar.tsx
+            describe: Topbar
+              [✓] ロゴ・タイトル・バージョンが表示される
+              [✓] Settings ボタンが表示される
+              [✓] Settings ボタンをクリックすると onSettingsClick が呼ばれる
+              [✓] onSettingsClick が未指定でもクリックでエラーが発生しない
+        -->
         <header id="ctx-topbar">
             <div class="logo">
                 <div class="logo-kanji-wrap">
@@ -404,27 +404,25 @@
                 <div class="logo-sep"></div>
                 <div class="logo-sub">
                     <span class="logo-romaji">Zizou</span>
-                    <span class="logo-ver">Protocol v8.10</span>
+                    <span class="logo-ver">Protocol v9.0</span>
                 </div>
             </div>
             <div class="topbar-spacer"></div>
             <button class="btn btn-ghost" title="Settings">⚙</button>
-
-            <!--
-                [✓][Feature] Settings    — アイコンボタンクリックで CTX-4 Settings ダイアログを開く
-                [✓][Logic]   Open Dialog — onSettingsClick コールバック経由で isSettingsOpen を true にする
-            -->
         </header>
 
-        <!-- ============================================================
-            CTX-2: PROJECT-GRID [✓]
-            責務: SurrealDB の projects テーブルを一覧表示・新規作成のエントリーポイント
-            注意: クリックで /projects/:id へ遷移（routing を更新）
-        ============================================================ -->
+        <!-- src/components/ProjectGrid.tsx
+            describe: ProjectGrid
+              [✓] projects が空のとき「＋ new project」ボタンのみ表示される
+              [✓] projects があるときカードが表示される
+              [✓] isHydrated が false のとき「＋ new project」は disabled になる
+              [✓] 「＋ new project」をクリックするとダイアログが開く
+              [✓] name 空で「作成」を押すとバリデーションエラーが表示される
+              [✓] onCreateProject 成功後にダイアログが閉じる
+              [✓] onCreateProject 失敗時はダイアログが閉じない
+        -->
         <main id="ctx-project-grid">
-
             <div class="grid">
-                <!-- [CTX-16] rootPath をカード下部に表示するモックアップ -->
                 <div class="card">
                     <div class="card-title">地蔵 Core</div>
                     <div class="card-description">グラフベースのプロジェクト管理OS。</div>
@@ -452,24 +450,20 @@
                 </div>
                 <div class="card new"><span class="new-text">＋ new project</span></div>
             </div>
-
-            <!--
-                [✓][Feature] Project List     — SurrealDB から取得した projects[] をカードグリッドで表示する
-                [✓][Feature] Open Project     — カードを TanStack Router の <Link to="/projects/$id"> でラップして遷移する
-                [✓][Feature] New Project Card — 破線カードクリックで shadcn Dialog を開き name・description・rootPath を入力して作成する
-                [✓][Logic]   Empty State      — projects[] が空のとき破線カードのみを表示する
-                [✓][Logic]   Routing          — TanStack Router に委譲。Zustand に currentPath は持たない
-                [✓][Logic]   Load             — 起動時に invoke('list_projects') で SurrealDB から projects[] を取得する
-            -->
         </main>
 
-        <!-- ============================================================
-            CTX-3: NEW PROJECT DIALOG [✓]
-            責務: プロジェクトの新規作成フォーム
-            トリガー: 破線カード（＋ new project）クリック
-            使用コンポーネント: shadcn Dialog / Input / Button / RootPathInput [CTX-16]
-            注意: </body> 直前に配置（position:fixed のため）
-        ============================================================ -->
+        <!-- src/components/ProjectGrid.tsx（New Project Dialog）
+             src/components/RootPathInput.tsx
+            describe: New Project Dialog
+              [✓] name 空で「作成」を押すとバリデーションエラーが表示される
+              [✓] onCreateProject 成功後にダイアログが閉じる
+              [✓] onCreateProject 失敗時はダイアログが閉じない
+            describe: RootPathInput
+              [✓] onOpenDirectory が文字列を返したとき onChange にパスが渡される
+              [✓] onOpenDirectory が null を返したとき onChange は呼ばれない
+              [✓] onOpenDirectory が未指定でも 📁 ボタンのクリックでエラーが発生しない
+              [✓] rootPath が空のとき「＋ new project」は disabled になる
+        -->
         <div class="dialog-overlay">
             <dialog id="ctx-new-project-dialog"
                 style="all:unset; display:flex; flex-direction:column; gap:20px; background:#13161a; border:1px solid #242830; border-radius:9px; padding:24px; width:420px; box-shadow:0 8px 32px #00000080;">
@@ -487,7 +481,6 @@
                     <input class="dialog-input" type="text" placeholder="このプロジェクトの説明（任意）" />
                 </div>
 
-                <!-- [CTX-16] root path フィールド：フォルダアイコンボタン付きテキスト入力 -->
                 <div class="dialog-field">
                     <label class="dialog-label">root path *</label>
                     <div style="display:flex; gap:6px;">
@@ -505,27 +498,15 @@
                     <button class="btn-outline">キャンセル</button>
                     <button class="btn btn-primary">作成</button>
                 </div>
-
-                <!--
-                    [✓][Feature] Create Project    — name・description・rootPath を入力して「作成」で projects[] に追加する
-                    [✓][Feature] Cancel            — 「キャンセル」または overlay クリックでダイアログを閉じる
-                    [✓][Feature] Directory Picker  — 📁 ボタンクリックで @tauri-apps/plugin-dialog の open({ directory: true }) を呼び、
-                                                     取得したパスを rootPath フィールドに反映する [CTX-16]
-                    [✓][Logic]   Validation        — name / rootPath が空のとき「作成」ボタンを押すとエラーを表示し送信しない（Zod）
-                    [✓][Logic]   Submit            — invoke('create_project', { name, description, rootPath }) で SurrealDB の project テーブルに INSERT し、
-                                                     Zustand の projects[] を更新してダイアログを閉じる
-                    [✓][Logic]   ID生成            — id は SurrealDB が自動生成する（nanoid 不要）
-                -->
             </dialog>
         </div>
 
-        <!-- ============================================================
-            CTX-4: SETTINGS DIALOG [✓]
-            責務: アプリ設定の表示（中身はおいおい追加）
-            トリガー: Topbar の Settings アイコンボタンクリック
-            使用コンポーネント: shadcn Dialog / Button
-            注意: </body> 直前に配置（position:fixed のため）
-        ============================================================ -->
+        <!-- src/components/SettingsDialog.tsx
+            describe: SettingsDialog
+              [✓] open=true のとき「Settings」タイトルと「閉じる」ボタンが表示される
+              [✓] open=false のときコンテンツが表示されない
+              [✓] 「閉じる」ボタンをクリックすると onOpenChange(false) が呼ばれる
+        -->
         <div class="dialog-overlay">
             <dialog id="ctx-settings-dialog" class="dialog" open
                 style="all:unset; display:flex; flex-direction:column; gap:20px; background:#13161a; border:1px solid #242830; border-radius:9px; padding:24px; width:400px; box-shadow:0 8px 32px #00000080;">
@@ -535,300 +516,17 @@
                 <div class="dialog-footer">
                     <button class="btn-outline">閉じる</button>
                 </div>
-
-                <!--
-                    [✓][Feature] Close   — 「閉じる」または overlay クリックでダイアログを閉じる
-                    [✓][Logic]   Control — isSettingsOpen && <SettingsDialog/> の条件付きレンダリング（shadcn Dialog）
-                -->
             </dialog>
         </div>
 
-        <!-- ============================================================
-            CTX-5: ROUTING [✓]
-            責務: TanStack Router のルート定義・ページコンポーネントの配線
-            注意: routing の SSOT は TanStack Router。Zustand に currentPath は持たない。
-        ============================================================ -->
-        <!--
-            src/routes/__root.tsx       — Root Layout。useProjectLoad を呼び出し、
-                                          どのルートに直接アクセスしても hydration を保証する。
-            src/router.tsx              — createRouter() + RouterProvider のエクスポート
-            src/routes/index.tsx        — "/" ルート（ProjectGrid をレンダリング）
-            src/routes/projects.$id.tsx — "/projects/$id" ルート
-
-            [✓][Feature] Project Detail Route — /projects/$id を開くと useParams で id を取得して表示する
-            [✓][Logic]   Router Setup         — createRouter() でルートツリーを構築し App.tsx で RouterProvider をラップする
-            [✓][Logic]   Link Wrap            — ProjectGrid の各カードを <Link to="/projects/$id"> でラップする（CTX-2 Open Project の実装）
-            [✓][Logic]   Root Layout          — __root.tsx で useProjectLoad を呼び出し全ルートで hydration を保証する
-            [✓][Logic]   Direct Navigation    — /projects/:id に直接アクセスしても ProjectGrid に戻った後プロジェクトが表示される
+        <!-- src/router.tsx
+            describe: Routing
+              [✓] "/" を開くと IndexRoute がレンダリングされる
+              [✓] "/projects/$id" を開くと ProjectDetailRoute がレンダリングされる
+              [✓] 不明なルートは NotFound を表示する
+              [✓] ProjectGrid の各カードは "/projects/$id" へのリンクになっている
+              [✓] "/" に直接アクセスしても ProjectGrid が表示される
         -->
-
-        <!-- ============================================================
-            CTX-16: PROJECT ROOT PATH [✓]
-            責務: プロジェクトと対象ソフトウェアリポジトリのファイルパスを紐付ける
-
-            背景:
-              SurrealDB 移行時に projectRootPath を削除したが、
-              ノード実行（CTX-14 execute_node）は git/test 等を CLI で実行するため
-              対象リポジトリの cwd が必須。Project レコードに root_path を持たせる。
-
-            マイグレーション戦略:
-              SurrealDB embedded は ALTER TABLE / migration runner がないため、
-              init_db() 内で以下のパッチを一度だけ実行する:
-                UPDATE project SET root_path = "" WHERE root_path IS NONE;
-              既存レコードは root_path = "" になる。
-              root_path が空文字のプロジェクトは execute_node 呼び出し時にフロントで弾く。
-
-            型配置:
-              層              フィールド名    型
-              ─────────────────────────────────────────────────
-              SurrealDB       root_path       string
-              Rust struct     root_path       String   (non-optional)
-              IPC JSON        "rootPath"      string   (json! マクロで変換)
-              TypeScript      rootPath        string
-              Zod Form        rootPath        string   min(1) 必須
-
-            横断する変更:
-              - SurrealDB: project テーブルに root_path: String カラム追加
-                           + init_db() に既存レコードパッチを追加
-              - Rust:      ProjectRecord / ProjectInput に root_path: String を追加
-                           create_project に root_path 引数追加
-                           list_projects / create_project の json! に "rootPath" を追加
-              - Frontend:  ProjectSchema / NewProjectFormSchema に rootPath を追加（docs/bom/project.ts）
-              - Component: src/components/RootPathInput.tsx — フォルダ選択ボタン付き入力コンポーネント
-                           props DI: onOpenDirectory?: () => Promise<string | null>
-              - UI:        ProjectGrid の NewProjectDialog に RootPathInput を組み込む
-              - Store:     Zustand の Project 型に rootPath を追加（ProjectSchema 派生のため自動追従）
-              - 実行:      useNodeExecute が activeProject.rootPath を cwd として渡す
-                           rootPath が空文字のとき execute を呼び出し前に toast.error で弾く
-
-            影響ファイル:
-              src-tauri/src/db.rs              — ProjectRecord / ProjectInput
-              src-tauri/src/lib.rs             — create_project / list_projects / execute_node (cwd)
-              docs/bom/project.ts              — ProjectSchema / NewProjectFormSchema
-              src/components/RootPathInput.tsx — 新規作成
-              src/components/ProjectGrid.tsx   — NewProjectDialog に rootPath フィールド追加
-              src/hooks/useNodeExecute.ts      — rootPath 空文字ガード追加
-              docs/specs/                      — Vitest / Storybook / E2E spec 追加
-
-            [✓][Feature] Directory Picker  — New Project Dialog で RootPathInput の 📁 ボタンをクリックすると
-                                             @tauri-apps/plugin-dialog の open({ directory: true }) が呼ばれ、
-                                             選択したパスが rootPath フィールドに反映される
-            [✓][Feature] Path Display      — ProjectGrid のカード下部に rootPath を短縮表示（~/... 形式）する
-            [✓][Logic]   Schema Migration  — init_db() 内で
-                                             "UPDATE project SET root_path = '' WHERE root_path IS NONE"
-                                             を実行し、既存レコードに root_path = "" を補完する
-            [✓][Logic]   Rust Types        — ProjectRecord.root_path: String（non-optional）
-                                             ProjectInput.root_path: String
-                                             list_projects / create_project の json! に "rootPath" キーを追加
-            [✓][Logic]   Validation        — NewProjectFormSchema で rootPath: z.string().min(1) を必須化
-                                             rootPath が空文字のとき作成ボタンを押すとエラーを表示し送信しない
-            [✓][Logic]   Cwd Injection     — useNodeExecute の execute() 呼び出し前に
-                                             activeProject.rootPath が空文字なら toast.error("root path が未設定です") で早期リターン
-                                             invoke('execute_node', { ..., cwd: activeProject.rootPath }) として渡す
-
-            関連ファイル（spec）:
-              docs/specs/unit/root-path-input.spec.tsx — RootPathInput Vitest
-              src/stories/RootPathInput.stories.tsx    — Storybook
-              docs/specs/e2e/project-root-path.e2e.spec.ts — Playwright E2E
-        ============================================================ -->
-
-
-        <!-- ============================================================
-            CTX-17: CONTEXT MAP AS GRAPH [ ]
-            責務: ContextMap を HTML 散在記述から、ノード/エッジを持つグラフ表現に移行する
-
-            コンセプト:
-              - メイングラフ: 機能・呼び出し・データフローの依存関係グラフ（粒度: Feature / Logic 単位）
-              - コンテクスト: ノードを束ねる論理的グループ（フィルタ）。閉じれば独立可能性を示唆
-              - モックアップ: 単なる HTML ファイル。グラフ上では1ノードとして参照される
-
-            設計軸（直交する2軸でフィルタリング）:
-              - layer:        ui / logic / data / infra — ノードの単一属性
-              - context_ids:  ノードが所属するコンテクストの集合（多重所属可）
-
-            ノードのフィールド:
-              - id, label
-              - kind:           feature / logic / mockup / bom / test
-              - file_path:      リポジトリ相対パス
-              - signature:      関数シグニチャ / 型定義（言語タグ付き JSON）
-              - doc:            簡潔な説明（旧 ContextMap.html の Feature/Logic 説明文に相当）
-              - layer
-              - context_ids[]
-              - test_file_path: このノードを検証するテストファイル
-
-            エッジのフィールド:
-              - source, target
-              - kind:           呼び出す（制御フロー） / データを渡す（データフロー）
-                                / 依存する（静的依存） / 実装する（抽象→具象）
-              - needs_review:   参照先のシグニチャが変化したとき自動で true（CTX-18 連携）
-
-            [ ][Logic]   Schema Definition    — node / edge テーブルを CTX-15 のスキーマから拡張
-            [ ][Logic]   Index Design         — context_ids 配列含有検索のためのインデックス
-                                                 SELECT * FROM node WHERE 'ctx-x' IN context_ids 形式
-            [ ][Feature] Graph Rendering      — React Flow で ContextMap グラフを描画
-            [ ][Feature] Layer Filter         — layer 軸でノードを絞り込む
-            [ ][Feature] Context Filter       — context_ids 軸でノードを絞り込む
-            [ ][Feature] Mockup Reference     — mockup ノードクリックで HTML ファイルを開く
-            [ ][Feature] needs_review Visual  — needs_review=true のエッジを赤くハイライト
-        ============================================================ -->
-
-
-        <!-- ============================================================
-            CTX-18: STATIC ANALYSIS LAYER [ ]
-            責務: ソースファイルから決定論的にシグニチャ・シンボルを抽出し、
-                  CTX-17 のノードメタデータに反映する
-
-            手段:
-              - tree-sitter (Rust ネイティブ) をメイン: TS / Rust / Python の grammar 公式提供
-              - 必要なら TS compiler バッチ実行で型解決まで補完（フェーズ2以降）
-              - LSP は使わない（メタデータは DB に保存して使い回す、ライブ通信不要）
-
-            ファーストパス方針:
-              tree-sitter で「関数名・引数名・型名（文字列レベル）」を抽出するのみ。
-              型解決（UserDTO → 実際の型定義への解決等）は次フェーズ。
-              文字列レベル抽出だけでもグラフ上のメタデータとして十分有用。
-
-            更新タイミング:
-              - ファイル保存時: notify クレート（推奨: notify-debouncer-mini）で監視
-                                + 1-2秒デバウンス → 該当ファイル再解析
-              - 明示トリガ:     pnpm sync-signatures で全件再解析（CI でも実行）
-
-            影響可視化:
-              シグニチャ変化時、参照しているエッジに needs_review = true をセット。
-              フロントで赤いエッジとして表示。
-
-            [ ][Logic]   tree-sitter Setup     — Rust 側に tree-sitter + grammars を導入
-            [ ][Logic]   extract_signatures    — Tauri command: 単一ファイルからシグニチャ抽出
-            [ ][Logic]   File Watcher          — notify-debouncer-mini でファイル変更検知
-            [ ][Logic]   Sync Command          — pnpm sync-signatures で全件再解析
-            [ ][Logic]   Edge needs_review     — シグニチャ差分検知時にエッジへフラグを立てる
-            [ ][Feature] Multi-language        — TS / Rust / Python に対応する言語別パーサ層
-        ============================================================ -->
-
-
-        <!-- ============================================================
-            CTX-19: FILE SYSTEM TREE [ ]
-            責務: プロジェクトの rootPath 配下のファイル構造を左パネルに表示する
-
-            背景:
-              現在の FileTree コンポーネントはグラフ一覧（list_graphs）を表示しているが、
-              プロジェクトのファイル構造表示に完全置き換える。
-              CTX-16 で rootPath が確定したことで実装可能になった。
-              グラフ一覧の UI は将来的に GraphEditor 側で対応（CTX-TBD）。
-
-            現状の FileTree の責務（削除対象）:
-              - invoke('list_graphs') でグラフ一覧を取得・表示
-              - グラフクリックで ?graph= URL を更新
-              - onListGraphs / onNavigate props DI
-
-            新しい FileTree の責務:
-              - Tauri @tauri-apps/plugin-fs の readDir で rootPath を読む
-              - ディレクトリ / ファイルをツリー形式で表示
-              - ディレクトリは展開 / 折りたたみ可能（ローカル状態で管理）
-              - 子エントリは展開時に遅延ロード（初期表示は1階層のみ）
-              - rootPath が空のとき「root path が未設定です」を表示
-              - readDir 失敗時はエラーメッセージを表示
-              - props DI: onReadDir を受け取り省略時は Tauri fs にフォールバック
-
-            型定義（docs/bom/file-tree.ts 新規作成）:
-              FsEntry     { name: string; path: string; isDirectory: boolean; children?: FsEntry[] }
-              ReadDirFn   (path: string) => Promise<FsEntry[]>
-              FileTreeProps {
-                rootPath?: string
-                onReadDir?: ReadDirFn
-              }
-
-            削除:
-              FileTree から GraphListItem / list_graphs / onListGraphs / onNavigate を削除
-              useProjectDetailStore への依存を削除
-
-            影響ファイル:
-              src/components/FileTree.tsx              — 完全書き直し
-              docs/bom/file-tree.ts                   — 新規作成
-              src/stories/FileTree.stories.tsx         — 完全書き直し
-              docs/specs/unit/FileTree.spec.tsx        — 完全書き直し（グラフ検証を削除）
-              docs/specs/e2e/file-tree.e2e.spec.ts    — E2E 更新（グラフ一覧検証を削除）
-              src/__mocks__/plugin-fs.ts               — readDir モック確認（既存実装あり）
-
-            モック戦略:
-              E2E: src/__mocks__/plugin-fs.ts の readDir が既に
-                   /Users/user/projects/zizou-core 配下の固定フィクスチャを返す実装あり。
-                   rootPath を /Users/user/projects/zizou-core に合わせてテストする。
-              Storybook / Vitest: onReadDir props DI で差し替える。
-
-            [ ][Feature] Fs Tree Display   — rootPath 配下のディレクトリ/ファイルをツリー表示する
-            [ ][Feature] Expand/Collapse   — ディレクトリクリックで展開/折りたたみ（遅延ロード）
-            [ ][Feature] Empty Root State  — rootPath が空のとき「root path が未設定です」を表示する
-            [ ][Feature] Loading State     — 読み込み中は Loading… を表示する
-            [ ][Feature] Error State       — readDir 失敗時はエラーメッセージを表示する
-            [ ][Logic]   readDir DI        — onReadDir props で Tauri fs を差し替え可能にする
-            [ ][Logic]   Lazy Load         — 子エントリは展開時に遅延ロードする（初期は1階層のみ）
-            [ ][Logic]   Remove Graph List — list_graphs / GraphListItem 依存を完全削除する
-        ============================================================ -->
-
-
-        <!-- ============================================================
-            CTX-20: RUST SERVICE LAYER REFACTORING [ ]
-            責務: lib.rs / db.rs に集中しているRustコードをサービス層に分離する
-
-            背景:
-              現状 lib.rs にTauriコマンドとビジネスロジックが混在している。
-              サービスを独立したモジュールに分離することで：
-              - AIコーディング時に渡すコンテキストを絞れる（トークン消費削減）
-              - 変更の影響範囲が明確になる
-              - CTX-21以降のサービス追加が容易になる
-
-            ディレクトリ構造:
-              src-tauri/src/
-                lib.rs                ← エントリポイント・コマンド登録のみ
-                services/
-                  vcs/
-                    mod.rs            ← VcsProvider trait
-                    git.rs            ← Git実装
-                  analysis/
-                    mod.rs            ← 静的解析インターフェース
-                  graph/
-                    mod.rs            ← グラフ CRUD
-                  db/
-                    mod.rs            ← SurrealDB 接続・クエリ
-
-            [✓][Logic]   Service Layer      — src-tauri/src/services/ ディレクトリを作成する
-            [✓][Logic]   DB Module          — db.rs を services/db/mod.rs に移動する
-            [✓][Logic]   Graph Module       — グラフ CRUD を services/graph/mod.rs に移動する
-            [✓][Logic]   lib.rs Cleanup     — lib.rs をコマンド登録のみに絞る
-        ============================================================ -->
-
-
-        <!-- ============================================================
-            CTX-21: PROJECT STRUCTURE GRAPH
-            → 定義は ContextMap_project-detail.html を参照
-        ============================================================ -->
-
-
-        <!-- ============================================================
-             CTX-22: TEST AS A CONTEXT (TaaC)
-            → 定義は ContextMap_project-detail.html を参照
-        ============================================================ -->
-
-
-        <!-- ============================================================
-            CTX-23 〜 CTX-25: 構想段階（未着手）
-
-            CTX-23: CONTEXT PACKAGING
-              責務: SourceContext に含まれるファイル内容を LLM 向け Markdown に集約する
-              手段: test_suite.node_ids → filePath → ファイル内容読み込み → Markdown 整形 → クリップボード / ファイル保存
-              関連: CTX-22 (TaaC)
-
-            CTX-24: STATIC SIMULATION
-              責務: 型レベルでデータがグラフを流れるかを検証する
-              手段: エッジの payload 型を突合して不一致をハイライト
-              関連: CTX-21
-
-            CTX-25: DYNAMIC SIMULATION
-              責務: テストデータを入口ノードから流して実行経路を確認する
-              手段: グラフをトポロジカルソートして execute_node を順番に呼ぶ
-              関連: CTX-14 (execute_node)
-        ============================================================ -->
 
     </body>
 </html>
