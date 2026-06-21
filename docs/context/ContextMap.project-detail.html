@@ -369,6 +369,16 @@
             describe: テストファイルを選択して依存グラフを確認する
               [ ] Boundary Edge — コンテキスト境界をまたぐエッジを amber でハイライトする
               [ ] Context Load Optimize — 解析済みの場合は analyze_tests をスキップする
+
+            src/components/nodes/TestNode.tsx
+            src/services/TestRunner.ts
+            describe: テストを実行して結果を確認する
+              [ ] テストノード / describe / it の横に ▶ ボタンが表示される
+              [ ] ▶ ボタンをクリックするとテストが実行される
+              [ ] 右ペインに実行結果（passed/failed + 生ログ）が表示される
+              [ ] 生ログをクリップボードにコピーする 📋 ボタンが表示される
+              [ ] it の順序に沿ってエッジがアニメーションする
+              [ ] passed のとき緑・failed のとき赤でエッジ・ノードが着色される
         -->
 
   </body>
