@@ -1,15 +1,3 @@
-/**
- * @context ProjectGrid
- * @bom docs/bom/project.ts
- * @story
- * 1. projects[] が空のとき「＋ new project」カードのみ表示される
- * 2. projects[] があるときプロジェクトカードが表示される
- * 3. isHydrated が false のとき「＋ new project」は disabled になる
- * 4. 「＋ new project」をクリックするとダイアログが開く
- * 5. name 空で「作成」を押すとバリデーションエラーが表示される
- * 6. フォームに入力して「作成」をクリックするとダイアログが閉じる
- * 7. 「キャンセル」でダイアログが閉じ form がリセットされる
- */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, screen, waitFor } from 'storybook/test'
 import { ProjectGrid } from '@/components/ProjectGrid'

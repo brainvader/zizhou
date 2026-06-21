@@ -1,18 +1,3 @@
-/**
- * @context ResizableLayout
- * @bom docs/bom/layout.ts
- * @story
- * 1. 3ペイン（FileTree / GraphEditor / NodeProperty）が横並びに表示される
- * 2. FileTree と GraphEditor の境界にドラッグハンドルが表示される
- * 3. NodeProperty と GraphEditor の境界にドラッグハンドルが表示される
- * 4. ハンドルをドラッグすると FileTree の幅が変わる（Playwright E2E で検証）
- * 5. ハンドルをドラッグすると NodeProperty の幅が変わる（Playwright E2E で検証）
- * @output src/stories/ResizableLayout.stories.tsx → src/routes/projects.$id.tsx
- *
- * @note ドラッグリサイズは react-resizable-panels が pointermove ネイティブイベントで
- *       動作するため Storybook の play 関数では検証できない。
- *       @story 4–5 は resizable-layout.e2e.spec.ts（Playwright）で検証する。
- */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, within } from 'storybook/test'
 import {

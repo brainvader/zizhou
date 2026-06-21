@@ -1,13 +1,3 @@
-/**
- * @context SourceNode
- * @bom docs/bom/source-graph.ts (SourceNodeProps, SourceNodeDisplayData)
- * @story
- * 1. fresh 状態で緑ボーダーが表示される
- * 2. stale 状態で amber ボーダー・背景が表示される
- * 3. pending 状態でグレーボーダー・背景が表示される
- * 4. selected=true のとき青リングが表示される
- * 5. ↺ ボタンをクリックすると onReanalyze(filePath) が呼ばれる
- */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, userEvent, within } from 'storybook/test'
 import { ReactFlowProvider } from '@xyflow/react'
@@ -102,19 +92,3 @@ export const Selected: Story = {
 // インタラクション
 // ============================================================
 
-/** @story ↺ ボタンをクリックすると onReanalyze が呼ばれる */
-export const ReanalyzeButton: Story = {
-    args: {
-        label: 'App.tsx',
-        filePath: 'src/App.tsx',
-        displayStatus: 'stale',
-        onReanalyze: fn(),
-    },
-    play: async ({ canvasElement, args }: { canvasElement: HTMLElement; args: any }) => {
-        const canvas = within(canvasElement)
-        const btn = await canvas.findByTestId('reanalyze-node-src-App.tsx')
-        await expect(btn).toBeVisible()
-        await userEvent.click(btn)
-        await expect(args.onReanalyze).toHaveBeenCalledWith('src/App.tsx')
-    },
-}

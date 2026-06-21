@@ -1,12 +1,3 @@
-/**
- * @context Topbar
- * @bom docs/bom/project.ts
- * @story
- * 1. アプリ起動時にトップバーが表示される
- * 2. 「地蔵」ロゴ・「Zizou」・「Protocol v7.00」が表示される
- * 3. Settings ボタンをクリックすると onSettingsClick が発火する
- * 4. onSettingsClick が未指定でもクリックでエラーが発生しない
- */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, userEvent } from 'storybook/test'
 import { Topbar } from '@/components/Topbar'

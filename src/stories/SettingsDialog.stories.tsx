@@ -1,10 +1,3 @@
-/**
- * @context SettingsDialog
- * @story
- * 1. open=true のとき「Settings」タイトルと「閉じる」ボタンが表示される
- * 2. open=false のときダイアログコンテンツがマウントされない
- * 3. 「閉じる」ボタンをクリックすると onOpenChange(false) が呼ばれる
- */
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn } from 'storybook/test'
 import { screen } from 'storybook/test'
