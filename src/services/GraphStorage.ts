@@ -29,8 +29,6 @@ import {
  * ネストしたオブジェクト（save_graph の nodes[] 内部など）はそのまま
  * snake_case (position_x / node_type) で渡す必要がある。
  *
- * @context CTX-21
- * @bom     docs/bom/graph.ts GraphStorage
  */
 
 // ============================================================
