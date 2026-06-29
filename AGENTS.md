@@ -61,9 +61,8 @@ root/
 │   │   └── useProjectStore.test.ts
 │   └── stories/
 │       └── SourceGraphView.stories.tsx  # Storybook
-└── tests/
-    └── e2e/                      # Playwright E2E のみ
-        └── taac.e2e.spec.ts
+└── e2e/                      # Playwright E2E のみ
+        └── taac.spec.ts
 ```
 
 型・インターフェースは `src/` 内の実装ファイルが所有・export する。
@@ -251,7 +250,7 @@ export const Default: Story = {
 };
 ```
 
-### 6-3. Playwright E2E（`tests/e2e/*.e2e.spec.ts`）
+### 6-3. Playwright E2E（`e2e/*.spec.ts`）
 
 複数コンテキストをまたぐ統合シナリオのみ。単一コンテキスト内の検証はここに書かない。
 
@@ -326,7 +325,7 @@ LLM は実装を提案し、人間が `pnpm vitest run` で確認する。
 
 ### Step 6: 統合確認（必要な場合のみ）
 
-複数コンテキストをまたぐシナリオが発生した場合のみ `tests/e2e/` に E2E を追加する。
+複数コンテキストをまたぐシナリオが発生した場合のみ `e2e/` に E2E を追加する。
 
 ### Step 7: 次のコンテキストへ
 
@@ -349,11 +348,4 @@ Step 1 に戻り、次のコンテキストを対話的に定義する。
 - 1ファイル・1ステップずつ提供し、ビルド／テスト確認後に次へ進む
 - スクリプト実行は `script.sh` に記述して実行する（複数コマンドをまとめて渡す用途）。`script.sh` は `.gitignore` で追跡対象外
 - コミットメッセージは Conventional Commits 形式・英語・1行（例: `feat: implement TaaC layout`）
-
-## 既知の技術的制約
-
-- **SurrealDB:** `=2.6.5` で exact pin 必須（unpinned だと 3.x が解決されてコンパイル不可）
-- **ReactFlow:** `useNodesState` / `useEdgesState` を使わない。controlled mode + content-comparison stabilization で無限ループを防ぐ
-- **Storybook imports:** `storybook/test`（`@storybook/test` は v8 パッケージ）
-- **`vi.hoisted()`:** Zustand ストアモックは必須
-- **ReactFlow `NODE_TYPES`:** コンポーネント外で定義する（内部で定義すると再レンダー毎にリセット）
+- 思考は英語で行う。出力は簡潔に日本語で最小限に行う。
