@@ -37,7 +37,7 @@ export const Default: Story = {
         await expect(canvas.getByText('グラフ基盤')).toBeVisible()
         await expect(canvas.getByText('ソース解析')).toBeVisible()
         await expect(canvas.getByText('プロジェクト管理')).toBeVisible()
-        await expect(canvas.getByText('TaskFlow')).toBeVisible()
+        await expect(canvas.getByText('Todo')).toBeVisible()
         await expect(canvas.getByText('設定画面')).toBeVisible()
         await expect(canvas.getByText('ログイン画面')).toBeVisible()
 
@@ -71,8 +71,8 @@ export const ContextsIndependentToggle: Story = {
 export const UiExclusiveSelect: Story = {
     args: { defaultVisibleIds: [] },
     play: async ({ canvasElement }) => {
-        await userEvent.click(getRow(canvasElement, 'taskflow'))
-        await expect(getRow(canvasElement, 'taskflow')).toHaveAttribute(
+        await userEvent.click(getRow(canvasElement, 'todo'))
+        await expect(getRow(canvasElement, 'todo')).toHaveAttribute(
             'data-visible',
             'true',
         )
@@ -82,7 +82,7 @@ export const UiExclusiveSelect: Story = {
             'data-visible',
             'true',
         )
-        await expect(getRow(canvasElement, 'taskflow')).toHaveAttribute(
+        await expect(getRow(canvasElement, 'todo')).toHaveAttribute(
             'data-visible',
             'false',
         )
@@ -97,8 +97,8 @@ export const UiExclusiveSelect: Story = {
 export const ContextsClearsUi: Story = {
     args: { defaultVisibleIds: [] },
     play: async ({ canvasElement }) => {
-        await userEvent.click(getRow(canvasElement, 'taskflow'))
-        await expect(getRow(canvasElement, 'taskflow')).toHaveAttribute(
+        await userEvent.click(getRow(canvasElement, 'todo'))
+        await expect(getRow(canvasElement, 'todo')).toHaveAttribute(
             'data-visible',
             'true',
         )
@@ -108,7 +108,7 @@ export const ContextsClearsUi: Story = {
             'data-visible',
             'true',
         )
-        await expect(getRow(canvasElement, 'taskflow')).toHaveAttribute(
+        await expect(getRow(canvasElement, 'todo')).toHaveAttribute(
             'data-visible',
             'false',
         )

@@ -53,7 +53,7 @@
     <!-- src/components/ContextSidebar.tsx
       describe: コンテキストの表示を切り替える
         [✓] Contexts セクションにグラフ基盤・ソース解析・プロジェクト管理が表示される
-        [✓] UI セクションに TaskFlow・設定画面・ログイン画面が表示される
+        [✓] UI セクションに Todo・設定画面・ログイン画面が表示される
         [✓] Contexts は独立トグル（複数同時 ON 可）
         [✓] UI は排他選択（1つ選ぶと他が OFF）
         [✓] Contexts を ON にすると UI は全 OFF
@@ -97,12 +97,12 @@
 
       <div style="font-size:11px; color:#6b7280; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; margin:8px 0 6px; padding:0 10px;">UI</div>
 
-      <div class="ctx-row" data-section="ui" data-node="taskflow" data-visible="false" onclick="toggleUi(this)"
+      <div class="ctx-row" data-section="ui" data-node="todo" data-visible="false" onclick="toggleUi(this)"
            style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; cursor:pointer;">
         <span class="eye-icon" style="display:flex; color:#6b7280;">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
         </span>
-        <span>TaskFlow</span>
+        <span>Todo</span>
       </div>
 
       <div class="ctx-row" data-section="ui" data-node="settings" data-visible="false" onclick="toggleUi(this)"

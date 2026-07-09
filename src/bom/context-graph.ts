@@ -12,11 +12,17 @@ export type ContextGraphChecklistItem = {
     done: boolean
 }
 
+/**
+ * ノードの種別。ContextMap.graph.html の data-kind 属性と1:1対応する。
+ * React Flow 導入後は nodeTypes の振り分けキーとして使う。
+ */
+export type NodeKind = 'component' | 'hook' | 'external' | 'state' | 'feature'
+
 export type ContextGraphNode = {
     id: string
     contextId: ContextNodeId
     label: string
-    kind?: string
+    kind: NodeKind
     checklist?: readonly ContextGraphChecklistItem[]
     position: { x: number; y: number }
     width?: number
@@ -25,9 +31,57 @@ export type ContextGraphNode = {
 
 export type ContextGraphEdge = {
     id: string
-    require: readonly ContextNodeId[]
-    d: string
+    source: string
+    target: string
     dashed?: boolean
+}
+
+// ============================================================
+// CustomNode data
+// React Flow の Node<T>.data に載せる、kind ごとのnarrow型。
+// ContextGraphNode（抽出・保存用の共通データ）から変換して使う。
+// ============================================================
+
+export type BaseNodeData = {
+    id: string
+    contextId: ContextNodeId
+    label: string
+    accent?: 'primary' | 'dashed'
+}
+
+export type ComponentNodeData = BaseNodeData & { kind: 'component' }
+export type HookNodeData = BaseNodeData & { kind: 'hook' }
+export type ExternalNodeData = BaseNodeData & { kind: 'external' }
+export type StateNodeData = BaseNodeData & { kind: 'state' }
+export type FeatureNodeData = BaseNodeData & {
+    kind: 'feature'
+    checklist: readonly ContextGraphChecklistItem[]
+}
+
+export type CustomNodeData =
+    | ComponentNodeData
+    | HookNodeData
+    | ExternalNodeData
+    | StateNodeData
+    | FeatureNodeData
+
+/**
+ * ContextGraphNode を CustomNode 用の narrow な data 型に変換する。
+ * kind === 'feature' のとき checklist が無ければ空配列にフォールバックする。
+ * accent（枠線の視覚強調）は React Flow 公式の BaseNode パターンに倣い、
+ * data 経由でカスタムノード内部から参照する。
+ */
+export function toCustomNodeData(node: ContextGraphNode): CustomNodeData {
+    const base: BaseNodeData = {
+        id: node.id,
+        contextId: node.contextId,
+        label: node.label,
+        accent: node.accent,
+    }
+    if (node.kind === 'feature') {
+        return { ...base, kind: 'feature', checklist: node.checklist ?? [] }
+    }
+    return { ...base, kind: node.kind }
 }
 
 /** ContextMap モック相当のノード定義 */
@@ -36,6 +90,7 @@ export const CONTEXT_GRAPH_NODES: readonly ContextGraphNode[] = [
         id: 'foundation',
         contextId: 'foundation',
         label: 'グラフ基盤',
+        kind: 'feature',
         position: { x: 0, y: 0 },
         width: 190,
         checklist: [
@@ -47,6 +102,7 @@ export const CONTEXT_GRAPH_NODES: readonly ContextGraphNode[] = [
         id: 'source',
         contextId: 'source',
         label: 'ソース解析',
+        kind: 'feature',
         position: { x: 250, y: 0 },
         width: 190,
         checklist: [
@@ -58,37 +114,38 @@ export const CONTEXT_GRAPH_NODES: readonly ContextGraphNode[] = [
         id: 'project',
         contextId: 'project',
         label: 'プロジェクト管理',
+        kind: 'feature',
         position: { x: 250, y: 170 },
         width: 190,
         checklist: [{ label: 'rootPathを選択・検証する', done: true }],
     },
     {
-        id: 'taskflow-add-todo',
-        contextId: 'taskflow',
+        id: 'add-todo-form',
+        contextId: 'todo',
         label: 'AddTodoForm',
         kind: 'component',
         position: { x: 10, y: 264 },
         width: 150,
     },
     {
-        id: 'taskflow-todo-list',
-        contextId: 'taskflow',
+        id: 'todo-list-view',
+        contextId: 'todo',
         label: 'TodoListView',
         kind: 'component',
         position: { x: 225, y: 264 },
         width: 150,
     },
     {
-        id: 'taskflow-filter-tabs',
-        contextId: 'taskflow',
+        id: 'filter-tabs',
+        contextId: 'todo',
         label: 'FilterTabs',
         kind: 'component',
         position: { x: 440, y: 264 },
         width: 150,
     },
     {
-        id: 'taskflow-use-todo-store',
-        contextId: 'taskflow',
+        id: 'use-todo-store',
+        contextId: 'todo',
         label: 'useTodoStore',
         kind: 'hook',
         position: { x: 225, y: 408 },
@@ -96,8 +153,8 @@ export const CONTEXT_GRAPH_NODES: readonly ContextGraphNode[] = [
         accent: 'primary',
     },
     {
-        id: 'taskflow-zustand',
-        contextId: 'taskflow',
+        id: 'zustand',
+        contextId: 'todo',
         label: 'zustand',
         kind: 'external',
         position: { x: 100, y: 526 },
@@ -105,17 +162,20 @@ export const CONTEXT_GRAPH_NODES: readonly ContextGraphNode[] = [
         accent: 'dashed',
     },
     {
-        id: 'taskflow-persist-todos',
-        contextId: 'taskflow',
+        // kind は暫定で 'external' としている。本来は別ContextMap
+        // （ContextMap.storage.html の service/schema unit）への参照を
+        // 持つべきだが、参照の表現方法は Todo サンプル生成フェーズまで保留。
+        id: 'persist-todos',
+        contextId: 'todo',
         label: 'persistTodos',
-        kind: 'ContextMap.storage.html',
+        kind: 'external',
         position: { x: 350, y: 526 },
         width: 150,
         accent: 'dashed',
     },
     {
-        id: 'taskflow-global-store',
-        contextId: 'taskflow',
+        id: 'global-store',
+        contextId: 'todo',
         label: 'global-store',
         kind: 'state',
         position: { x: 545, y: 380 },
@@ -124,47 +184,47 @@ export const CONTEXT_GRAPH_NODES: readonly ContextGraphNode[] = [
     },
 ] as const
 
-/** ContextMap モック相当のエッジ定義 */
+/** ContextMap モック相当のエッジ定義（source/target はノード id） */
 export const CONTEXT_GRAPH_EDGES: readonly ContextGraphEdge[] = [
     {
         id: 'foundation-source',
-        require: ['foundation', 'source'],
-        d: 'M190 55 C215 55,225 55,250 55',
+        source: 'foundation',
+        target: 'source',
     },
     {
         id: 'foundation-project',
-        require: ['foundation', 'project'],
-        d: 'M110 130 C110 170,160 190,250 205',
+        source: 'foundation',
+        target: 'project',
     },
     {
-        id: 'taskflow-add-to-store',
-        require: ['taskflow'],
-        d: 'M85 316 C85 350, 200 370, 280 408',
+        id: 'todo-add-to-store',
+        source: 'add-todo-form',
+        target: 'use-todo-store',
     },
     {
-        id: 'taskflow-list-to-store',
-        require: ['taskflow'],
-        d: 'M300 316 C300 350, 300 370, 300 408',
+        id: 'todo-list-to-store',
+        source: 'todo-list-view',
+        target: 'use-todo-store',
     },
     {
-        id: 'taskflow-filter-to-store',
-        require: ['taskflow'],
-        d: 'M515 316 C515 350, 400 370, 320 408',
+        id: 'todo-filter-to-store',
+        source: 'filter-tabs',
+        target: 'use-todo-store',
     },
     {
-        id: 'taskflow-store-to-zustand',
-        require: ['taskflow'],
-        d: 'M280 474 C230 500, 200 508, 165 526',
+        id: 'todo-store-to-zustand',
+        source: 'use-todo-store',
+        target: 'zustand',
     },
     {
-        id: 'taskflow-store-to-persist',
-        require: ['taskflow'],
-        d: 'M320 474 C370 500, 400 508, 425 526',
+        id: 'todo-store-to-persist',
+        source: 'use-todo-store',
+        target: 'persist-todos',
     },
     {
-        id: 'taskflow-store-to-global',
-        require: ['taskflow'],
-        d: 'M375 440 C460 440, 520 425, 545 408',
+        id: 'todo-store-to-global',
+        source: 'use-todo-store',
+        target: 'global-store',
         dashed: true,
     },
 ] as const

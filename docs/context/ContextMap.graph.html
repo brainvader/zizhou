@@ -52,7 +52,7 @@
     <!-- src/components/ContextSidebar.tsx
       describe: コンテキストの表示を切り替える
         [✓] Contexts セクションにグラフ基盤・ソース解析・プロジェクト管理が表示される
-        [✓] UI セクションに TaskFlow・設定画面・ログイン画面が表示される
+        [✓] UI セクションに Todo・設定画面・ログイン画面が表示される
         [✓] Contexts は独立トグル（複数同時 ON 可）
         [✓] UI は排他選択（1つ選ぶと他が OFF）
         [✓] Contexts を ON にすると UI は全 OFF
@@ -96,12 +96,12 @@
 
       <div style="font-size:11px; color:#6b7280; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; margin:8px 0 6px; padding:0 10px;">UI</div>
 
-      <div class="ctx-row" data-section="ui" data-node="taskflow" data-visible="false" onclick="toggleUi(this)"
+      <div class="ctx-row" data-section="ui" data-node="todo" data-visible="false" onclick="toggleUi(this)"
            style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; cursor:pointer;">
         <span class="eye-icon" style="display:flex; color:#6b7280;">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
         </span>
-        <span>TaskFlow</span>
+        <span>Todo</span>
       </div>
 
       <div class="ctx-row" data-section="ui" data-node="settings" data-visible="false" onclick="toggleUi(this)"
@@ -121,15 +121,20 @@
       </div>
     </nav>
 
-    <!-- src/components/ContextGraphView.tsx
-      describe: 可視コンテキストのグラフを表示する
+    <!-- src/components/ComponentGraphEditor.tsx
+      describe: 可視コンテキストのグラフを React Flow で表示する
         [✓] visibleIds に含まれるコンテキストのノードが表示される
         [✓] visibleIds に含まれないコンテキストのノードは非表示
-        [✓] エッジは require した全コンテキストが可視のときだけ表示される
+        [✓] source/target 両端が可視のときだけエッジが表示される
         [✓] 可視ノードが無いとき空状態メッセージを表示する
         [✓] 初期表示（foundation のみ）ではグラフ基盤ノードが見える
+        [✓] ノードをドラッグして位置を変更できる
+        [✓] ノードを選択すると強調表示される
+        [✓] エッジの接続方向（上下左右）は両端ノードの相対位置から自動選択される
+        [✓] ズーム・Fit View等の操作UI（Controls）が表示される
+        [✓] 可視コンテキストが変わるたびに Fit View が再実行される
     -->
-    <div id="workspace-view-graph" data-testid="workspace-view-graph" style="position:relative; width:600px; height:560px; flex-shrink:0;">
+    <div id="component-graph-editor" data-testid="component-graph-editor" style="position:relative; width:600px; height:560px; flex-shrink:0;">
 
       <div id="graph-empty" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; color:#6b7280; font-size:12px; font-family:'JetBrains Mono',monospace;">表示中のコンテクストがありません</div>
 
@@ -144,22 +149,22 @@
         <path class="edge" data-require="foundation project" style="display:none;"
               d="M110 130 C110 170,160 190,250 205" fill="none" stroke="#3a4048" stroke-width="1" marker-end="url(#arrowM)" />
 
-        <path class="edge" data-require="taskflow" style="display:none;"
+        <path class="edge" data-require="todo" style="display:none;"
               d="M85 316 C85 350, 200 370, 280 408" fill="none" stroke="#3a4048" stroke-width="1.2" marker-end="url(#arrowM)" />
-        <path class="edge" data-require="taskflow" style="display:none;"
+        <path class="edge" data-require="todo" style="display:none;"
               d="M300 316 C300 350, 300 370, 300 408" fill="none" stroke="#3a4048" stroke-width="1.2" marker-end="url(#arrowM)" />
-        <path class="edge" data-require="taskflow" style="display:none;"
+        <path class="edge" data-require="todo" style="display:none;"
               d="M515 316 C515 350, 400 370, 320 408" fill="none" stroke="#3a4048" stroke-width="1.2" marker-end="url(#arrowM)" />
-        <path class="edge" data-require="taskflow" style="display:none;"
+        <path class="edge" data-require="todo" style="display:none;"
               d="M280 474 C230 500, 200 508, 165 526" fill="none" stroke="#3a4048" stroke-width="1.2" marker-end="url(#arrowM)" />
-        <path class="edge" data-require="taskflow" style="display:none;"
+        <path class="edge" data-require="todo" style="display:none;"
               d="M320 474 C370 500, 400 508, 425 526" fill="none" stroke="#3a4048" stroke-width="1.2" marker-end="url(#arrowM)" />
-        <path class="edge" data-require="taskflow" style="display:none;"
+        <path class="edge" data-require="todo" style="display:none;"
               d="M375 440 C460 440, 520 425, 545 408" fill="none" stroke="#242830" stroke-width="1.2" stroke-dasharray="3 3" />
       </svg>
 
       <!-- グラフ基盤 -->
-      <div class="node" data-context="foundation"
+      <div class="node" id="foundation" data-node="foundation" data-kind="feature"
            style="position:absolute; left:0; top:0; width:190px; background:#13161a; border:1px solid #242830; border-radius:10px; padding:12px 14px;">
         <div style="font-size:14px; font-weight:600; margin-bottom:8px;">グラフ基盤</div>
         <div style="display:flex; align-items:flex-start; gap:6px; font-size:12px; color:#a3a8b0; margin-bottom:4px; line-height:1.4;">
@@ -171,7 +176,7 @@
       </div>
 
       <!-- ソース解析 -->
-      <div class="node" data-context="source"
+      <div class="node" id="source" data-node="source" data-kind="feature"
            style="display:none; position:absolute; left:250px; top:0; width:190px; background:#13161a; border:1px solid #242830; border-radius:10px; padding:12px 14px;">
         <div style="font-size:14px; font-weight:600; margin-bottom:8px;">ソース解析</div>
         <div style="display:flex; align-items:flex-start; gap:6px; font-size:12px; color:#a3a8b0; margin-bottom:4px; line-height:1.4;">
@@ -183,7 +188,7 @@
       </div>
 
       <!-- プロジェクト管理 -->
-      <div class="node" data-context="project"
+      <div class="node" id="project" data-node="project" data-kind="feature"
            style="display:none; position:absolute; left:250px; top:170px; width:190px; background:#13161a; border:1px solid #242830; border-radius:10px; padding:12px 14px;">
         <div style="font-size:14px; font-weight:600; margin-bottom:8px;">プロジェクト管理</div>
         <div style="display:flex; align-items:flex-start; gap:6px; font-size:12px; color:#a3a8b0; line-height:1.4;">
@@ -191,38 +196,38 @@
         </div>
       </div>
 
-      <!-- TaskFlow: コンポーネント依存グラフ -->
-      <div class="node" data-context="taskflow"
+      <!-- Todo: コンポーネント依存グラフ -->
+      <div class="node" id="add-todo-form" data-node="todo" data-kind="component"
            style="display:none; position:absolute; left:10px; top:264px; width:150px; background:#13161a; border:1px solid #242830; border-radius:10px; padding:10px 12px;">
         <div style="font-size:12.5px; font-weight:600;">AddTodoForm</div>
         <div style="font-size:10px; color:#6b7280; margin-top:2px;">component</div>
       </div>
-      <div class="node" data-context="taskflow"
+      <div class="node" id="todo-list-view" data-node="todo" data-kind="component"
            style="display:none; position:absolute; left:225px; top:264px; width:150px; background:#13161a; border:1px solid #242830; border-radius:10px; padding:10px 12px;">
         <div style="font-size:12.5px; font-weight:600;">TodoListView</div>
         <div style="font-size:10px; color:#6b7280; margin-top:2px;">component</div>
       </div>
-      <div class="node" data-context="taskflow"
+      <div class="node" id="filter-tabs" data-node="todo" data-kind="component"
            style="display:none; position:absolute; left:440px; top:264px; width:150px; background:#13161a; border:1px solid #242830; border-radius:10px; padding:10px 12px;">
         <div style="font-size:12.5px; font-weight:600;">FilterTabs</div>
         <div style="font-size:10px; color:#6b7280; margin-top:2px;">component</div>
       </div>
-      <div class="node" data-context="taskflow"
+      <div class="node" id="use-todo-store" data-node="todo" data-kind="hook"
            style="display:none; position:absolute; left:225px; top:408px; width:150px; background:#13161a; border:1.5px solid #c0392b; border-radius:10px; padding:10px 12px;">
         <div style="font-size:12.5px; font-weight:600;">useTodoStore</div>
         <div style="font-size:10px; color:#6b7280; margin-top:2px;">hook</div>
       </div>
-      <div class="node" data-context="taskflow"
+      <div class="node" id="zustand" data-node="todo" data-kind="external"
            style="display:none; position:absolute; left:100px; top:526px; width:130px; background:#101317; border:1px dashed #242830; border-radius:10px; padding:8px 12px;">
         <div style="font-size:11.5px; font-weight:500; color:#a3a8b0;">zustand</div>
         <div style="font-size:9.5px; color:#6b7280; margin-top:2px;">external</div>
       </div>
-      <div class="node" data-context="taskflow"
+      <div class="node" id="persist-todos" data-node="todo" data-kind="external"
            style="display:none; position:absolute; left:350px; top:526px; width:150px; background:#101317; border:1px dashed #242830; border-radius:10px; padding:8px 12px;">
         <div style="font-size:11.5px; font-weight:500; color:#a3a8b0;">persistTodos</div>
         <div style="font-size:9.5px; color:#6b7280; margin-top:2px;">ContextMap.storage.html</div>
       </div>
-      <div class="node" data-context="taskflow"
+      <div class="node" id="global-store" data-node="todo" data-kind="state"
            style="display:none; position:absolute; left:545px; top:380px; width:90px; background:#101317; border:1px dashed #242830; border-radius:10px; padding:8px 10px;">
         <div style="font-size:11px; font-weight:500; color:#a3a8b0;">global-store</div>
         <div style="font-size:9.5px; color:#6b7280; margin-top:2px;">state</div>
@@ -255,7 +260,7 @@
 
       var anyVisible = false;
       document.querySelectorAll('.node').forEach(function (n) {
-        var show = !!visible[n.getAttribute('data-context')];
+        var show = !!visible[n.getAttribute('data-node')];
         n.style.display = show ? '' : 'none';
         if (show) anyVisible = true;
       });

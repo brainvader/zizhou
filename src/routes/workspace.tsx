@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useSearch } from '@tanstack/react-router'
 import { WorkspaceTopbar } from '@/components/WorkspaceTopbar'
 import { ContextSidebar } from '@/components/ContextSidebar'
-import { ContextGraphView } from '@/components/ContextGraphView'
+import { ComponentGraphEditor } from '@/components/ComponentGraphEditor'
 import { ContextPipelineView } from '@/components/ContextPipelineView'
 import { ContextChatPanel } from '@/components/ContextChatPanel'
 import { ProjectContextSetup } from '@/components/ProjectContextSetup'
@@ -88,7 +88,7 @@ export function WorkspaceRoute({
                     defaultVisibleIds={visibleIds}
                     onVisibilityChange={setVisibleIds}
                 />
-                <div className="flex flex-col gap-3 min-w-0">
+                <div className="flex flex-1 self-stretch min-h-0 flex-col gap-3 min-w-0">
                     {needsSetup && project && (
                         <ProjectContextSetup
                             projectName={project.name}
@@ -117,5 +117,5 @@ function WorkspaceViewArea({
     if (view === 'pipeline') {
         return <ContextPipelineView visibleIds={visibleIds} />
     }
-    return <ContextGraphView visibleIds={visibleIds} />
+    return <ComponentGraphEditor visibleIds={visibleIds} />
 }
