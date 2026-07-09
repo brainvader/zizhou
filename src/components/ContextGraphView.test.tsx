@@ -22,7 +22,7 @@ describe('可視コンテキストのグラフを表示する', () => {
         expect(screen.getByTestId('graph-node-foundation')).toBeInTheDocument()
         expect(screen.queryByTestId('graph-node-source')).not.toBeInTheDocument()
         expect(screen.queryByTestId('graph-node-project')).not.toBeInTheDocument()
-        expect(screen.queryByTestId('graph-node-taskflow-add-todo')).not.toBeInTheDocument()
+        expect(screen.queryByTestId('graph-node-add-todo-form')).not.toBeInTheDocument()
     })
 
     it('エッジは require した全コンテキストが可視のときだけ表示される', () => {

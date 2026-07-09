@@ -39,12 +39,12 @@ export const MultipleContexts: Story = {
     },
 }
 
-/** @story TaskFlow UI コンテキスト */
-export const TaskFlow: Story = {
-    args: { visibleIds: ['taskflow'] },
+/** @story Todo UI コンテキスト */
+export const Todo: Story = {
+    args: { visibleIds: ['todo'] },
     play: async ({ canvas }) => {
-        await expect(canvas.getByTestId('graph-node-taskflow-add-todo')).toBeVisible()
-        await expect(canvas.getByTestId('graph-node-taskflow-use-todo-store')).toBeVisible()
+        await expect(canvas.getByTestId('graph-node-add-todo-form')).toBeVisible()
+        await expect(canvas.getByTestId('graph-node-use-todo-store')).toBeVisible()
         await expect(canvas.queryByTestId('graph-node-foundation')).not.toBeInTheDocument()
     },
 }

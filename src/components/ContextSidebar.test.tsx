@@ -28,9 +28,9 @@ describe('コンテキストの表示を切り替える', () => {
         expect(screen.getByText('プロジェクト管理')).toBeInTheDocument()
     })
 
-    it('UI セクションに TaskFlow・設定画面・ログイン画面が表示される', () => {
+    it('UI セクションに Todo・設定画面・ログイン画面が表示される', () => {
         render(<ContextSidebar />)
-        expect(screen.getByText('TaskFlow')).toBeInTheDocument()
+        expect(screen.getByText('Todo')).toBeInTheDocument()
         expect(screen.getByText('設定画面')).toBeInTheDocument()
         expect(screen.getByText('ログイン画面')).toBeInTheDocument()
     })
@@ -55,12 +55,12 @@ describe('コンテキストの表示を切り替える', () => {
         const user = userEvent.setup()
         render(<ContextSidebar defaultVisibleIds={[]} />)
 
-        await user.click(getRow('taskflow'))
-        expect(getRow('taskflow')).toHaveAttribute('data-visible', 'true')
+        await user.click(getRow('todo'))
+        expect(getRow('todo')).toHaveAttribute('data-visible', 'true')
 
         await user.click(getRow('settings'))
         expect(getRow('settings')).toHaveAttribute('data-visible', 'true')
-        expect(getRow('taskflow')).toHaveAttribute('data-visible', 'false')
+        expect(getRow('todo')).toHaveAttribute('data-visible', 'false')
         expect(getRow('login')).toHaveAttribute('data-visible', 'false')
     })
 
@@ -68,12 +68,12 @@ describe('コンテキストの表示を切り替える', () => {
         const user = userEvent.setup()
         render(<ContextSidebar defaultVisibleIds={[]} />)
 
-        await user.click(getRow('taskflow'))
-        expect(getRow('taskflow')).toHaveAttribute('data-visible', 'true')
+        await user.click(getRow('todo'))
+        expect(getRow('todo')).toHaveAttribute('data-visible', 'true')
 
         await user.click(getRow('foundation'))
         expect(getRow('foundation')).toHaveAttribute('data-visible', 'true')
-        expect(getRow('taskflow')).toHaveAttribute('data-visible', 'false')
+        expect(getRow('todo')).toHaveAttribute('data-visible', 'false')
         expect(getRow('settings')).toHaveAttribute('data-visible', 'false')
         expect(getRow('login')).toHaveAttribute('data-visible', 'false')
     })

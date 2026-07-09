@@ -43,7 +43,7 @@ export type ContextNodeId =
     | 'foundation'
     | 'source'
     | 'project'
-    | 'taskflow'
+    | 'todo'
     | 'settings'
     | 'login'
 
@@ -57,7 +57,7 @@ export const WORKSPACE_SIDEBAR_ITEMS: readonly ContextSidebarItem[] = [
     { id: 'foundation', section: 'contexts', label: 'グラフ基盤' },
     { id: 'source', section: 'contexts', label: 'ソース解析' },
     { id: 'project', section: 'contexts', label: 'プロジェクト管理' },
-    { id: 'taskflow', section: 'ui', label: 'TaskFlow' },
+    { id: 'todo', section: 'ui', label: 'Todo' },
     { id: 'settings', section: 'ui', label: '設定画面' },
     { id: 'login', section: 'ui', label: 'ログイン画面' },
 ] as const
