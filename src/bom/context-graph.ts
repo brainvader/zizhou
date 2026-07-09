@@ -12,11 +12,17 @@ export type ContextGraphChecklistItem = {
     done: boolean
 }
 
+/**
+ * ノードの種別。ContextMap.graph.html の data-kind 属性と1:1対応する。
+ * React Flow 導入後は nodeTypes の振り分けキーとして使う。
+ */
+export type NodeKind = 'component' | 'hook' | 'external' | 'state' | 'feature'
+
 export type ContextGraphNode = {
     id: string
     contextId: ContextNodeId
     label: string
-    kind?: string
+    kind: NodeKind
     checklist?: readonly ContextGraphChecklistItem[]
     position: { x: number; y: number }
     width?: number
@@ -30,12 +36,57 @@ export type ContextGraphEdge = {
     dashed?: boolean
 }
 
+// ============================================================
+// CustomNode data
+// React Flow の Node<T>.data に載せる、kind ごとのnarrow型。
+// ContextGraphNode（抽出・保存用の共通データ）から変換して使う。
+// ============================================================
+
+export type BaseNodeData = {
+    id: string
+    contextId: ContextNodeId
+    label: string
+}
+
+export type ComponentNodeData = BaseNodeData & { kind: 'component' }
+export type HookNodeData = BaseNodeData & { kind: 'hook' }
+export type ExternalNodeData = BaseNodeData & { kind: 'external' }
+export type StateNodeData = BaseNodeData & { kind: 'state' }
+export type FeatureNodeData = BaseNodeData & {
+    kind: 'feature'
+    checklist: readonly ContextGraphChecklistItem[]
+}
+
+export type CustomNodeData =
+    | ComponentNodeData
+    | HookNodeData
+    | ExternalNodeData
+    | StateNodeData
+    | FeatureNodeData
+
+/**
+ * ContextGraphNode を CustomNode 用の narrow な data 型に変換する。
+ * kind === 'feature' のとき checklist が無ければ空配列にフォールバックする。
+ */
+export function toCustomNodeData(node: ContextGraphNode): CustomNodeData {
+    const base: BaseNodeData = {
+        id: node.id,
+        contextId: node.contextId,
+        label: node.label,
+    }
+    if (node.kind === 'feature') {
+        return { ...base, kind: 'feature', checklist: node.checklist ?? [] }
+    }
+    return { ...base, kind: node.kind }
+}
+
 /** ContextMap モック相当のノード定義 */
 export const CONTEXT_GRAPH_NODES: readonly ContextGraphNode[] = [
     {
         id: 'foundation',
         contextId: 'foundation',
         label: 'グラフ基盤',
+        kind: 'feature',
         position: { x: 0, y: 0 },
         width: 190,
         checklist: [
@@ -47,6 +98,7 @@ export const CONTEXT_GRAPH_NODES: readonly ContextGraphNode[] = [
         id: 'source',
         contextId: 'source',
         label: 'ソース解析',
+        kind: 'feature',
         position: { x: 250, y: 0 },
         width: 190,
         checklist: [
@@ -58,6 +110,7 @@ export const CONTEXT_GRAPH_NODES: readonly ContextGraphNode[] = [
         id: 'project',
         contextId: 'project',
         label: 'プロジェクト管理',
+        kind: 'feature',
         position: { x: 250, y: 170 },
         width: 190,
         checklist: [{ label: 'rootPathを選択・検証する', done: true }],
@@ -105,10 +158,13 @@ export const CONTEXT_GRAPH_NODES: readonly ContextGraphNode[] = [
         accent: 'dashed',
     },
     {
+        // kind は暫定で 'external' としている。本来は別ContextMap
+        // （ContextMap.storage.html の service/schema unit）への参照を
+        // 持つべきだが、参照の表現方法は Todo サンプル生成フェーズまで保留。
         id: 'persist-todos',
         contextId: 'todo',
         label: 'persistTodos',
-        kind: 'ContextMap.storage.html',
+        kind: 'external',
         position: { x: 350, y: 526 },
         width: 150,
         accent: 'dashed',
