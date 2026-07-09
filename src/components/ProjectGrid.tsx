@@ -85,9 +85,10 @@ export function ProjectGrid({ onCreateProject, LinkComponent }: ProjectGridProps
                 {projects.map((project) => (
                     <CustomLink
                         key={project.id}
-                        to="/projects/$id"
-                        params={{ id: project.id }}
+                        to="/workspace"
+                        search={{ view: 'graph', projectId: project.id }}
                         className="block p-4 border rounded-lg hover:border-foreground transition-colors"
+                        data-testid={`card-${project.id}`}
                     >
                         <h2 className="font-bold text-lg truncate">{project.name}</h2>
                         {project.description && (

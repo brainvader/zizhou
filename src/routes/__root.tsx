@@ -1,6 +1,7 @@
 import { Outlet, createRootRoute } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { useProjectLoad } from '@/hooks/useProjectLoad'
+import { NotFound } from '@/routes/not-found'
 
 /**
  * RootRoute
@@ -21,4 +22,5 @@ const RootComponent = () => {
 
 export const rootRoute = createRootRoute({
     component: RootComponent,
+    notFoundComponent: NotFound,
 })

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>ContextMap: Zizhou — Graph</title>
+
+<!--
+  STACK
+  runtime:  Tauri 2
+  frontend: React 19 + TypeScript
+  router:   TanStack Router（/workspace?view=graph|pipeline）
+  state:    Zustand（シェルは local state）
+  testing:  Vitest + RTL + Storybook + Playwright
+  package:  pnpm
+
+  第1スライス: Workspace シェル（Topbar + ContextSidebar）のみ。
+  Graph キャンバス / Pipeline / Chat は後続コンテキスト。
+-->
+
+<!-- src/router.tsx
+  describe: Workspace へ遷移する
+    [✓] "/workspace" を開くと WorkspaceRoute がレンダリングされる
+    [✓] view 未指定時は view=graph 相当として扱う
+    [✓] view=pipeline のとき Pipeline ビュー領域が表示される
+-->
+</head>
+<body style="margin:0; background:#0d0f11; color:#e8e6e3; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:13px;">
+
+  <div style="height:28px; background:#13161a; border-bottom:1px solid #242830; display:flex; align-items:center; padding:0 14px; gap:6px;">
+    <div style="width:10px; height:10px; border-radius:50%; background:#6b2a2a;"></div>
+    <div style="width:10px; height:10px; border-radius:50%; background:#6b5a2a;"></div>
+    <div style="width:10px; height:10px; border-radius:50%; background:#2a4a35;"></div>
+  </div>
+
+  <!-- src/components/WorkspaceTopbar.tsx
+    describe: Workspace の見出しを表示する
+      [✓] ロゴ・Zizou・「Context Graph Workspace」が表示される
+      [✓] Projects へ戻るリンクが表示される
+  -->
+  <header id="workspace-topbar" style="height:52px; background:#13161a; border-bottom:1px solid #242830; display:flex; align-items:center; padding:0 20px; gap:14px; box-shadow:inset 0 1px 0 #c0392b28;">
+    <span style="font-size:18px; letter-spacing:0.1em;">地蔵</span>
+    <div style="width:1px; height:16px; background:#242830;"></div>
+    <span style="font-family:'JetBrains Mono',monospace; font-size:9px; color:#6b7280; letter-spacing:0.2em; text-transform:uppercase;">Zizou</span>
+    <div style="width:1px; height:16px; background:#242830;"></div>
+    <span style="font-size:12px; color:#6b7280;">Context Graph Workspace</span>
+    <div style="flex:1;"></div>
+    <a href="/" style="font-size:12px; color:#6b7280;">‹ Projects</a>
+  </header>
+
+  <div style="display:flex; align-items:flex-start; padding:24px; gap:24px;">
+
+    <!-- src/components/ContextSidebar.tsx
+      describe: コンテキストの表示を切り替える
+        [✓] Contexts セクションにグラフ基盤・ソース解析・プロジェクト管理が表示される
+        [✓] UI セクションに TaskFlow・設定画面・ログイン画面が表示される
+        [✓] Contexts は独立トグル（複数同時 ON 可）
+        [✓] UI は排他選択（1つ選ぶと他が OFF）
+        [✓] Contexts を ON にすると UI は全 OFF
+        [✓] UI を選ぶと Contexts は全 OFF
+        [✓] 可視行は data-visible="true" と開いた目アイコン、非可視は false と閉じた目
+        [✓] 可視変化で onVisibilityChange(visibleIds) が呼ばれる
+
+      Contexts: 独立トグル（複数同時ON可）
+      UI:       排他選択（1つ選ぶと他が自動でOFF）
+      セクション間: どちらか一方を選ぶと、もう一方は全OFFになる
+    -->
+    <nav id="context-sidebar" style="width:170px; flex-shrink:0; display:flex; flex-direction:column; gap:2px;">
+
+      <div style="font-size:11px; color:#6b7280; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:6px; padding:0 10px;">Contexts</div>
+
+      <div class="ctx-row" data-section="contexts" data-node="foundation" data-visible="true" onclick="toggleContext(this)"
+           style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; cursor:pointer;">
+        <span class="eye-icon" style="display:flex; color:#c0392b;">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        </span>
+        <span>グラフ基盤</span>
+      </div>
+
+      <div class="ctx-row" data-section="contexts" data-node="source" data-visible="false" onclick="toggleContext(this)"
+           style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; cursor:pointer;">
+        <span class="eye-icon" style="display:flex; color:#6b7280;">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </span>
+        <span>ソース解析</span>
+      </div>
+
+      <div class="ctx-row" data-section="contexts" data-node="project" data-visible="false" onclick="toggleContext(this)"
+           style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; cursor:pointer;">
+        <span class="eye-icon" style="display:flex; color:#6b7280;">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </span>
+        <span>プロジェクト管理</span>
+      </div>
+
+      <div style="height:1px; background:#242830; margin:10px 10px 4px;"></div>
+
+      <div style="font-size:11px; color:#6b7280; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; margin:8px 0 6px; padding:0 10px;">UI</div>
+
+      <div class="ctx-row" data-section="ui" data-node="taskflow" data-visible="false" onclick="toggleUi(this)"
+           style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; cursor:pointer;">
+        <span class="eye-icon" style="display:flex; color:#6b7280;">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </span>
+        <span>TaskFlow</span>
+      </div>
+
+      <div class="ctx-row" data-section="ui" data-node="settings" data-visible="false" onclick="toggleUi(this)"
+           style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; cursor:pointer;">
+        <span class="eye-icon" style="display:flex; color:#6b7280;">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </span>
+        <span>設定画面</span>
+      </div>
+
+      <div class="ctx-row" data-section="ui" data-node="login" data-visible="false" onclick="toggleUi(this)"
+           style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; cursor:pointer;">
+        <span class="eye-icon" style="display:flex; color:#6b7280;">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </span>
+        <span>ログイン画面</span>
+      </div>
+    </nav>
+
+    <!-- src/components/ContextGraphView.tsx
+      describe: 可視コンテキストのグラフを表示する
+        [✓] visibleIds に含まれるコンテキストのノードが表示される
+        [✓] visibleIds に含まれないコンテキストのノードは非表示
+        [✓] エッジは require した全コンテキストが可視のときだけ表示される
+        [✓] 可視ノードが無いとき空状態メッセージを表示する
+        [✓] 初期表示（foundation のみ）ではグラフ基盤ノードが見える
+    -->
+    <div id="workspace-view-graph" data-testid="workspace-view-graph" style="position:relative; width:600px; height:560px; flex-shrink:0;">
+
+      <div id="graph-empty" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; color:#6b7280; font-size:12px; font-family:'JetBrains Mono',monospace;">表示中のコンテクストがありません</div>
+
+      <svg width="600" height="560" style="position:absolute; inset:0; pointer-events:none;">
+        <defs>
+          <marker id="arrowM" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="#3a4048" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+          </marker>
+        </defs>
+        <path class="edge" data-require="foundation source" style="display:none;"
+              d="M190 55 C215 55,225 55,250 55" fill="none" stroke="#3a4048" stroke-width="1" marker-end="url(#arrowM)" />
+        <path class="edge" data-require="foundation project" style="display:none;"
+              d="M110 130 C110 170,160 190,250 205" fill="none" stroke="#3a4048" stroke-width="1" marker-end="url(#arrowM)" />
+
+        <path class="edge" data-require="taskflow" style="display:none;"
+              d="M85 316 C85 350, 200 370, 280 408" fill="none" stroke="#3a4048" stroke-width="1.2" marker-end="url(#arrowM)" />
+        <path class="edge" data-require="taskflow" style="display:none;"
+              d="M300 316 C300 350, 300 370, 300 408" fill="none" stroke="#3a4048" stroke-width="1.2" marker-end="url(#arrowM)" />
+        <path class="edge" data-require="taskflow" style="display:none;"
+              d="M515 316 C515 350, 400 370, 320 408" fill="none" stroke="#3a4048" stroke-width="1.2" marker-end="url(#arrowM)" />
+        <path class="edge" data-require="taskflow" style="display:none;"
+              d="M280 474 C230 500, 200 508, 165 526" fill="none" stroke="#3a4048" stroke-width="1.2" marker-end="url(#arrowM)" />
+        <path class="edge" data-require="taskflow" style="display:none;"
+              d="M320 474 C370 500, 400 508, 425 526" fill="none" stroke="#3a4048" stroke-width="1.2" marker-end="url(#arrowM)" />
+        <path class="edge" data-require="taskflow" style="display:none;"
+              d="M375 440 C460 440, 520 425, 545 408" fill="none" stroke="#242830" stroke-width="1.2" stroke-dasharray="3 3" />
+      </svg>
+
+      <!-- グラフ基盤 -->
+      <div class="node" data-context="foundation"
+           style="position:absolute; left:0; top:0; width:190px; background:#13161a; border:1px solid #242830; border-radius:10px; padding:12px 14px;">
+        <div style="font-size:14px; font-weight:600; margin-bottom:8px;">グラフ基盤</div>
+        <div style="display:flex; align-items:flex-start; gap:6px; font-size:12px; color:#a3a8b0; margin-bottom:4px; line-height:1.4;">
+          <input type="checkbox" checked disabled style="margin-top:2px;">SurrealDBのnode/edgeスキーマを定義する
+        </div>
+        <div style="display:flex; align-items:flex-start; gap:6px; font-size:12px; color:#a3a8b0; line-height:1.4;">
+          <input type="checkbox" disabled style="margin-top:2px;">React Flowでグラフを描画する
+        </div>
+      </div>
+
+      <!-- ソース解析 -->
+      <div class="node" data-context="source"
+           style="display:none; position:absolute; left:250px; top:0; width:190px; background:#13161a; border:1px solid #242830; border-radius:10px; padding:12px 14px;">
+        <div style="font-size:14px; font-weight:600; margin-bottom:8px;">ソース解析</div>
+        <div style="display:flex; align-items:flex-start; gap:6px; font-size:12px; color:#a3a8b0; margin-bottom:4px; line-height:1.4;">
+          <input type="checkbox" checked disabled style="margin-top:2px;">ファイル間の依存関係を取得する
+        </div>
+        <div style="display:flex; align-items:flex-start; gap:6px; font-size:12px; color:#a3a8b0; line-height:1.4;">
+          <input type="checkbox" disabled style="margin-top:2px;">テストファイルの依存元/依存先を辿る
+        </div>
+      </div>
+
+      <!-- プロジェクト管理 -->
+      <div class="node" data-context="project"
+           style="display:none; position:absolute; left:250px; top:170px; width:190px; background:#13161a; border:1px solid #242830; border-radius:10px; padding:12px 14px;">
+        <div style="font-size:14px; font-weight:600; margin-bottom:8px;">プロジェクト管理</div>
+        <div style="display:flex; align-items:flex-start; gap:6px; font-size:12px; color:#a3a8b0; line-height:1.4;">
+          <input type="checkbox" checked disabled style="margin-top:2px;">rootPathを選択・検証する
+        </div>
+      </div>
+
+      <!-- TaskFlow: コンポーネント依存グラフ -->
+      <div class="node" data-context="taskflow"
+           style="display:none; position:absolute; left:10px; top:264px; width:150px; background:#13161a; border:1px solid #242830; border-radius:10px; padding:10px 12px;">
+        <div style="font-size:12.5px; font-weight:600;">AddTodoForm</div>
+        <div style="font-size:10px; color:#6b7280; margin-top:2px;">component</div>
+      </div>
+      <div class="node" data-context="taskflow"
+           style="display:none; position:absolute; left:225px; top:264px; width:150px; background:#13161a; border:1px solid #242830; border-radius:10px; padding:10px 12px;">
+        <div style="font-size:12.5px; font-weight:600;">TodoListView</div>
+        <div style="font-size:10px; color:#6b7280; margin-top:2px;">component</div>
+      </div>
+      <div class="node" data-context="taskflow"
+           style="display:none; position:absolute; left:440px; top:264px; width:150px; background:#13161a; border:1px solid #242830; border-radius:10px; padding:10px 12px;">
+        <div style="font-size:12.5px; font-weight:600;">FilterTabs</div>
+        <div style="font-size:10px; color:#6b7280; margin-top:2px;">component</div>
+      </div>
+      <div class="node" data-context="taskflow"
+           style="display:none; position:absolute; left:225px; top:408px; width:150px; background:#13161a; border:1.5px solid #c0392b; border-radius:10px; padding:10px 12px;">
+        <div style="font-size:12.5px; font-weight:600;">useTodoStore</div>
+        <div style="font-size:10px; color:#6b7280; margin-top:2px;">hook</div>
+      </div>
+      <div class="node" data-context="taskflow"
+           style="display:none; position:absolute; left:100px; top:526px; width:130px; background:#101317; border:1px dashed #242830; border-radius:10px; padding:8px 12px;">
+        <div style="font-size:11.5px; font-weight:500; color:#a3a8b0;">zustand</div>
+        <div style="font-size:9.5px; color:#6b7280; margin-top:2px;">external</div>
+      </div>
+      <div class="node" data-context="taskflow"
+           style="display:none; position:absolute; left:350px; top:526px; width:150px; background:#101317; border:1px dashed #242830; border-radius:10px; padding:8px 12px;">
+        <div style="font-size:11.5px; font-weight:500; color:#a3a8b0;">persistTodos</div>
+        <div style="font-size:9.5px; color:#6b7280; margin-top:2px;">ContextMap.storage.html</div>
+      </div>
+      <div class="node" data-context="taskflow"
+           style="display:none; position:absolute; left:545px; top:380px; width:90px; background:#101317; border:1px dashed #242830; border-radius:10px; padding:8px 10px;">
+        <div style="font-size:11px; font-weight:500; color:#a3a8b0;">global-store</div>
+        <div style="font-size:9.5px; color:#6b7280; margin-top:2px;">state</div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    function setIcon(el, visible) {
+      el.setAttribute('data-visible', String(visible));
+      var iconWrap = el.querySelector('.eye-icon');
+      iconWrap.style.color = visible ? '#c0392b' : '#6b7280';
+      iconWrap.innerHTML = visible
+        ? '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>'
+        : '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+    }
+
+    function clearSection(section) {
+      document.querySelectorAll('.ctx-row[data-section="' + section + '"]').forEach(function (row) {
+        setIcon(row, false);
+      });
+    }
+
+    function refreshGraph() {
+      var visible = {};
+      document.querySelectorAll('.ctx-row').forEach(function (row) {
+        visible[row.getAttribute('data-node')] = row.getAttribute('data-visible') === 'true';
+      });
+
+      var anyVisible = false;
+      document.querySelectorAll('.node').forEach(function (n) {
+        var show = !!visible[n.getAttribute('data-context')];
+        n.style.display = show ? '' : 'none';
+        if (show) anyVisible = true;
+      });
+      document.querySelectorAll('.edge').forEach(function (e) {
+        var reqs = e.getAttribute('data-require').split(' ');
+        var show = reqs.every(function (r) { return visible[r]; });
+        e.style.display = show ? '' : 'none';
+      });
+
+      document.getElementById('graph-empty').style.display = anyVisible ? 'none' : 'flex';
+    }
+
+    function toggleContext(el) {
+      var nowVisible = el.getAttribute('data-visible') !== 'true';
+      if (nowVisible) clearSection('ui');
+      setIcon(el, nowVisible);
+      refreshGraph();
+    }
+
+    function toggleUi(el) {
+      clearSection('contexts');
+      document.querySelectorAll('.ctx-row[data-section="ui"]').forEach(function (row) {
+        setIcon(row, row === el);
+      });
+      refreshGraph();
+    }
+
+    refreshGraph();
+  </script>
+
+</body>
+</html>

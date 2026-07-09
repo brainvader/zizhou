@@ -31,6 +31,7 @@ import {
     Link,
 } from '@tanstack/react-router';
 import type { Project } from '@/bom/project'
+import { parseWorkspaceView, type WorkspaceView } from '@/bom/workspace'
 
 // =============================================================================
 // Slot 3: モック・セットアップ (Test Setup)
@@ -88,7 +89,6 @@ const ProjectGridStub = () => (
                 <Link
                     to="/projects/$id"
                     params={{ id: p.id }}
-                    search={{ graph: undefined }}
                     data-testid={`card-${p.id}`}
                 >
                     {p.name}
@@ -98,8 +98,12 @@ const ProjectGridStub = () => (
     </ul>
 );
 
+const NotFoundStub = () => <div data-testid="not-found">Not Found</div>;
+
 const buildTestRouter = (initialPath = '/') => {
-    const rootRoute = createRootRoute();
+    const rootRoute = createRootRoute({
+        notFoundComponent: NotFoundStub,
+    });
 
     const indexRoute = createRoute({
         getParentRoute: () => rootRoute,
@@ -117,7 +121,34 @@ const buildTestRouter = (initialPath = '/') => {
         },
     });
 
-    const routeTree = rootRoute.addChildren([indexRoute, projectDetailRoute]);
+    // Workspace: /workspace?view=graph|pipeline（未指定は graph）
+    const workspaceRoute = createRoute({
+        getParentRoute: () => rootRoute,
+        path: '/workspace',
+        validateSearch: (search: Record<string, unknown>) => ({
+            view: parseWorkspaceView(search.view) as WorkspaceView,
+            projectId:
+                typeof search.projectId === 'string' ? search.projectId : undefined,
+        }),
+        component: function WorkspacePage() {
+            const { view } = workspaceRoute.useSearch();
+            return (
+                <div data-testid="workspace-route">
+                    {view === 'pipeline' ? (
+                        <div data-testid="workspace-view-pipeline" />
+                    ) : (
+                        <div data-testid="workspace-view-graph" />
+                    )}
+                </div>
+            );
+        },
+    });
+
+    const routeTree = rootRoute.addChildren([
+        indexRoute,
+        projectDetailRoute,
+        workspaceRoute,
+    ]);
     const history = createMemoryHistory({ initialEntries: [initialPath] });
 
     return createRouter({ routeTree, history });
@@ -154,12 +185,13 @@ describe('logic: route tree', () => {
         );
     });
 
-    it('unknown route should not render project-grid', async () => {
+    it('unknown route should render NotFound', async () => {
         const router = buildTestRouter('/unknown');
         render(<RouterProvider router={router} />);
         await waitFor(() =>
-            expect(screen.queryByTestId('project-grid')).not.toBeInTheDocument(),
+            expect(screen.getByTestId('not-found')).toBeInTheDocument(),
         );
+        expect(screen.queryByTestId('project-grid')).not.toBeInTheDocument();
     });
 });
 
@@ -249,5 +281,33 @@ describe('CTX-5 ROUTING — Visual Story (RTL)', () => {
         await waitFor(() =>
             expect(screen.getByTestId('project-grid')).toBeInTheDocument(),
         );
+    });
+});
+
+describe('Workspace へ遷移する', () => {
+    it('"/workspace" を開くと WorkspaceRoute がレンダリングされる', async () => {
+        const router = buildTestRouter('/workspace');
+        render(<RouterProvider router={router} />);
+        await waitFor(() =>
+            expect(screen.getByTestId('workspace-route')).toBeInTheDocument(),
+        );
+    });
+
+    it('view 未指定時は view=graph 相当として扱う', async () => {
+        const router = buildTestRouter('/workspace');
+        render(<RouterProvider router={router} />);
+        await waitFor(() =>
+            expect(screen.getByTestId('workspace-view-graph')).toBeInTheDocument(),
+        );
+        expect(screen.queryByTestId('workspace-view-pipeline')).not.toBeInTheDocument();
+    });
+
+    it('view=pipeline のとき Pipeline ビュー領域が表示される', async () => {
+        const router = buildTestRouter('/workspace?view=pipeline');
+        render(<RouterProvider router={router} />);
+        await waitFor(() =>
+            expect(screen.getByTestId('workspace-view-pipeline')).toBeInTheDocument(),
+        );
+        expect(screen.queryByTestId('workspace-view-graph')).not.toBeInTheDocument();
     });
 });
