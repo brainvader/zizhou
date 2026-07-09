@@ -1,12 +1,18 @@
+import { useState } from 'react'
 import { useSearch } from '@tanstack/react-router'
 import { WorkspaceTopbar } from '@/components/WorkspaceTopbar'
 import { ContextSidebar } from '@/components/ContextSidebar'
-import type { WorkspaceView } from '@/bom/workspace'
+import { ContextGraphView } from '@/components/ContextGraphView'
+import {
+    DEFAULT_VISIBLE_CONTEXT_IDS,
+    type ContextNodeId,
+    type WorkspaceView,
+} from '@/bom/workspace'
 
 /**
  * WorkspaceRoute
  * "/workspace?view=graph|pipeline" のページコンポーネント。
- * 第1スライス: Topbar + ContextSidebar + view 領域の切替のみ。
+ * Topbar + ContextSidebar + view 領域（graph は可視フィルタ）。
  *
  * @see docs/context/ContextMap.graph.html
  * @see docs/context/ContextMap.pipeline.html
@@ -14,6 +20,9 @@ import type { WorkspaceView } from '@/bom/workspace'
  */
 export function WorkspaceRoute() {
     const { view } = useSearch({ from: '/workspace' })
+    const [visibleIds, setVisibleIds] = useState<ContextNodeId[]>(() => [
+        ...DEFAULT_VISIBLE_CONTEXT_IDS,
+    ])
 
     return (
         <div
@@ -22,16 +31,25 @@ export function WorkspaceRoute() {
         >
             <WorkspaceTopbar />
             <div className="flex flex-1 min-h-0 items-start p-6 gap-6">
-                <ContextSidebar />
-                <WorkspaceViewArea view={view} />
+                <ContextSidebar
+                    defaultVisibleIds={visibleIds}
+                    onVisibilityChange={setVisibleIds}
+                />
+                <WorkspaceViewArea view={view} visibleIds={visibleIds} />
             </div>
         </div>
     )
 }
 
-function WorkspaceViewArea({ view }: { view: WorkspaceView }) {
+function WorkspaceViewArea({
+    view,
+    visibleIds,
+}: {
+    view: WorkspaceView
+    visibleIds: readonly ContextNodeId[]
+}) {
     if (view === 'pipeline') {
         return <div data-testid="workspace-view-pipeline" className="flex-1 min-w-0" />
     }
-    return <div data-testid="workspace-view-graph" className="flex-1 min-w-0" />
+    return <ContextGraphView visibleIds={visibleIds} />
 }

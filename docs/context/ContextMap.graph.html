@@ -118,10 +118,14 @@
       </div>
     </nav>
 
-    <!-- ============================================================
-         グラフキャンバス（後続コンテキスト — 第1スライス対象外）
-         data-testid="workspace-view-graph"
-    ============================================================ -->
+    <!-- src/components/ContextGraphView.tsx
+      describe: 可視コンテキストのグラフを表示する
+        [✓] visibleIds に含まれるコンテキストのノードが表示される
+        [✓] visibleIds に含まれないコンテキストのノードは非表示
+        [✓] エッジは require した全コンテキストが可視のときだけ表示される
+        [✓] 可視ノードが無いとき空状態メッセージを表示する
+        [✓] 初期表示（foundation のみ）ではグラフ基盤ノードが見える
+    -->
     <div id="workspace-view-graph" data-testid="workspace-view-graph" style="position:relative; width:600px; height:560px; flex-shrink:0;">
 
       <div id="graph-empty" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; color:#6b7280; font-size:12px; font-family:'JetBrains Mono',monospace;">表示中のコンテクストがありません</div>
