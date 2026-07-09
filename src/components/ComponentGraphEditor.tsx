@@ -57,7 +57,7 @@ export function ComponentGraphEditor({
     return (
         <div
             data-testid="component-graph-editor"
-            className="relative w-[600px] h-[560px] shrink-0"
+            className="relative flex-1 min-h-0 w-full"
         >
             {isEmpty ? (
                 <div

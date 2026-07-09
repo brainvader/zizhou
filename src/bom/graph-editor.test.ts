@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest'
 
-import { toReactFlowNodes, toReactFlowEdges, reconcileNodes } from './graph-editor'
+import { toReactFlowNodes, toReactFlowEdges, reconcileNodes, pickHandleIds } from './graph-editor'
 import { CONTEXT_GRAPH_NODES, CONTEXT_GRAPH_EDGES } from './context-graph'
 
 describe('ContextGraphNode を React Flow の Node に変換する', () => {
@@ -49,6 +49,8 @@ describe('ContextGraphEdge を React Flow の Edge に変換する', () => {
             id: 'foundation-source',
             source: 'foundation',
             target: 'source',
+            sourceHandle: 'right',
+            targetHandle: 'left',
         })
     })
 
@@ -99,5 +101,59 @@ describe('ノードid集合の変化に基づいて state を再利用するか�
         const prevNodes: { id: string }[] = []
         const nextNodes: { id: string }[] = []
         expect(reconcileNodes(prevNodes, nextNodes)).toBe(prevNodes)
+    })
+})
+
+describe('ノードの相対位置から接続に使う4方向のHandleを選ぶ', () => {
+    const node = (x: number, y: number, width = 100) => ({
+        id: 'n',
+        contextId: 'foundation' as const,
+        label: 'n',
+        kind: 'component' as const,
+        position: { x, y },
+        width,
+    })
+
+    it('target が右にあるとき right/left を選ぶ', () => {
+        expect(pickHandleIds(node(0, 0), node(300, 0))).toEqual({
+            sourceHandle: 'right',
+            targetHandle: 'left',
+        })
+    })
+
+    it('target が左にあるとき left/right を選ぶ', () => {
+        expect(pickHandleIds(node(300, 0), node(0, 0))).toEqual({
+            sourceHandle: 'left',
+            targetHandle: 'right',
+        })
+    })
+
+    it('target が下にあるとき bottom/top を選ぶ', () => {
+        expect(pickHandleIds(node(0, 0), node(0, 300))).toEqual({
+            sourceHandle: 'bottom',
+            targetHandle: 'top',
+        })
+    })
+
+    it('target が上にあるとき top/bottom を選ぶ', () => {
+        expect(pickHandleIds(node(0, 300), node(0, 0))).toEqual({
+            sourceHandle: 'top',
+            targetHandle: 'bottom',
+        })
+    })
+
+    it('dxとdyが同じ大きさのときは水平方向を優先する', () => {
+        expect(pickHandleIds(node(0, 0), node(200, 200))).toEqual({
+            sourceHandle: 'right',
+            targetHandle: 'left',
+        })
+    })
+
+    it('実データ(foundation→project)でも妥当な方向を選ぶ', () => {
+        const foundation = CONTEXT_GRAPH_NODES.find((n) => n.id === 'foundation')!
+        const project = CONTEXT_GRAPH_NODES.find((n) => n.id === 'project')!
+        const result = pickHandleIds(foundation, project)
+        expect(['top', 'right', 'bottom', 'left']).toContain(result.sourceHandle)
+        expect(['top', 'right', 'bottom', 'left']).toContain(result.targetHandle)
     })
 })

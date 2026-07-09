@@ -55,8 +55,37 @@ export function reconcileNodes<T extends { id: string }>(
     return prevIds === nextIds ? prevNodes : nextNodes
 }
 
+export type HandleSide = 'top' | 'right' | 'bottom' | 'left'
+
+function centerX(node: ContextGraphNode): number {
+    return node.position.x + (node.width ?? 0) / 2
+}
+
+/**
+ * source→target の相対位置から、接続に使う4方向の Handle id（GraphNodeHandles参照）を選ぶ。
+ * ノードの高さ情報を持たないため、垂直方向は position.y（左上）をそのまま近似値として使う。
+ * |dx| と |dy| を比較し、大きい方の軸を採用する（同値のときは水平方向を優先）。
+ */
+export function pickHandleIds(
+    source: ContextGraphNode,
+    target: ContextGraphNode,
+): { sourceHandle: HandleSide; targetHandle: HandleSide } {
+    const dx = centerX(target) - centerX(source)
+    const dy = target.position.y - source.position.y
+
+    if (Math.abs(dx) >= Math.abs(dy)) {
+        return dx >= 0
+            ? { sourceHandle: 'right', targetHandle: 'left' }
+            : { sourceHandle: 'left', targetHandle: 'right' }
+    }
+    return dy >= 0
+        ? { sourceHandle: 'bottom', targetHandle: 'top' }
+        : { sourceHandle: 'top', targetHandle: 'bottom' }
+}
+
 /**
  * source/target 両端のノードが可視のときだけエッジを React Flow の Edge[] に変換する。
+ * sourceHandle/targetHandle は pickHandleIds が両ノードの相対位置から自動選択する。
  */
 export function toReactFlowEdges(
     edges: readonly ContextGraphEdge[],
@@ -64,15 +93,22 @@ export function toReactFlowEdges(
     visibleIds: readonly ContextNodeId[],
 ): GraphEditorEdge[] {
     const visible = new Set(visibleIds)
-    const visibleNodeIds = new Set(
-        nodes.filter((n) => visible.has(n.contextId)).map((n) => n.id),
-    )
+    const visibleNodes = nodes.filter((n) => visible.has(n.contextId))
+    const nodeById = new Map(visibleNodes.map((n) => [n.id, n]))
+
     return edges
-        .filter((e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target))
-        .map((e) => ({
-            id: e.id,
-            source: e.source,
-            target: e.target,
-            style: e.dashed ? { strokeDasharray: '3 3' } : undefined,
-        }))
+        .filter((e) => nodeById.has(e.source) && nodeById.has(e.target))
+        .map((e) => {
+            const sourceNode = nodeById.get(e.source)!
+            const targetNode = nodeById.get(e.target)!
+            const { sourceHandle, targetHandle } = pickHandleIds(sourceNode, targetNode)
+            return {
+                id: e.id,
+                source: e.source,
+                target: e.target,
+                sourceHandle,
+                targetHandle,
+                style: e.dashed ? { strokeDasharray: '3 3' } : undefined,
+            }
+        })
 }

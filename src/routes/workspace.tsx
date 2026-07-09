@@ -88,7 +88,7 @@ export function WorkspaceRoute({
                     defaultVisibleIds={visibleIds}
                     onVisibilityChange={setVisibleIds}
                 />
-                <div className="flex flex-col gap-3 min-w-0">
+                <div className="flex flex-1 self-stretch min-h-0 flex-col gap-3 min-w-0">
                     {needsSetup && project && (
                         <ProjectContextSetup
                             projectName={project.name}

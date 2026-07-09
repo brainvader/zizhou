@@ -9,7 +9,7 @@ const meta: Meta<typeof ComponentGraphEditor> = {
     parameters: { layout: 'centered' },
     decorators: [
         (Story) => (
-            <div className="bg-background text-foreground p-4">
+            <div className="bg-background text-foreground p-4 w-[700px] h-[600px] flex flex-col">
                 <Story />
             </div>
         ),
