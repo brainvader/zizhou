@@ -12,7 +12,7 @@ import { parseWorkspaceView, parseWorkspaceProjectId } from '@/bom/workspace'
  *
  * ルート構成:
  *   /             → IndexRoute
- *   /projects/$id → ProjectDetailRoute（.zizhou/context ゲート → Workspace）
+ *   /projects/$id → ProjectDetailRoute（/workspace へリダイレクト）
  *   /workspace    → WorkspaceRoute (?view=&projectId=, 未指定 view は graph)
  *   *             → NotFound（rootRoute.notFoundComponent）
  *

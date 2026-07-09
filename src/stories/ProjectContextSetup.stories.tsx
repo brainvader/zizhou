@@ -5,19 +5,26 @@ import { ProjectContextSetup } from '@/components/ProjectContextSetup'
 const meta: Meta<typeof ProjectContextSetup> = {
     component: ProjectContextSetup,
     title: 'Projects/ProjectContextSetup',
-    parameters: { layout: 'fullscreen' },
+    parameters: { layout: 'centered' },
     args: {
         projectName: '地蔵 Core',
         rootPath: '/Users/user/projects/zizhou',
         onCreate: fn(),
-        onBack: fn(),
+        variant: 'inline',
     },
+    decorators: [
+        (Story) => (
+            <div className="bg-background text-foreground p-4 w-[480px]">
+                <Story />
+            </div>
+        ),
+    ],
 }
 export default meta
 type Story = StoryObj<typeof ProjectContextSetup>
 
-/** @story 作成を促す UI */
-export const NeedsSetup: Story = {
+/** @story グラフ上の作成バナー */
+export const InlineBanner: Story = {
     play: async ({ canvas }) => {
         await expect(canvas.getByTestId('project-context-setup')).toBeVisible()
         await expect(canvas.getByTestId('ensure-zizhou-context')).toBeVisible()

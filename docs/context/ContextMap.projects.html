@@ -523,7 +523,7 @@
             describe: プロジェクトに ContextMap 置き場を用意する
               [✓] .zizhou/context が無いとき作成を促す UI を表示する
               [✓] 「作成する」で .zizhou/context が作られる
-              [✓] 既にあるときは作成 UI を出さず Workspace を開く
+              [✓] Workspace（グラフ）は先に表示し、無いときだけバナーを出す
               [✓] 作成は冪等（再実行しても既存を壊さない）
         -->
 
@@ -532,7 +532,7 @@
               [✓] "/" を開くと IndexRoute がレンダリングされる
               [✓] "/projects/$id" を開くと ProjectDetailRoute がレンダリングされる
               [✓] 不明なルートは NotFound を表示する
-              [✓] ProjectGrid の各カードは "/projects/$id" へのリンクになっている
+              [✓] ProjectGrid の各カードは "/workspace?projectId=" へのリンクになっている
               [✓] "/" に直接アクセスしても ProjectGrid が表示される
         -->
 

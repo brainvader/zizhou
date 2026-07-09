@@ -26,6 +26,7 @@ describe('プロジェクトに ContextMap 置き場を用意する', () => {
         )
         expect(screen.getByTestId('project-context-setup')).toBeInTheDocument()
         expect(screen.getByText(/ContextMap 置き場がありません/)).toBeInTheDocument()
+        expect(screen.getByText(/グラフは先に表示しています/)).toBeInTheDocument()
         expect(screen.getByTestId('setup-target-path')).toHaveTextContent(
             zizhouContextPath('/projects/zizhou'),
         )
