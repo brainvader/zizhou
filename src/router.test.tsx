@@ -98,8 +98,12 @@ const ProjectGridStub = () => (
     </ul>
 );
 
+const NotFoundStub = () => <div data-testid="not-found">Not Found</div>;
+
 const buildTestRouter = (initialPath = '/') => {
-    const rootRoute = createRootRoute();
+    const rootRoute = createRootRoute({
+        notFoundComponent: NotFoundStub,
+    });
 
     const indexRoute = createRoute({
         getParentRoute: () => rootRoute,
@@ -179,12 +183,13 @@ describe('logic: route tree', () => {
         );
     });
 
-    it('unknown route should not render project-grid', async () => {
+    it('unknown route should render NotFound', async () => {
         const router = buildTestRouter('/unknown');
         render(<RouterProvider router={router} />);
         await waitFor(() =>
-            expect(screen.queryByTestId('project-grid')).not.toBeInTheDocument(),
+            expect(screen.getByTestId('not-found')).toBeInTheDocument(),
         );
+        expect(screen.queryByTestId('project-grid')).not.toBeInTheDocument();
     });
 });
 

@@ -14,6 +14,7 @@ import { parseWorkspaceView, type WorkspaceView } from '@/bom/workspace'
  *   /             → IndexRoute
  *   /projects/$id → ProjectDetailRoute（プレースホルダー）
  *   /workspace    → WorkspaceRoute (?view=graph|pipeline, 未指定は graph)
+ *   *             → NotFound（rootRoute.notFoundComponent）
  *
  * @see docs/context/ContextMap.projects.html
  * @see docs/context/ContextMap.graph.html

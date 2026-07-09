@@ -20,9 +20,9 @@
 
 <!-- src/router.tsx
   describe: Workspace へ遷移する
-    [ ] "/workspace" を開くと WorkspaceRoute がレンダリングされる
-    [ ] view 未指定時は view=graph 相当として扱う
-    [ ] view=pipeline のとき Pipeline ビュー領域が表示される
+    [✓] "/workspace" を開くと WorkspaceRoute がレンダリングされる
+    [✓] view 未指定時は view=graph 相当として扱う
+    [✓] view=pipeline のとき Pipeline ビュー領域が表示される
 -->
 </head>
 <body style="margin:0; background:#0d0f11; color:#e8e6e3; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:13px;">
@@ -35,7 +35,7 @@
 
   <!-- src/components/WorkspaceTopbar.tsx
     describe: Workspace の見出しを表示する
-      [ ] ロゴ・Zizou・「Context Graph Workspace」が表示される
+      [✓] ロゴ・Zizou・「Context Graph Workspace」が表示される
   -->
   <header id="workspace-topbar" style="height:52px; background:#13161a; border-bottom:1px solid #242830; display:flex; align-items:center; padding:0 20px; gap:14px; box-shadow:inset 0 1px 0 #c0392b28;">
     <span style="font-size:18px; letter-spacing:0.1em;">地蔵</span>
@@ -49,14 +49,14 @@
 
     <!-- src/components/ContextSidebar.tsx
       describe: コンテキストの表示を切り替える
-        [ ] Contexts セクションにグラフ基盤・ソース解析・プロジェクト管理が表示される
-        [ ] UI セクションに TaskFlow・設定画面・ログイン画面が表示される
-        [ ] Contexts は独立トグル（複数同時 ON 可）
-        [ ] UI は排他選択（1つ選ぶと他が OFF）
-        [ ] Contexts を ON にすると UI は全 OFF
-        [ ] UI を選ぶと Contexts は全 OFF
-        [ ] 可視行は data-visible="true" と開いた目アイコン、非可視は false と閉じた目
-        [ ] 可視変化で onVisibilityChange(visibleIds) が呼ばれる
+        [✓] Contexts セクションにグラフ基盤・ソース解析・プロジェクト管理が表示される
+        [✓] UI セクションに TaskFlow・設定画面・ログイン画面が表示される
+        [✓] Contexts は独立トグル（複数同時 ON 可）
+        [✓] UI は排他選択（1つ選ぶと他が OFF）
+        [✓] Contexts を ON にすると UI は全 OFF
+        [✓] UI を選ぶと Contexts は全 OFF
+        [✓] 可視行は data-visible="true" と開いた目アイコン、非可視は false と閉じた目
+        [✓] 可視変化で onVisibilityChange(visibleIds) が呼ばれる
 
       Contexts: 独立トグル（複数同時ON可）
       UI:       排他選択（1つ選ぶと他が自動でOFF）
