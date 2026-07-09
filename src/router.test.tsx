@@ -89,7 +89,6 @@ const ProjectGridStub = () => (
                 <Link
                     to="/projects/$id"
                     params={{ id: p.id }}
-                    search={{ graph: undefined }}
                     data-testid={`card-${p.id}`}
                 >
                     {p.name}

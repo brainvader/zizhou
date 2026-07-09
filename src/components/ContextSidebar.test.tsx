@@ -123,7 +123,8 @@ describe('コンテキストの表示を切り替える', () => {
         await user.click(getRow('source'))
 
         expect(onVisibilityChange).toHaveBeenCalled()
-        const last = onVisibilityChange.mock.calls.at(-1)?.[0] as ContextNodeId[]
+        const calls = onVisibilityChange.mock.calls
+        const last = calls[calls.length - 1]?.[0] as ContextNodeId[]
         expect(last).toEqual(expect.arrayContaining(['foundation', 'source']))
         expect(last).toHaveLength(2)
     })
