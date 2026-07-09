@@ -36,10 +36,13 @@ test.describe('CTX-5 ROUTING — Visual Story (Playwright)', () => {
         })
     })
 
-    test('step 2-3: clicking a card navigates to /projects/:id', async ({ page }) => {
+    test('step 2-3: clicking a card navigates to /projects/:id then Workspace or setup', async ({ page }) => {
         await page.getByRole('link', { name: TEST_PROJECT_NAME }).click()
         await expect(page).toHaveURL(/\/projects\//)
-        await expect(page.getByTestId('project-detail-id')).toBeVisible({ timeout: 10000 })
+        // .zizhou/context がある場合は Workspace へ、無い場合はセットアップ UI
+        await expect(
+            page.getByTestId('workspace-route').or(page.getByTestId('project-context-setup')),
+        ).toBeVisible({ timeout: 10000 })
 
         await page.screenshot({ path: `${EVIDENCE}/routing_step3_project_detail.png`, fullPage: true })
     })

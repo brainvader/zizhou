@@ -23,6 +23,15 @@ export function parseWorkspaceView(value: unknown): WorkspaceView {
     return value === 'pipeline' ? 'pipeline' : DEFAULT_WORKSPACE_VIEW
 }
 
+export function parseWorkspaceProjectId(value: unknown): string | undefined {
+    return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
+export type WorkspaceSearch = {
+    view: WorkspaceView
+    projectId?: string
+}
+
 // ============================================================
 // ContextSidebar
 // Contexts = 独立トグル / UI = 排他選択。セクション間は排他。

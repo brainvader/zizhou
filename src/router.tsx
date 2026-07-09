@@ -3,7 +3,7 @@ import { rootRoute } from '@/routes/__root'
 import { IndexRoute } from '@/routes/index'
 import { ProjectDetailRoute } from '@/routes/projects.$id'
 import { WorkspaceRoute } from '@/routes/workspace'
-import { parseWorkspaceView, type WorkspaceView } from '@/bom/workspace'
+import { parseWorkspaceView, parseWorkspaceProjectId } from '@/bom/workspace'
 
 /**
  * router
@@ -12,8 +12,8 @@ import { parseWorkspaceView, type WorkspaceView } from '@/bom/workspace'
  *
  * ルート構成:
  *   /             → IndexRoute
- *   /projects/$id → ProjectDetailRoute（プレースホルダー）
- *   /workspace    → WorkspaceRoute (?view=graph|pipeline, 未指定は graph)
+ *   /projects/$id → ProjectDetailRoute（.zizhou/context ゲート → Workspace）
+ *   /workspace    → WorkspaceRoute (?view=&projectId=, 未指定 view は graph)
  *   *             → NotFound（rootRoute.notFoundComponent）
  *
  * @see docs/context/ContextMap.projects.html
@@ -36,7 +36,8 @@ const workspaceRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/workspace',
     validateSearch: (search: Record<string, unknown>) => ({
-        view: parseWorkspaceView(search.view) as WorkspaceView,
+        view: parseWorkspaceView(search.view),
+        projectId: parseWorkspaceProjectId(search.projectId),
     }),
     component: WorkspaceRoute,
 })

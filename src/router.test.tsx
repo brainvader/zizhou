@@ -127,6 +127,8 @@ const buildTestRouter = (initialPath = '/') => {
         path: '/workspace',
         validateSearch: (search: Record<string, unknown>) => ({
             view: parseWorkspaceView(search.view) as WorkspaceView,
+            projectId:
+                typeof search.projectId === 'string' ? search.projectId : undefined,
         }),
         component: function WorkspacePage() {
             const { view } = workspaceRoute.useSearch();
