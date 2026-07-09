@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>ContextMap: Zizhou — Pipeline</title>
+</head>
+<body style="margin:0; background:#0d0f11; color:#e8e6e3; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:13px;">
+
+  <!-- ============================================================
+       共通: titlebar / topbar / 左サイドバー
+       ContextMap.graph.html と同一のマークアップ。
+  ============================================================ -->
+  <div style="height:28px; background:#13161a; border-bottom:1px solid #242830; display:flex; align-items:center; padding:0 14px; gap:6px;">
+    <div style="width:10px; height:10px; border-radius:50%; background:#6b2a2a;"></div>
+    <div style="width:10px; height:10px; border-radius:50%; background:#6b5a2a;"></div>
+    <div style="width:10px; height:10px; border-radius:50%; background:#2a4a35;"></div>
+  </div>
+
+  <div style="height:52px; background:#13161a; border-bottom:1px solid #242830; display:flex; align-items:center; padding:0 20px; gap:14px; box-shadow:inset 0 1px 0 #c0392b28;">
+    <span style="font-size:18px; letter-spacing:0.1em;">地蔵</span>
+    <div style="width:1px; height:16px; background:#242830;"></div>
+    <span style="font-family:'JetBrains Mono',monospace; font-size:9px; color:#6b7280; letter-spacing:0.2em; text-transform:uppercase;">Zizou</span>
+    <div style="width:1px; height:16px; background:#242830;"></div>
+    <span style="font-size:12px; color:#6b7280;">Context Graph Workspace</span>
+  </div>
+
+  <div style="display:flex; align-items:flex-start; padding:24px; gap:24px;">
+
+    <!-- ============================================================
+         左サイドバー
+         Contexts: 独立トグル（複数同時ON可）
+         UI:       排他選択（1つ選ぶと他が自動でOFF）
+         セクション間: どちらか一方を選ぶと、もう一方は全OFFになる
+    ============================================================ -->
+    <div style="width:170px; flex-shrink:0; display:flex; flex-direction:column; gap:2px;">
+
+      <div style="font-size:11px; color:#6b7280; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:6px; padding:0 10px;">Contexts</div>
+
+      <div class="ctx-row" data-section="contexts" data-node="foundation" data-visible="true" onclick="toggleContext(this)"
+           style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; cursor:pointer;">
+        <span class="eye-icon" style="display:flex; color:#c0392b;">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        </span>
+        <span>グラフ基盤</span>
+      </div>
+
+      <div class="ctx-row" data-section="contexts" data-node="source" data-visible="false" onclick="toggleContext(this)"
+           style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; cursor:pointer;">
+        <span class="eye-icon" style="display:flex; color:#6b7280;">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </span>
+        <span>ソース解析</span>
+      </div>
+
+      <div class="ctx-row" data-section="contexts" data-node="project" data-visible="false" onclick="toggleContext(this)"
+           style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; cursor:pointer;">
+        <span class="eye-icon" style="display:flex; color:#6b7280;">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </span>
+        <span>プロジェクト管理</span>
+      </div>
+
+      <div style="height:1px; background:#242830; margin:10px 10px 4px;"></div>
+
+      <div style="font-size:11px; color:#6b7280; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; margin:8px 0 6px; padding:0 10px;">UI</div>
+
+      <div class="ctx-row" data-section="ui" data-node="taskflow" data-visible="false" onclick="toggleUi(this)"
+           style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; cursor:pointer;">
+        <span class="eye-icon" style="display:flex; color:#6b7280;">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </span>
+        <span>TaskFlow</span>
+      </div>
+
+      <div class="ctx-row" data-section="ui" data-node="settings" data-visible="false" onclick="toggleUi(this)"
+           style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; cursor:pointer;">
+        <span class="eye-icon" style="display:flex; color:#6b7280;">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </span>
+        <span>設定画面</span>
+      </div>
+
+      <div class="ctx-row" data-section="ui" data-node="login" data-visible="false" onclick="toggleUi(this)"
+           style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; cursor:pointer;">
+        <span class="eye-icon" style="display:flex; color:#6b7280;">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </span>
+        <span>ログイン画面</span>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         中央: 作業パイプライン（既存のまま）
+    ============================================================ -->
+    <div style="width:400px; flex-shrink:0;">
+
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; font-size:12px; color:#6b7280;">
+        <span style="cursor:pointer;">‹ Contexts</span>
+        <span>/</span>
+        <span style="color:#e8e6e3; font-weight:600;">グラフ基盤</span>
+        <span>の作業パイプライン</span>
+      </div>
+
+      <div style="position:relative;">
+
+        <div style="background:#13161a; border:1px solid #3f9161; border-radius:10px; padding:12px 14px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+            <span style="font-size:14px; font-weight:600;">Design（設計）</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:9px; padding:2px 7px; border-radius:999px; color:#3f9161; background:#3f916122;">done</span>
+          </div>
+          <div style="font-size:12px; color:#a3a8b0; line-height:1.5;">人間とSonnetの対話で要件を固める。</div>
+        </div>
+        <div style="width:1px; height:20px; background:#3a4048; margin-left:20px;"></div>
+
+        <div style="background:#1a1712; border:1px solid #b8862f; border-radius:10px; padding:12px 14px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+            <span style="font-size:14px; font-weight:600;">Task Splitting（契約定義）</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:9px; padding:2px 7px; border-radius:999px; color:#b8862f; background:#b8862f22;">doing</span>
+          </div>
+          <div style="font-size:12px; color:#a3a8b0; line-height:1.5; margin-bottom:8px;">Sonnetがdescribe/criteriaを契約として書き出す。</div>
+          <div style="display:flex; align-items:flex-start; gap:6px; font-size:12px; color:#a3a8b0; margin-bottom:4px; line-height:1.4;">
+            <input type="checkbox" checked disabled style="margin-top:2px;">SurrealDBのnode/edgeスキーマを定義する
+          </div>
+          <div style="display:flex; align-items:flex-start; gap:6px; font-size:12px; color:#a3a8b0; line-height:1.4;">
+            <input type="checkbox" disabled style="margin-top:2px;">React Flowでグラフを描画する
+          </div>
+        </div>
+        <div style="width:1px; height:20px; background:#3a4048; margin-left:20px;"></div>
+
+        <div style="background:#13161a; border:1px dashed #4a4f58; border-radius:10px; padding:12px 14px; opacity:0.75;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+            <span style="font-size:14px; font-weight:600;">Execution（実装: Haiku）</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:9px; padding:2px 7px; border-radius:999px; color:#4a4f58; background:#4a4f5822;">todo</span>
+          </div>
+          <div style="font-size:12px; color:#a3a8b0; line-height:1.5;">契約（criteria）に基づいてHaikuが機械的に実装する。</div>
+        </div>
+        <div style="width:1px; height:20px; background:#3a4048; margin-left:20px;"></div>
+
+        <div style="background:#13161a; border:1px dashed #4a4f58; border-radius:10px; padding:12px 14px; opacity:0.75;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+            <span style="font-size:14px; font-weight:600;">Failure Handling（失敗対応）</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:9px; padding:2px 7px; border-radius:999px; color:#4a4f58; background:#4a4f5822;">todo</span>
+          </div>
+          <div style="font-size:12px; color:#a3a8b0; line-height:1.5;">テスト失敗はSonnetへ、契約自体の誤りはDesignへ差し戻す。</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================================
+         右サイドバー: Chat Interface
+         責務: このコンテクストの作業で流れる実行結果を受け取り、
+               人間が次にどう処理するかを指示する場。
+    ============================================================ -->
+    <div style="width:260px; flex-shrink:0; display:flex; flex-direction:column; height:560px;">
+      <div style="font-size:11px; color:#6b7280; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:8px;">Chat</div>
+
+      <div style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:2px;">
+
+        <div style="align-self:flex-start; max-width:88%; background:#13161a; border:1px solid #242830; border-radius:8px; padding:8px 10px;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:9px; color:#b8862f; margin-bottom:4px;">EXECUTION · Haiku</div>
+          <div style="font-size:12px; color:#e8e6e3; line-height:1.5;">ContextGraphView.tsx の実装完了。テスト: 3/5 pass、2 fail（renders edges / toggles node visibility）</div>
+        </div>
+
+        <div style="align-self:flex-end; max-width:88%; background:#c0392b22; border:1px solid #7a1f16; border-radius:8px; padding:8px 10px;">
+          <div style="font-size:12px; color:#e8e6e3; line-height:1.5;">toggles node visibility の失敗、原因を先に見せて</div>
+        </div>
+
+        <div style="align-self:flex-start; max-width:88%; background:#13161a; border:1px solid #242830; border-radius:8px; padding:8px 10px;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:9px; color:#6b7280; margin-bottom:4px;">SONNET</div>
+          <div style="font-size:12px; color:#e8e6e3; line-height:1.5;">原因: data-visible の初期値とDOM描画順序がズレていました。修正案を提示します。</div>
+        </div>
+
+      </div>
+
+      <div style="display:flex; gap:6px; margin-top:12px; flex-shrink:0;">
+        <input type="text" placeholder="指示を入力…"
+               style="flex:1; background:#13161a; border:1px solid #242830; border-radius:6px; padding:8px 10px; color:#e8e6e3; font-size:12px;">
+        <button style="background:#c0392b; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-size:12px; cursor:pointer; flex-shrink:0;">送信</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function setIcon(el, visible) {
+      el.setAttribute('data-visible', String(visible));
+      var iconWrap = el.querySelector('.eye-icon');
+      iconWrap.style.color = visible ? '#c0392b' : '#6b7280';
+      iconWrap.innerHTML = visible
+        ? '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>'
+        : '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+    }
+
+    function clearSection(section) {
+      document.querySelectorAll('.ctx-row[data-section="' + section + '"]').forEach(function (row) {
+        setIcon(row, false);
+      });
+    }
+
+    function toggleContext(el) {
+      var nowVisible = el.getAttribute('data-visible') !== 'true';
+      if (nowVisible) clearSection('ui');
+      setIcon(el, nowVisible);
+    }
+
+    function toggleUi(el) {
+      clearSection('contexts');
+      document.querySelectorAll('.ctx-row[data-section="ui"]').forEach(function (row) {
+        setIcon(row, row === el);
+      });
+    }
+  </script>
+
+</body>
+</html>
