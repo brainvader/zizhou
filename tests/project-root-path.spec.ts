@@ -10,25 +10,10 @@
  *          テキスト直接入力でのパス設定のみ検証する。
  */
 import { test, expect } from '@playwright/test'
+import { createProject } from './helpers'
 
 const ROOT_PATH = '/tmp/e2e-test-project'
 const PROJECT_NAME = 'CTX-16 E2E Project'
-
-/** rootPath を含むプロジェクト作成ヘルパー */
-const createProjectWithRootPath = async (
-    page: import('@playwright/test').Page,
-    name: string,
-    rootPath: string,
-) => {
-    const newProjectBtn = page.getByText('＋ new project')
-    await expect(newProjectBtn).toBeEnabled({ timeout: 10000 })
-    await newProjectBtn.click()
-    await expect(page.getByRole('dialog')).toBeVisible()
-    await page.getByPlaceholder('My Awesome App').fill(name)
-    await page.getByPlaceholder('/Users/user/projects/my-app').fill(rootPath)
-    await page.getByRole('button', { name: '作成' }).click()
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 })
-}
 
 test.describe('CTX-16 PROJECT ROOT PATH — Integration', () => {
 
@@ -40,7 +25,7 @@ test.describe('CTX-16 PROJECT ROOT PATH — Integration', () => {
      * rootPath を入力してプロジェクトを作成できる
      */
     test('rootPath を入力してプロジェクトを作成できる', async ({ page }) => {
-        await createProjectWithRootPath(page, PROJECT_NAME, ROOT_PATH)
+        await createProject(page, PROJECT_NAME, ROOT_PATH)
 
         await expect(page.getByRole('link', { name: PROJECT_NAME })).toBeVisible()
 
@@ -71,7 +56,7 @@ test.describe('CTX-16 PROJECT ROOT PATH — Integration', () => {
      * 作成したプロジェクトのカードに rootPath が短縮表示される
      */
     test('プロジェクトカードに rootPath が表示される', async ({ page }) => {
-        await createProjectWithRootPath(page, PROJECT_NAME, ROOT_PATH)
+        await createProject(page, PROJECT_NAME, ROOT_PATH)
 
         const card = page.getByRole('link', { name: PROJECT_NAME })
         await expect(card).toBeVisible()
