@@ -76,4 +76,33 @@ describe('ContextGraphNode を CustomNode 用の narrow な data 型に変換す
         })
         expect('checklist' in result).toBe(false)
     })
+
+    it('accent が指定されているとき data に引き継がれる', () => {
+        const node: ContextGraphNode = {
+            id: 'use-todo-store',
+            contextId: 'todo',
+            label: 'useTodoStore',
+            kind: 'hook',
+            accent: 'primary',
+            position: { x: 0, y: 0 },
+        }
+        expect(toCustomNodeData(node)).toEqual({
+            id: 'use-todo-store',
+            contextId: 'todo',
+            label: 'useTodoStore',
+            kind: 'hook',
+            accent: 'primary',
+        })
+    })
+
+    it('accent が未指定のとき data 側でも undefined になる', () => {
+        const node: ContextGraphNode = {
+            id: 'add-todo-form',
+            contextId: 'todo',
+            label: 'AddTodoForm',
+            kind: 'component',
+            position: { x: 0, y: 0 },
+        }
+        expect(toCustomNodeData(node).accent).toBeUndefined()
+    })
 })

@@ -46,6 +46,7 @@ export type BaseNodeData = {
     id: string
     contextId: ContextNodeId
     label: string
+    accent?: 'primary' | 'dashed'
 }
 
 export type ComponentNodeData = BaseNodeData & { kind: 'component' }
@@ -67,12 +68,15 @@ export type CustomNodeData =
 /**
  * ContextGraphNode を CustomNode 用の narrow な data 型に変換する。
  * kind === 'feature' のとき checklist が無ければ空配列にフォールバックする。
+ * accent（枠線の視覚強調）は React Flow 公式の BaseNode パターンに倣い、
+ * data 経由でカスタムノード内部から参照する。
  */
 export function toCustomNodeData(node: ContextGraphNode): CustomNodeData {
     const base: BaseNodeData = {
         id: node.id,
         contextId: node.contextId,
         label: node.label,
+        accent: node.accent,
     }
     if (node.kind === 'feature') {
         return { ...base, kind: 'feature', checklist: node.checklist ?? [] }
