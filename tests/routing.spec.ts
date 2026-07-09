@@ -39,7 +39,7 @@ test.describe('CTX-5 ROUTING — Visual Story (Playwright)', () => {
     test('step 2-3: clicking a card navigates to /projects/:id', async ({ page }) => {
         await page.getByRole('link', { name: TEST_PROJECT_NAME }).click()
         await expect(page).toHaveURL(/\/projects\//)
-        await expect(page.getByTestId('file-tree')).toBeVisible({ timeout: 10000 })
+        await expect(page.getByTestId('project-detail-id')).toBeVisible({ timeout: 10000 })
 
         await page.screenshot({ path: `${EVIDENCE}/routing_step3_project_detail.png`, fullPage: true })
     })

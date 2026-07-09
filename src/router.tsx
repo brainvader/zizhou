@@ -11,15 +11,11 @@ import { parseWorkspaceView, type WorkspaceView } from '@/bom/workspace'
  * Zustand に currentPath は持たない。
  *
  * ルート構成:
- *   /             → IndexRoute   (CTX-2: PROJECT-GRID)
- *   /projects/$id → ProjectDetailRoute
+ *   /             → IndexRoute
+ *   /projects/$id → ProjectDetailRoute（プレースホルダー）
  *   /workspace    → WorkspaceRoute (?view=graph|pipeline, 未指定は graph)
  *
- * search params:
- *   ?graph={graphId} — 開いているグラフの ID。activeGraphId の SSOT。
- *   ?view=graph|pipeline — Workspace の表示モード。
- *
- * @see docs/bom/project.ts — routing は TanStack Router に委譲
+ * @see docs/context/ContextMap.projects.html
  * @see docs/context/ContextMap.graph.html
  * @see docs/context/ContextMap.pipeline.html
  */
@@ -32,9 +28,6 @@ const indexRoute = createRoute({
 const projectDetailRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/projects/$id',
-    validateSearch: (search: Record<string, unknown>) => ({
-        graph: typeof search.graph === 'string' ? search.graph : undefined,
-    }),
     component: ProjectDetailRoute,
 })
 
