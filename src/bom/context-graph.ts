@@ -31,8 +31,12 @@ export type ContextGraphNode = {
 
 export type ContextGraphEdge = {
     id: string
+    /** @deprecated 静的SVG版（ContextGraphView）専用。React Flow版は source/target を使う */
     require: readonly ContextNodeId[]
+    /** @deprecated 静的SVG版（ContextGraphView）専用の手描きパス */
     d: string
+    source: string
+    target: string
     dashed?: boolean
 }
 
@@ -184,47 +188,63 @@ export const CONTEXT_GRAPH_NODES: readonly ContextGraphNode[] = [
     },
 ] as const
 
-/** ContextMap モック相当のエッジ定義 */
+/** ContextMap モック相当のエッジ定義。d/require は静的SVG版専用（互換性維持）、source/target はReact Flow版用 */
 export const CONTEXT_GRAPH_EDGES: readonly ContextGraphEdge[] = [
     {
         id: 'foundation-source',
         require: ['foundation', 'source'],
         d: 'M190 55 C215 55,225 55,250 55',
+        source: 'foundation',
+        target: 'source',
     },
     {
         id: 'foundation-project',
         require: ['foundation', 'project'],
         d: 'M110 130 C110 170,160 190,250 205',
+        source: 'foundation',
+        target: 'project',
     },
     {
         id: 'todo-add-to-store',
         require: ['todo'],
         d: 'M85 316 C85 350, 200 370, 280 408',
+        source: 'add-todo-form',
+        target: 'use-todo-store',
     },
     {
         id: 'todo-list-to-store',
         require: ['todo'],
         d: 'M300 316 C300 350, 300 370, 300 408',
+        source: 'todo-list-view',
+        target: 'use-todo-store',
     },
     {
         id: 'todo-filter-to-store',
         require: ['todo'],
         d: 'M515 316 C515 350, 400 370, 320 408',
+        source: 'filter-tabs',
+        target: 'use-todo-store',
     },
     {
         id: 'todo-store-to-zustand',
         require: ['todo'],
         d: 'M280 474 C230 500, 200 508, 165 526',
+        source: 'use-todo-store',
+        target: 'zustand',
     },
     {
         id: 'todo-store-to-persist',
         require: ['todo'],
         d: 'M320 474 C370 500, 400 508, 425 526',
+        source: 'use-todo-store',
+        target: 'persist-todos',
     },
     {
         id: 'todo-store-to-global',
         require: ['todo'],
         d: 'M375 440 C460 440, 520 425, 545 408',
+        source: 'use-todo-store',
+        target: 'global-store',
         dashed: true,
     },
 ] as const
