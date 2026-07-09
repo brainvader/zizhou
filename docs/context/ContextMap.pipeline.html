@@ -3,36 +3,66 @@
 <head>
 <meta charset="UTF-8" />
 <title>ContextMap: Zizhou — Pipeline</title>
+
+<!--
+  STACK
+  runtime:  Tauri 2
+  frontend: React 19 + TypeScript
+  router:   TanStack Router（/workspace?view=graph|pipeline）
+  state:    Zustand（シェルは local state）
+  testing:  Vitest + RTL + Storybook + Playwright
+  package:  pnpm
+
+  第1スライス: Workspace シェル（Topbar + ContextSidebar）のみ。
+  Pipeline / Chat は後続コンテキスト。
+  共通シェルは ContextMap.graph.html と同一。
+-->
+
+<!-- src/router.tsx
+  describe: Workspace へ遷移する
+    [ ] "/workspace" を開くと WorkspaceRoute がレンダリングされる
+    [ ] view 未指定時は view=graph 相当として扱う
+    [ ] view=pipeline のとき Pipeline ビュー領域が表示される
+-->
 </head>
 <body style="margin:0; background:#0d0f11; color:#e8e6e3; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:13px;">
 
-  <!-- ============================================================
-       共通: titlebar / topbar / 左サイドバー
-       ContextMap.graph.html と同一のマークアップ。
-  ============================================================ -->
   <div style="height:28px; background:#13161a; border-bottom:1px solid #242830; display:flex; align-items:center; padding:0 14px; gap:6px;">
     <div style="width:10px; height:10px; border-radius:50%; background:#6b2a2a;"></div>
     <div style="width:10px; height:10px; border-radius:50%; background:#6b5a2a;"></div>
     <div style="width:10px; height:10px; border-radius:50%; background:#2a4a35;"></div>
   </div>
 
-  <div style="height:52px; background:#13161a; border-bottom:1px solid #242830; display:flex; align-items:center; padding:0 20px; gap:14px; box-shadow:inset 0 1px 0 #c0392b28;">
+  <!-- src/components/WorkspaceTopbar.tsx
+    describe: Workspace の見出しを表示する
+      [ ] ロゴ・Zizou・「Context Graph Workspace」が表示される
+  -->
+  <header id="workspace-topbar" style="height:52px; background:#13161a; border-bottom:1px solid #242830; display:flex; align-items:center; padding:0 20px; gap:14px; box-shadow:inset 0 1px 0 #c0392b28;">
     <span style="font-size:18px; letter-spacing:0.1em;">地蔵</span>
     <div style="width:1px; height:16px; background:#242830;"></div>
     <span style="font-family:'JetBrains Mono',monospace; font-size:9px; color:#6b7280; letter-spacing:0.2em; text-transform:uppercase;">Zizou</span>
     <div style="width:1px; height:16px; background:#242830;"></div>
     <span style="font-size:12px; color:#6b7280;">Context Graph Workspace</span>
-  </div>
+  </header>
 
   <div style="display:flex; align-items:flex-start; padding:24px; gap:24px;">
 
-    <!-- ============================================================
-         左サイドバー
-         Contexts: 独立トグル（複数同時ON可）
-         UI:       排他選択（1つ選ぶと他が自動でOFF）
-         セクション間: どちらか一方を選ぶと、もう一方は全OFFになる
-    ============================================================ -->
-    <div style="width:170px; flex-shrink:0; display:flex; flex-direction:column; gap:2px;">
+    <!-- src/components/ContextSidebar.tsx
+      describe: コンテキストの表示を切り替える
+        [ ] Contexts セクションにグラフ基盤・ソース解析・プロジェクト管理が表示される
+        [ ] UI セクションに TaskFlow・設定画面・ログイン画面が表示される
+        [ ] Contexts は独立トグル（複数同時 ON 可）
+        [ ] UI は排他選択（1つ選ぶと他が OFF）
+        [ ] Contexts を ON にすると UI は全 OFF
+        [ ] UI を選ぶと Contexts は全 OFF
+        [ ] 可視行は data-visible="true" と開いた目アイコン、非可視は false と閉じた目
+        [ ] 可視変化で onVisibilityChange(visibleIds) が呼ばれる
+
+      Contexts: 独立トグル（複数同時ON可）
+      UI:       排他選択（1つ選ぶと他が自動でOFF）
+      セクション間: どちらか一方を選ぶと、もう一方は全OFFになる
+    -->
+    <nav id="context-sidebar" style="width:170px; flex-shrink:0; display:flex; flex-direction:column; gap:2px;">
 
       <div style="font-size:11px; color:#6b7280; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:6px; padding:0 10px;">Contexts</div>
 
@@ -87,12 +117,13 @@
         </span>
         <span>ログイン画面</span>
       </div>
-    </div>
+    </nav>
 
     <!-- ============================================================
-         中央: 作業パイプライン（既存のまま）
+         中央: 作業パイプライン（後続コンテキスト — 第1スライス対象外）
+         data-testid="workspace-view-pipeline"
     ============================================================ -->
-    <div style="width:400px; flex-shrink:0;">
+    <div id="workspace-view-pipeline" data-testid="workspace-view-pipeline" style="width:400px; flex-shrink:0;">
 
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; font-size:12px; color:#6b7280;">
         <span style="cursor:pointer;">‹ Contexts</span>
