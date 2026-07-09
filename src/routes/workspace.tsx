@@ -3,6 +3,8 @@ import { useSearch } from '@tanstack/react-router'
 import { WorkspaceTopbar } from '@/components/WorkspaceTopbar'
 import { ContextSidebar } from '@/components/ContextSidebar'
 import { ContextGraphView } from '@/components/ContextGraphView'
+import { ContextPipelineView } from '@/components/ContextPipelineView'
+import { ContextChatPanel } from '@/components/ContextChatPanel'
 import {
     DEFAULT_VISIBLE_CONTEXT_IDS,
     type ContextNodeId,
@@ -12,7 +14,7 @@ import {
 /**
  * WorkspaceRoute
  * "/workspace?view=graph|pipeline" のページコンポーネント。
- * Topbar + ContextSidebar + view 領域（graph は可視フィルタ）。
+ * Topbar + ContextSidebar + view 領域（graph / pipeline）+ Chat（pipeline 時）。
  *
  * @see docs/context/ContextMap.graph.html
  * @see docs/context/ContextMap.pipeline.html
@@ -36,6 +38,7 @@ export function WorkspaceRoute() {
                     onVisibilityChange={setVisibleIds}
                 />
                 <WorkspaceViewArea view={view} visibleIds={visibleIds} />
+                {view === 'pipeline' && <ContextChatPanel />}
             </div>
         </div>
     )
@@ -49,7 +52,7 @@ function WorkspaceViewArea({
     visibleIds: readonly ContextNodeId[]
 }) {
     if (view === 'pipeline') {
-        return <div data-testid="workspace-view-pipeline" className="flex-1 min-w-0" />
+        return <ContextPipelineView visibleIds={visibleIds} />
     }
     return <ContextGraphView visibleIds={visibleIds} />
 }

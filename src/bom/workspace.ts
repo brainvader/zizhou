@@ -2,7 +2,9 @@
  * Workspace（Context Graph / Pipeline）の型・定数 SSOT。
  *
  * 第1スライス: シェル（Topbar + ContextSidebar）と view 切替。
- * 第2スライス: ContextGraphView（可視フィルタ）。Pipeline / Chat は後続。
+ * 第2スライス: ContextGraphView（可視フィルタ）。
+ * 第3スライス: ContextPipelineView（静的ステージ）。
+ * 第4スライス: ContextChatPanel（ローカル送信）。
  *
  * @see docs/context/ContextMap.graph.html
  * @see docs/context/ContextMap.pipeline.html

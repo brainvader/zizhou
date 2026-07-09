@@ -119,10 +119,14 @@
       </div>
     </nav>
 
-    <!-- ============================================================
-         中央: 作業パイプライン（後続コンテキスト — 第1スライス対象外）
-         data-testid="workspace-view-pipeline"
-    ============================================================ -->
+    <!-- src/components/ContextPipelineView.tsx
+      describe: コンテキストの作業パイプラインを表示する
+        [✓] パンくずにアクティブコンテキスト名が表示される
+        [✓] Design / Task Splitting / Execution / Failure Handling の4ステージが表示される
+        [✓] 各ステージに status（done/doing/todo）が表示される
+        [✓] visibleIds が空のとき空状態を表示する
+        [✓] 初期表示（foundation）では「グラフ基盤」のパイプラインになる
+    -->
     <div id="workspace-view-pipeline" data-testid="workspace-view-pipeline" style="width:400px; flex-shrink:0;">
 
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; font-size:12px; color:#6b7280;">
@@ -178,12 +182,14 @@
       </div>
     </div>
 
-    <!-- ============================================================
-         右サイドバー: Chat Interface
-         責務: このコンテクストの作業で流れる実行結果を受け取り、
-               人間が次にどう処理するかを指示する場。
-    ============================================================ -->
-    <div style="width:260px; flex-shrink:0; display:flex; flex-direction:column; height:560px;">
+    <!-- src/components/ContextChatPanel.tsx
+      describe: 作業指示のチャットを表示する
+        [✓] Chat 見出しとメッセージ一覧が表示される
+        [✓] 初期メッセージ（EXECUTION / ユーザー / SONNET）が表示される
+        [✓] 入力して送信するとユーザーメッセージが末尾に追加される
+        [✓] 空文字では送信してもメッセージが増えない
+    -->
+    <div data-testid="context-chat-panel" style="width:260px; flex-shrink:0; display:flex; flex-direction:column; height:560px;">
       <div style="font-size:11px; color:#6b7280; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:8px;">Chat</div>
 
       <div style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:2px;">
