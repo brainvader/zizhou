@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ReactFlow, Background, applyNodeChanges, type NodeChange } from '@xyflow/react'
+import {
+    ReactFlow,
+    Background,
+    Controls,
+    applyNodeChanges,
+    type NodeChange,
+} from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
     CONTEXT_GRAPH_EDGES,
@@ -76,6 +82,7 @@ export function ComponentGraphEditor({
                     fitView
                 >
                     <Background />
+                    <Controls />
                 </ReactFlow>
             )}
         </div>
