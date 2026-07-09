@@ -12,11 +12,11 @@ export type ExternalNodeType = Node<ExternalNodeData, 'external'>
  * @see src/components/GraphNodeCard.tsx
  * @see src/bom/context-graph.ts
  */
-export function ExternalNode({ data }: NodeProps<ExternalNodeType>) {
+export function ExternalNode({ data, selected }: NodeProps<ExternalNodeType>) {
     return (
         <>
             <Handle type="target" position={Position.Top} />
-            <GraphNodeCard data={data} />
+            <GraphNodeCard data={data} selected={selected} />
             <Handle type="source" position={Position.Bottom} />
         </>
     )

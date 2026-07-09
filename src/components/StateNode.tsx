@@ -12,11 +12,11 @@ export type StateNodeType = Node<StateNodeData, 'state'>
  * @see src/components/GraphNodeCard.tsx
  * @see src/bom/context-graph.ts
  */
-export function StateNode({ data }: NodeProps<StateNodeType>) {
+export function StateNode({ data, selected }: NodeProps<StateNodeType>) {
     return (
         <>
             <Handle type="target" position={Position.Top} />
-            <GraphNodeCard data={data} />
+            <GraphNodeCard data={data} selected={selected} />
             <Handle type="source" position={Position.Bottom} />
         </>
     )

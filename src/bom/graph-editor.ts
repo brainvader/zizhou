@@ -39,6 +39,23 @@ export function toReactFlowNodes(
 }
 
 /**
+ * ノードid集合が前と同じなら prevNodes（ドラッグ後の位置を保持したstate）を、
+ * 変わっていれば nextNodes（props から再計算した新しいノード配列）を返す。
+ *
+ * controlled mode で ReactFlow を使う際、visibleIds の変化のたびに
+ * toReactFlowNodes が新しい配列を生成してしまうため、このガードが無いと
+ * ドラッグで動かした位置が毎レンダーでリセットされてしまう。
+ */
+export function reconcileNodes<T extends { id: string }>(
+    prevNodes: readonly T[],
+    nextNodes: readonly T[],
+): readonly T[] {
+    const prevIds = prevNodes.map((n) => n.id).join(',')
+    const nextIds = nextNodes.map((n) => n.id).join(',')
+    return prevIds === nextIds ? prevNodes : nextNodes
+}
+
+/**
  * source/target 両端のノードが可視のときだけエッジを React Flow の Edge[] に変換する。
  */
 export function toReactFlowEdges(

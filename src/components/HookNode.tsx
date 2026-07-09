@@ -12,11 +12,11 @@ export type HookNodeType = Node<HookNodeData, 'hook'>
  * @see src/components/GraphNodeCard.tsx
  * @see src/bom/context-graph.ts
  */
-export function HookNode({ data }: NodeProps<HookNodeType>) {
+export function HookNode({ data, selected }: NodeProps<HookNodeType>) {
     return (
         <>
             <Handle type="target" position={Position.Top} />
-            <GraphNodeCard data={data} />
+            <GraphNodeCard data={data} selected={selected} />
             <Handle type="source" position={Position.Bottom} />
         </>
     )

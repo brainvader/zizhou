@@ -12,11 +12,11 @@ export type FeatureNodeType = Node<FeatureNodeData, 'feature'>
  * @see src/components/GraphNodeCard.tsx
  * @see src/bom/context-graph.ts
  */
-export function FeatureNode({ data }: NodeProps<FeatureNodeType>) {
+export function FeatureNode({ data, selected }: NodeProps<FeatureNodeType>) {
     return (
         <>
             <Handle type="target" position={Position.Top} />
-            <GraphNodeCard data={data} />
+            <GraphNodeCard data={data} selected={selected} />
             <Handle type="source" position={Position.Bottom} />
         </>
     )

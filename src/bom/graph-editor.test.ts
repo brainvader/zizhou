@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest'
 
-import { toReactFlowNodes, toReactFlowEdges } from './graph-editor'
+import { toReactFlowNodes, toReactFlowEdges, reconcileNodes } from './graph-editor'
 import { CONTEXT_GRAPH_NODES, CONTEXT_GRAPH_EDGES } from './context-graph'
 
 describe('ContextGraphNode を React Flow の Node に変換する', () => {
@@ -73,5 +73,31 @@ describe('ContextGraphEdge を React Flow の Edge に変換する', () => {
             'source',
         ])
         expect(result[0].style).toBeUndefined()
+    })
+})
+
+describe('ノードid集合の変化に基づいて state を再利用するか判定する', () => {
+    it('id集合が同じなら prevNodes（ドラッグ後の位置）を維持する', () => {
+        const prevNodes = [{ id: 'a', position: { x: 999, y: 999 } }]
+        const nextNodes = [{ id: 'a', position: { x: 0, y: 0 } }]
+        expect(reconcileNodes(prevNodes, nextNodes)).toBe(prevNodes)
+    })
+
+    it('id集合が異なるなら nextNodes（新しい配列）に切り替える', () => {
+        const prevNodes = [{ id: 'a', position: { x: 999, y: 999 } }]
+        const nextNodes = [{ id: 'b', position: { x: 0, y: 0 } }]
+        expect(reconcileNodes(prevNodes, nextNodes)).toBe(nextNodes)
+    })
+
+    it('id集合の順序も一致している必要がある', () => {
+        const prevNodes = [{ id: 'a' }, { id: 'b' }]
+        const nextNodes = [{ id: 'b' }, { id: 'a' }]
+        expect(reconcileNodes(prevNodes, nextNodes)).toBe(nextNodes)
+    })
+
+    it('prevNodes が空でも next が空なら prevNodes を維持する', () => {
+        const prevNodes: { id: string }[] = []
+        const nextNodes: { id: string }[] = []
+        expect(reconcileNodes(prevNodes, nextNodes)).toBe(prevNodes)
     })
 })

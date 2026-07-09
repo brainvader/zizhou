@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils'
 
 export type GraphNodeCardProps = {
     data: CustomNodeData
+    selected?: boolean
 }
 
 /**
@@ -13,10 +14,13 @@ export type GraphNodeCardProps = {
  * - kind === 'feature' のときは checklist を表示し、種別テキストは表示しない
  * - それ以外は種別テキスト（component/hook/external/state）を表示する
  * - accent は React Flow 公式の BaseNode パターンに倣い、data 経由で枠線を出し分ける
+ * - selected は React Flow の NodeProps から渡された選択状態。ring で強調表示する
+ *   （React Flow のデフォルトの選択枠は外側ラッパーに付くため、カード自身が背景と枠線を
+ *   持つこの設計では見えにくい。ring はカード自身の外側に出るため視認できる）
  *
  * @see src/bom/context-graph.ts
  */
-export function GraphNodeCard({ data }: GraphNodeCardProps) {
+export function GraphNodeCard({ data, selected }: GraphNodeCardProps) {
     const isFeature = data.kind === 'feature'
     const checklist = data.kind === 'feature' ? data.checklist : undefined
 
@@ -32,6 +36,7 @@ export function GraphNodeCard({ data }: GraphNodeCardProps) {
                     : data.accent === 'dashed'
                       ? 'border border-dashed border-border bg-[#101317]'
                       : 'border border-border',
+                selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
             )}
         >
             <div

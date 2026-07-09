@@ -105,4 +105,26 @@ describe('CustomNode共通のカード外観を描画する', () => {
         expect(card).toHaveClass('border-border')
         expect(card).not.toHaveClass('border-dashed')
     })
+
+    it('selected が true のとき強調用の ring クラスが付く', () => {
+        const data: CustomNodeData = {
+            id: 'filter-tabs',
+            contextId: 'todo',
+            label: 'FilterTabs',
+            kind: 'component',
+        }
+        render(<GraphNodeCard data={data} selected />)
+        expect(screen.getByTestId('graph-node-filter-tabs')).toHaveClass('ring-primary')
+    })
+
+    it('selected が false/未指定のとき ring クラスが付かない', () => {
+        const data: CustomNodeData = {
+            id: 'filter-tabs',
+            contextId: 'todo',
+            label: 'FilterTabs',
+            kind: 'component',
+        }
+        render(<GraphNodeCard data={data} />)
+        expect(screen.getByTestId('graph-node-filter-tabs')).not.toHaveClass('ring-primary')
+    })
 })

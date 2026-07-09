@@ -112,3 +112,20 @@ export const FeatureEmptyChecklist: Story = {
         },
     },
 }
+
+/** @story selected: 選択時の強調表示 */
+export const Selected: Story = {
+    args: {
+        data: {
+            id: 'add-todo-form',
+            contextId: 'todo',
+            label: 'AddTodoForm',
+            kind: 'component',
+        },
+        selected: true,
+    },
+    play: async ({ canvasElement }) => {
+        const card = canvasElement.querySelector('[data-testid="graph-node-add-todo-form"]')
+        await expect(card).toHaveClass('ring-primary')
+    },
+}

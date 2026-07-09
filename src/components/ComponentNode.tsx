@@ -12,11 +12,11 @@ export type ComponentNodeType = Node<ComponentNodeData, 'component'>
  * @see src/components/GraphNodeCard.tsx
  * @see src/bom/context-graph.ts
  */
-export function ComponentNode({ data }: NodeProps<ComponentNodeType>) {
+export function ComponentNode({ data, selected }: NodeProps<ComponentNodeType>) {
     return (
         <>
             <Handle type="target" position={Position.Top} />
-            <GraphNodeCard data={data} />
+            <GraphNodeCard data={data} selected={selected} />
             <Handle type="source" position={Position.Bottom} />
         </>
     )
