@@ -12,6 +12,21 @@ type WorkspaceShellProps = {
     view?: WorkspaceView
 }
 
+const StubLink = ({
+    children,
+    className,
+    'data-testid': testId,
+}: {
+    to: string
+    children: React.ReactNode
+    className?: string
+    'data-testid'?: string
+}) => (
+    <a href="/" className={className} data-testid={testId}>
+        {children}
+    </a>
+)
+
 /**
  * Workspace 第1スライスのシェル合成。
  * Route 本体は Router context が必要なため、Story では見た目相当を組み立てる。
@@ -25,7 +40,7 @@ function WorkspaceShell({ view = 'graph' }: WorkspaceShellProps) {
             data-testid="workspace-route"
             className="flex flex-col h-screen bg-background text-foreground"
         >
-            <WorkspaceTopbar />
+            <WorkspaceTopbar LinkComponent={StubLink} />
             <div className="flex flex-1 min-h-0 items-start p-6 gap-6">
                 <ContextSidebar
                     items={[...WORKSPACE_SIDEBAR_ITEMS]}

@@ -1,11 +1,29 @@
+import { Link } from '@tanstack/react-router'
+
+type LinkProps = {
+    to: string
+    children: React.ReactNode
+    className?: string
+    'data-testid'?: string
+}
+
+export type WorkspaceTopbarProps = {
+    /** props DI: Storybook / テスト用。省略時は TanStack Router の Link */
+    LinkComponent?: React.ComponentType<LinkProps>
+}
+
 /**
  * WorkspaceTopbar
- * Workspace の見出しを表示するヘッダー。
+ * Workspace の見出しと Projects への戻りリンクを表示する。
  *
  * @see docs/context/ContextMap.graph.html
  * @see docs/context/ContextMap.pipeline.html
  */
-export function WorkspaceTopbar() {
+export function WorkspaceTopbar({
+    LinkComponent = DefaultLink,
+}: WorkspaceTopbarProps = {}) {
+    const NavLink = LinkComponent
+
     return (
         <header
             data-testid="workspace-topbar"
@@ -25,6 +43,24 @@ export function WorkspaceTopbar() {
             <span className="text-xs text-muted-foreground">
                 Context Graph Workspace
             </span>
+
+            <div className="flex-1" />
+
+            <NavLink
+                to="/"
+                data-testid="back-to-projects"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+                ‹ Projects
+            </NavLink>
         </header>
+    )
+}
+
+function DefaultLink({ to, children, className, 'data-testid': testId }: LinkProps) {
+    return (
+        <Link to={to} search={{}} className={className} data-testid={testId}>
+            {children}
+        </Link>
     )
 }
