@@ -20,8 +20,8 @@ export type ComponentGraphEditorProps = {
 /**
  * ComponentGraphEditor
  * React Flow ベースのグラフエディタ。可視コンテキストのノード・エッジを表示する。
+ * /workspace の view=graph（デフォルト）で表示される、グラフ表示の実体。
  *
- * 既存の ContextGraphView（静的SVG版）は温存し、これは並行導入の新規コンポーネント。
  * controlled mode を採用する（useNodesState/useEdgesState は使わない、既知の制約）。
  * ノードのドラッグ位置はローカル state で保持し、visibleIds 変化のたびに
  * ノードid集合が変わっていなければ reconcileNodes で state を維持する
