@@ -274,12 +274,174 @@ pub fn extract_context_graph(root_path: String) -> Result<serde_json::Value, Str
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+
+    /// テスト用の一時ディレクトリを作り、渡したファイル群を書き込んで返す。
+    /// std::env::temp_dir() 配下にテスト名+プロセスIDでユニークな場所を作る
+    /// （fixtureファイルをリポジトリに常設せず、テストコード自体をSSOTにする）。
+    fn write_fixtures(test_name: &str, files: &[(&str, &str)]) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "extractor_test_{test_name}_{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        for (name, content) in files {
+            fs::write(dir.join(name), content).unwrap();
+        }
+        dir
+    }
+
+    const UI_NODE_HTML: &str = r#"<!DOCTYPE html><html><body>
+        <div id="app" data-context="todo">
+            <form id="add-todo-form" data-context="todo" data-kind="component" data-file="src/components/AddTodoForm.tsx">
+                <script type="application/json" data-key="spec">
+                    { "describe": "テキストを入力してTodoを追加する", "criteria": [{ "label": "追加できる", "done": false }] }
+                </script>
+            </form>
+        </div>
+    </body></html>"#;
 
     #[test]
-    fn extracts_todo_and_storage_as_project() {
-        // NOTE: 実行には tests/fixtures/.zizhou/context/*.html 相当の
-        // テストプロジェクトが別途必要（このリポジトリへの組み込み時に配置する）。
-        // ここでは関数シグネチャ・呼び出し形の確認のみを目的とする。
-        let _ = extract_project(Path::new("tests/fixtures/todo-app"));
+    fn extracts_ui_node_with_child_spec_script() {
+        let dir = write_fixtures("ui_node", &[("ContextMap.todo.html", UI_NODE_HTML)]);
+        let result = extract(&dir.join("ContextMap.todo.html")).unwrap();
+
+        assert_eq!(result.nodes.len(), 1);
+        let node = &result.nodes[0];
+        assert_eq!(node.id, "add-todo-form");
+        assert_eq!(node.kind.as_deref(), Some("component"));
+        assert_eq!(node.context.as_deref(), Some("todo"));
+        assert_eq!(node.file.as_deref(), Some("src/components/AddTodoForm.tsx"));
+        assert_eq!(
+            node.describe.as_deref(),
+            Some("テキストを入力してTodoを追加する")
+        );
+    }
+
+    const WRAPPER_LEAK_HTML: &str = r#"<!DOCTYPE html><html><body>
+        <div id="logic-nodes" style="display:none">
+            <script id="use-todo-store" type="application/json" data-key="spec"
+                    data-context="todo" data-kind="hook" data-file="src/hooks/useTodoStore.ts">
+                { "describe": "状態を保持する", "criteria": [] }
+            </script>
+        </div>
+    </body></html>"#;
+
+    #[test]
+    fn wrapper_element_without_data_kind_is_not_extracted_as_node() {
+        // #logic-nodes は data-kind を持たないラッパーなので node として抽出されてはならない。
+        // （scraperの実装過程で見つかった誤抽出バグの回帰テスト）
+        let dir = write_fixtures("wrapper_leak", &[("ContextMap.todo.html", WRAPPER_LEAK_HTML)]);
+        let result = extract(&dir.join("ContextMap.todo.html")).unwrap();
+
+        assert_eq!(result.nodes.len(), 1);
+        assert_eq!(result.nodes[0].id, "use-todo-store");
+        assert!(result.nodes.iter().all(|n| n.id != "logic-nodes"));
+    }
+
+    #[test]
+    fn resolves_cross_context_map_link() {
+        let todo_html = r#"<!DOCTYPE html><html><body>
+            <link rel="context-ref" id="persist-todos" data-kind="service"
+                  href="ContextMap.storage.html#persist-todos">
+        </body></html>"#;
+        let storage_html = r#"<!DOCTYPE html><html><body>
+            <div id="persist-todos" class="unit" data-context="todo"
+                 data-kind="service" data-path="src/lib/persistTodos.ts">
+                <script type="application/json" data-key="spec">
+                    { "describe": "localStorageへ読み書きする", "deps": ["todo-record"] }
+                </script>
+            </div>
+        </body></html>"#;
+        let dir = write_fixtures(
+            "cross_ref",
+            &[
+                ("ContextMap.todo.html", todo_html),
+                ("ContextMap.storage.html", storage_html),
+            ],
+        );
+        let result = extract(&dir.join("ContextMap.todo.html")).unwrap();
+
+        assert_eq!(result.nodes.len(), 1);
+        let node = &result.nodes[0];
+        assert_eq!(node.id, "persist-todos");
+        assert_eq!(node.source_context_map, "ContextMap.storage.html");
+        assert_eq!(
+            node.deps,
+            Some(serde_json::json!(["todo-record"]))
+        );
+    }
+
+    #[test]
+    fn missing_link_target_does_not_panic_and_is_simply_absent() {
+        let todo_html = r#"<!DOCTYPE html><html><body>
+            <link rel="context-ref" id="persist-todos" data-kind="service"
+                  href="ContextMap.storage.html#nonexistent-id">
+        </body></html>"#;
+        let storage_html = r#"<!DOCTYPE html><html><body></body></html>"#;
+        let dir = write_fixtures(
+            "missing_link",
+            &[
+                ("ContextMap.todo.html", todo_html),
+                ("ContextMap.storage.html", storage_html),
+            ],
+        );
+
+        let result = extract(&dir.join("ContextMap.todo.html"));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().nodes.len(), 0);
+    }
+
+    #[test]
+    fn extracts_edges_from_json_array() {
+        let html = r#"<!DOCTYPE html><html><head>
+            <script id="edges" type="application/json">
+                [{ "source": "add-todo-form", "target": "use-todo-store" }]
+            </script>
+        </head><body></body></html>"#;
+        let dir = write_fixtures("edges", &[("ContextMap.todo.html", html)]);
+        let result = extract(&dir.join("ContextMap.todo.html")).unwrap();
+
+        assert_eq!(result.edges.len(), 1);
+        assert_eq!(result.edges[0].source, "add-todo-form");
+        assert_eq!(result.edges[0].target, "use-todo-store");
+    }
+
+    #[test]
+    fn extract_project_scans_all_html_files_under_zizhou_context_and_dedupes() {
+        let dir = write_fixtures(
+            "project_scan",
+            &[
+                ("ContextMap.todo.html", UI_NODE_HTML),
+                (
+                    "ContextMap.storage.html",
+                    r#"<!DOCTYPE html><html><body>
+                        <div id="todo-record" class="unit" data-context="todo"
+                             data-kind="schema" data-path="src/types/TodoRecord.ts">
+                            <script type="application/json" data-key="spec">
+                                { "describe": "Todo1件のデータ形状" }
+                            </script>
+                        </div>
+                    </body></html>"#,
+                ),
+            ],
+        );
+        // .zizhou/context/ 配下に配置し直す
+        let project_root = dir.join("project");
+        let context_dir = project_root.join(".zizhou").join("context");
+        fs::create_dir_all(&context_dir).unwrap();
+        fs::rename(dir.join("ContextMap.todo.html"), context_dir.join("ContextMap.todo.html")).unwrap();
+        fs::rename(
+            dir.join("ContextMap.storage.html"),
+            context_dir.join("ContextMap.storage.html"),
+        )
+        .unwrap();
+
+        let result = extract_project(&project_root).unwrap();
+        assert_eq!(result.nodes.len(), 2);
+        let ids: Vec<&str> = result.nodes.iter().map(|n| n.id.as_str()).collect();
+        assert!(ids.contains(&"add-todo-form"));
+        assert!(ids.contains(&"todo-record"));
     }
 }
