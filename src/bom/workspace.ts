@@ -39,13 +39,13 @@ export type WorkspaceSearch = {
 
 export type ContextSection = 'contexts' | 'ui'
 
-export type ContextNodeId =
-    | 'foundation'
-    | 'source'
-    | 'project'
-    | 'todo'
-    | 'settings'
-    | 'login'
+/**
+ * コンテキストの識別子。
+ * Zizhou自身の固定コンテキスト（foundation/source/project/settings/login）に加え、
+ * Extractorが外部プロジェクトから動的に発見するcontext（data-context属性の値）も
+ * 同じ型で表現するため string に広げている。
+ */
+export type ContextNodeId = string
 
 export type ContextSidebarItem = {
     id: ContextNodeId

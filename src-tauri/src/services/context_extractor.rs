@@ -33,6 +33,7 @@ pub struct ExtractedNode {
     pub id: String,
     pub kind: Option<String>,
     pub file: Option<String>,
+    pub context: Option<String>,
     pub describe: Option<String>,
     pub criteria: Option<Value>,
     pub deps: Option<Value>,
@@ -143,6 +144,7 @@ pub fn extract_nodes_from_file(
         };
 
         let spec = parse_spec_json(&spec_text.unwrap_or_default(), &format!("{file_name}#{id}"));
+        let context = el.value().attr("data-context").map(String::from);
 
         seen.insert(
             id.to_string(),
@@ -150,6 +152,7 @@ pub fn extract_nodes_from_file(
                 id: id.to_string(),
                 kind,
                 file,
+                context,
                 describe: spec
                     .get("describe")
                     .and_then(|v| v.as_str())
