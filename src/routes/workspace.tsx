@@ -14,12 +14,34 @@ import {
     type MkdirFn,
 } from '@/lib/ensureZizhouContext'
 import { useContextGraph } from '@/hooks/useContextGraph'
-import type { ContextGraphNode, ContextGraphEdge } from '@/bom/context-graph'
+import {
+    CONTEXT_GRAPH_NODES,
+    CONTEXT_GRAPH_EDGES,
+    type ContextGraphNode,
+    type ContextGraphEdge,
+} from '@/bom/context-graph'
 import {
     DEFAULT_VISIBLE_CONTEXT_IDS,
+    WORKSPACE_SIDEBAR_ITEMS,
     type ContextNodeId,
     type WorkspaceView,
 } from '@/bom/workspace'
+
+// contexts セクション（foundation/source/project = Zizhou自身の固定グラフ）に属する
+// ノード/エッジだけを静的デモから取り出す。ui セクション（抽出結果由来）とは独立して
+// 常に表示できるようにするため。
+const CONTEXTS_SECTION_IDS = new Set(
+    WORKSPACE_SIDEBAR_ITEMS.filter((item) => item.section === 'contexts').map(
+        (item) => item.id,
+    ),
+)
+const STATIC_CONTEXT_NODES = CONTEXT_GRAPH_NODES.filter((n) =>
+    CONTEXTS_SECTION_IDS.has(n.contextId),
+)
+const staticContextNodeIds = new Set(STATIC_CONTEXT_NODES.map((n) => n.id))
+const STATIC_CONTEXT_EDGES = CONTEXT_GRAPH_EDGES.filter(
+    (e) => staticContextNodeIds.has(e.source) && staticContextNodeIds.has(e.target),
+)
 
 export type WorkspaceRouteProps = {
     onExists?: ExistsFn
@@ -50,7 +72,37 @@ export function WorkspaceRoute({
     const [needsSetup, setNeedsSetup] = useState(false)
     const [isCreating, setIsCreating] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const { nodes, edges, extractContextGraph } = useContextGraph()
+    const { nodes, edges, sidebarItems, isLoading, error: extractError, extractContextGraph } =
+        useContextGraph()
+
+    // contexts セクション（foundation/source/project）は常に静的デモから、
+    // ui セクションは常に抽出結果（nodes/edges）から取り、両方を合成する。
+    // 以前は「抽出結果があれば丸ごと置き換える」実装だったため、抽出成功直後に
+    // foundation/source/project が消えて既定表示（visibleIds:['foundation']）が
+    // 空になる不具合があった。
+    const mergedNodes = [...STATIC_CONTEXT_NODES, ...nodes]
+    const mergedEdges = [...STATIC_CONTEXT_EDGES, ...edges]
+
+    // contexts セクション（foundation/source/project = Zizhou自身の固定グラフ）は常に残し、
+    // ui セクションだけ抽出結果（sidebarItems）に差し替える。抽出結果が無い（未選択/抽出前）
+    // ときは、従来の静的 ui 項目（todo/settings/login のモック）にフォールバックする。
+    const items =
+        sidebarItems.length > 0
+            ? [
+                  ...WORKSPACE_SIDEBAR_ITEMS.filter((item) => item.section === 'contexts'),
+                  ...sidebarItems,
+              ]
+            : WORKSPACE_SIDEBAR_ITEMS
+
+    // 抽出（sidebarItems）が得られたら、そのプロジェクト自身のコンテキストに
+    // 自動で切り替える。foundation/source/project はZizhou自身の固定グラフであり、
+    // 開いた外部プロジェクト（例: todo-app）とは無関係なため、そのままにしておくと
+    // 「プロジェクトを開いたのに無関係なグラフが表示され続ける」ことになる。
+    useEffect(() => {
+        if (sidebarItems.length > 0) {
+            setVisibleIds(sidebarItems.map((item) => item.id))
+        }
+    }, [sidebarItems])
 
     useEffect(() => {
         if (!projectId || !isHydrated || !project) {
@@ -95,10 +147,27 @@ export function WorkspaceRoute({
             <WorkspaceTopbar />
             <div className="flex flex-1 min-h-0 items-start p-6 gap-6">
                 <ContextSidebar
+                    key={sidebarItems.length > 0 ? 'extracted' : 'static'}
+                    items={items}
                     defaultVisibleIds={visibleIds}
                     onVisibilityChange={setVisibleIds}
                 />
                 <div className="flex flex-1 self-stretch min-h-0 flex-col gap-3 min-w-0">
+                    {project && (
+                        <div
+                            data-testid="context-graph-debug"
+                            className="text-[11px] font-mono bg-muted/50 border border-border rounded-md px-3 py-2 whitespace-pre-wrap break-all"
+                        >
+                            {[
+                                `rootPath: ${project.rootPath}`,
+                                `needsSetup: ${needsSetup}`,
+                                `isLoading: ${isLoading}`,
+                                `error: ${extractError ?? '(なし)'}`,
+                                `extracted nodes: ${nodes.length} / edges: ${edges.length}`,
+                                `sidebarItems: ${sidebarItems.map((i) => i.id).join(', ') || '(なし)'}`,
+                            ].join('\n')}
+                        </div>
+                    )}
                     {needsSetup && project && (
                         <ProjectContextSetup
                             projectName={project.name}
@@ -112,8 +181,8 @@ export function WorkspaceRoute({
                     <WorkspaceViewArea
                         view={view}
                         visibleIds={visibleIds}
-                        nodes={nodes}
-                        edges={edges}
+                        nodes={mergedNodes}
+                        edges={mergedEdges}
                     />
                 </div>
                 {view === 'pipeline' && <ContextChatPanel />}
@@ -136,13 +205,5 @@ function WorkspaceViewArea({
     if (view === 'pipeline') {
         return <ContextPipelineView visibleIds={visibleIds} />
     }
-    // 抽出結果が空（未取得/抽出0件）のときは ComponentGraphEditor 側の
-    // デフォルト値（CONTEXT_GRAPH_NODES/EDGES）にフォールバックさせる。
-    return (
-        <ComponentGraphEditor
-            visibleIds={visibleIds}
-            nodes={nodes.length > 0 ? nodes : undefined}
-            edges={edges.length > 0 ? edges : undefined}
-        />
-    )
+    return <ComponentGraphEditor visibleIds={visibleIds} nodes={nodes} edges={edges} />
 }
