@@ -66,14 +66,24 @@ export function WorkspaceRoute({
     const project = useProjectStore((s) =>
         projectId ? s.projects.find((p) => p.id === projectId) : undefined,
     )
-    const [visibleIds, setVisibleIds] = useState<ContextNodeId[]>(() => [
-        ...DEFAULT_VISIBLE_CONTEXT_IDS,
-    ])
+    const { nodes, edges, sidebarItems, isLoading, error: extractError, extractContextGraph } =
+        useContextGraph()
+
+    // 可視コンテキストのSSOT。ユーザーが手動でサイドバーを操作するまでは
+    // 抽出結果（sidebarItems）から自動導出し、操作後はその選択を優先する。
+    // 以前は useEffect で setVisibleIds していたため、ContextSidebar を
+    // key で再マウントするタイミングと1レンダー分ズレ、再マウント時点で
+    // まだ古い visibleIds を defaultVisibleIds として渡してしまうバグがあった。
+    // レンダー中に同期的に導出することでズレを無くす。
+    const [manualVisibleIds, setManualVisibleIds] = useState<ContextNodeId[] | null>(null)
+    const autoVisibleIds =
+        sidebarItems.length > 0
+            ? sidebarItems.map((item) => item.id)
+            : [...DEFAULT_VISIBLE_CONTEXT_IDS]
+    const visibleIds = manualVisibleIds ?? autoVisibleIds
     const [needsSetup, setNeedsSetup] = useState(false)
     const [isCreating, setIsCreating] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const { nodes, edges, sidebarItems, isLoading, error: extractError, extractContextGraph } =
-        useContextGraph()
 
     // contexts セクション（foundation/source/project）は常に静的デモから、
     // ui セクションは常に抽出結果（nodes/edges）から取り、両方を合成する。
@@ -93,16 +103,6 @@ export function WorkspaceRoute({
                   ...sidebarItems,
               ]
             : WORKSPACE_SIDEBAR_ITEMS
-
-    // 抽出（sidebarItems）が得られたら、そのプロジェクト自身のコンテキストに
-    // 自動で切り替える。foundation/source/project はZizhou自身の固定グラフであり、
-    // 開いた外部プロジェクト（例: todo-app）とは無関係なため、そのままにしておくと
-    // 「プロジェクトを開いたのに無関係なグラフが表示され続ける」ことになる。
-    useEffect(() => {
-        if (sidebarItems.length > 0) {
-            setVisibleIds(sidebarItems.map((item) => item.id))
-        }
-    }, [sidebarItems])
 
     useEffect(() => {
         if (!projectId || !isHydrated || !project) {
@@ -150,7 +150,7 @@ export function WorkspaceRoute({
                     key={sidebarItems.length > 0 ? 'extracted' : 'static'}
                     items={items}
                     defaultVisibleIds={visibleIds}
-                    onVisibilityChange={setVisibleIds}
+                    onVisibilityChange={setManualVisibleIds}
                 />
                 <div className="flex flex-1 self-stretch min-h-0 flex-col gap-3 min-w-0">
                     {project && (
