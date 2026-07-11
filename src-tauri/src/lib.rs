@@ -5,6 +5,7 @@
 
 mod services;
 
+use services::context_extractor::extract_context_graph;
 use services::db::{thing_to_string, Db, ProjectInput, ProjectRecord};
 use tauri::{Manager, State};
 
@@ -81,7 +82,11 @@ pub fn run() {
             app.manage(db);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![list_projects, create_project])
+        .invoke_handler(tauri::generate_handler![
+            list_projects,
+            create_project,
+            extract_context_graph
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

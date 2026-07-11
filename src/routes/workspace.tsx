@@ -13,6 +13,8 @@ import {
     type ExistsFn,
     type MkdirFn,
 } from '@/lib/ensureZizhouContext'
+import { useContextGraph } from '@/hooks/useContextGraph'
+import type { ContextGraphNode, ContextGraphEdge } from '@/bom/context-graph'
 import {
     DEFAULT_VISIBLE_CONTEXT_IDS,
     type ContextNodeId,
@@ -48,6 +50,7 @@ export function WorkspaceRoute({
     const [needsSetup, setNeedsSetup] = useState(false)
     const [isCreating, setIsCreating] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const { nodes, edges, extractContextGraph } = useContextGraph()
 
     useEffect(() => {
         if (!projectId || !isHydrated || !project) {
@@ -62,6 +65,13 @@ export function WorkspaceRoute({
             cancelled = true
         }
     }, [projectId, isHydrated, project, onExists])
+
+    // .zizhou/context の存在が確認できた（needsSetup === false）後にのみ抽出する。
+    // 存在しない状態で呼んでも空/失敗になるだけのため。
+    useEffect(() => {
+        if (!project || needsSetup) return
+        void extractContextGraph(project.rootPath)
+    }, [project, needsSetup, extractContextGraph])
 
     const handleCreate = useCallback(async () => {
         if (!project) return
@@ -99,7 +109,12 @@ export function WorkspaceRoute({
                             variant="inline"
                         />
                     )}
-                    <WorkspaceViewArea view={view} visibleIds={visibleIds} />
+                    <WorkspaceViewArea
+                        view={view}
+                        visibleIds={visibleIds}
+                        nodes={nodes}
+                        edges={edges}
+                    />
                 </div>
                 {view === 'pipeline' && <ContextChatPanel />}
             </div>
@@ -110,12 +125,24 @@ export function WorkspaceRoute({
 function WorkspaceViewArea({
     view,
     visibleIds,
+    nodes,
+    edges,
 }: {
     view: WorkspaceView
     visibleIds: readonly ContextNodeId[]
+    nodes: ContextGraphNode[]
+    edges: ContextGraphEdge[]
 }) {
     if (view === 'pipeline') {
         return <ContextPipelineView visibleIds={visibleIds} />
     }
-    return <ComponentGraphEditor visibleIds={visibleIds} />
+    // 抽出結果が空（未取得/抽出0件）のときは ComponentGraphEditor 側の
+    // デフォルト値（CONTEXT_GRAPH_NODES/EDGES）にフォールバックさせる。
+    return (
+        <ComponentGraphEditor
+            visibleIds={visibleIds}
+            nodes={nodes.length > 0 ? nodes : undefined}
+            edges={edges.length > 0 ? edges : undefined}
+        />
+    )
 }
