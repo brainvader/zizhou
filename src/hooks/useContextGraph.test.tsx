@@ -69,6 +69,19 @@ describe('useContextGraph: logic', () => {
         expect(mockExtract).not.toHaveBeenCalled()
     })
 
+    test('logic: 引数省略（デフォルト値使用）時、再レンダーしても extractContextGraph の参照は変わらない', () => {
+        // 呼び出し側（WorkspaceRoute）は extractContextGraph を useEffect の依存配列に含める。
+        // デフォルト引数がレンダーごとに新しい関数として評価されると、
+        // extractContextGraph の参照も毎回変わり、useEffect が無限に再発火する
+        // （実際に起きた回帰: デフォルト値がインライン関数リテラルだった）。
+        const { result, rerender } = renderHook(() => useContextGraph())
+        const first = result.current.extractContextGraph
+
+        rerender()
+
+        expect(result.current.extractContextGraph).toBe(first)
+    })
+
     test('logic: extractContextGraph(rootPath) は onExtractContextGraph に rootPath を渡す', async () => {
         const mockExtract = vi.fn().mockResolvedValue(fixtureResult)
         const { result } = renderHook(() => useContextGraph(mockExtract))

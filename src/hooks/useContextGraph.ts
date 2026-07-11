@@ -6,6 +6,16 @@ import type { ContextGraphNode, ContextGraphEdge } from '@/bom/context-graph'
 
 type ExtractContextGraphFn = (rootPath: string) => Promise<ExtractResult>
 
+/**
+ * デフォルトのinvokeラッパー。モジュールスコープの定数にすることで参照を安定させる。
+ * useContextGraph() の引数省略時にインライン関数リテラルを渡すと、呼び出しごとに
+ * 新しい関数として評価され、それに依存する extractContextGraph（useCallback）の
+ * 参照も毎レンダー変わってしまい、それを依存配列に含む呼び出し側のuseEffectが
+ * 無限に再発火する（既知の制約: useEffectの依存配列に毎レンダー変わる値を入れない）。
+ */
+const defaultExtractContextGraph: ExtractContextGraphFn = (rootPath) =>
+    invoke('extract_context_graph', { rootPath })
+
 export type UseContextGraphReturn = {
     nodes: ContextGraphNode[]
     edges: ContextGraphEdge[]
@@ -26,8 +36,7 @@ export type UseContextGraphReturn = {
  * @see src-tauri/src/services/context_extractor.rs extract_context_graph
  */
 export function useContextGraph(
-    onExtractContextGraph: ExtractContextGraphFn = (rootPath) =>
-        invoke('extract_context_graph', { rootPath }),
+    onExtractContextGraph: ExtractContextGraphFn = defaultExtractContextGraph,
 ): UseContextGraphReturn {
     const [nodes, setNodes] = useState<ContextGraphNode[]>([])
     const [edges, setEdges] = useState<ContextGraphEdge[]>([])
