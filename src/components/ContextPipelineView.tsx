@@ -1,4 +1,5 @@
-import { ReactFlow, Background } from '@xyflow/react'
+import { useEffect } from 'react'
+import { ReactFlow, Background, useReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
     CONTEXT_PIPELINE_STAGES,
@@ -33,9 +34,15 @@ export type ContextPipelineViewProps = {
  * 対象外（nodesDraggable={false}）。依存関係グラフ（ComponentGraphEditor）とは違い、
  * 自動レイアウト（dagre）は使わず toPipelineFlow() の固定縦一列配置を使う。
  *
+ * fitView（ReactFlowのbool prop）は初回マウント時にしか効かず、かつ親コンテナが
+ * flex-1で高さが動的に決まる関係でマウント直後はまだレイアウトが確定していないことがある
+ * （ComponentGraphEditorと同じ既知の制約）。ステージ集合（id列）が変わるたびに
+ * FitViewOnChange が useReactFlow().fitView() を呼び直して中央寄せし直す。
+ *
  * @see docs/context/ContextMap.pipeline.html
  * @see src/bom/context-pipeline.ts
  * @see src/bom/pipeline-node-types.ts
+ * @see src/components/ComponentGraphEditor.tsx (同じFitViewOnChangeパターン)
  */
 export function ContextPipelineView({
     visibleIds,
@@ -45,11 +52,12 @@ export function ContextPipelineView({
     const activeId = resolveActiveContextId(visibleIds)
     const effectiveStages = selectedNode ? applyNodeToTaskSplitting(stages, selectedNode) : stages
     const { nodes, edges } = toPipelineFlow(effectiveStages)
+    const nodeIds = nodes.map((n) => n.id).join(',')
 
     return (
         <div
             data-testid="workspace-view-pipeline"
-            className="w-[400px] shrink-0"
+            className="w-full flex-1 flex flex-col min-h-0"
         >
             {activeId == null ? (
                 <div
@@ -62,7 +70,7 @@ export function ContextPipelineView({
                 <>
                     <div
                         data-testid="pipeline-breadcrumb"
-                        className="flex items-center gap-2 mb-4 text-xs text-muted-foreground"
+                        className="flex items-center gap-2 mb-4 text-xs text-muted-foreground shrink-0"
                     >
                         <span>‹ Contexts</span>
                         <span>/</span>
@@ -85,7 +93,7 @@ export function ContextPipelineView({
                         )}
                     </div>
 
-                    <div className="h-[520px]">
+                    <div className="relative flex-1 min-h-0 w-full">
                         <ReactFlow
                             nodes={nodes}
                             edges={edges}
@@ -95,6 +103,7 @@ export function ContextPipelineView({
                             fitView
                         >
                             <Background />
+                            <FitViewOnChange nodeIds={nodeIds} />
                         </ReactFlow>
                     </div>
                 </>
@@ -120,4 +129,23 @@ function applyNodeToTaskSplitting(
               }
             : stage,
     )
+}
+
+/**
+ * FitViewOnChange
+ * nodeIds（ノードid集合を join した文字列）が変わったときだけ fitView() を呼び直す。
+ * ContextPipelineView自体はステージのドラッグを許可していない（nodesDraggable={false}）ため、
+ * position変化による誤発火は起きない。
+ *
+ * @see src/components/ComponentGraphEditor.tsx (同じパターンの元ネタ)
+ */
+function FitViewOnChange({ nodeIds }: { nodeIds: string }) {
+    const { fitView } = useReactFlow()
+
+    useEffect(() => {
+        fitView({ duration: 200 })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [nodeIds])
+
+    return null
 }
