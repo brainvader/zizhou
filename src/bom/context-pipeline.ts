@@ -36,7 +36,7 @@ export const CONTEXT_PIPELINE_STAGES: readonly PipelineStage[] = [
     },
     {
         id: 'task-splitting',
-        title: 'Task Splitting（契約定義）',
+        title: '仕様',
         status: 'doing',
         description: 'Sonnetがdescribe/criteriaを契約として書き出す。',
         checklist: [
@@ -87,7 +87,13 @@ export type PipelineFlowNode = {
     data: PipelineFlowNodeData
     style: { width: number }
 }
-export type PipelineFlowEdge = { id: string; source: string; target: string }
+export type PipelineFlowEdge = {
+    id: string
+    source: string
+    target: string
+    sourceHandle: string
+    targetHandle: string
+}
 
 const PIPELINE_NODE_WIDTH = 340
 // タイトル行+description分のおおよその基礎高さ
@@ -133,6 +139,11 @@ export function toPipelineFlow(stages: readonly PipelineStage[]): {
         id: `${stages[index].id}-${stage.id}`,
         source: stages[index].id,
         target: stage.id,
+        // 縦一列・上から下への一直線という前提があるため、GraphNodeHandlesの
+        // 自動選択（依存関係グラフ用、相対位置から4方向のどれかを選ぶ）には頼らず、
+        // source側は下端、target側は上端に固定する。
+        sourceHandle: 'bottom',
+        targetHandle: 'top',
     }))
     return { nodes, edges }
 }
