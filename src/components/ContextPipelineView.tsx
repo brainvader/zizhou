@@ -13,9 +13,12 @@ export type ContextPipelineViewProps = {
     visibleIds: readonly ContextNodeId[]
     stages?: readonly PipelineStage[]
     /**
-     * グラフ側でノードをクリックしたときに渡される、そのノード自身の詳細。
-     * 指定されているときは、静的な4ステージパイプラインの代わりに
-     * そのノードの describe/criteria（ZTE抽出由来）を表示する。
+     * Contextsサイドバーで選ばれたコンテキスト（＝ContextMap上の1ノード）。
+     * 指定されているときは、4ステージパイプラインの Task Splitting ステージの
+     * 中身（description/checklist）だけを、そのノードの describe/criteria
+     * （ZTE抽出由来）に差し替える。Task Splittingは元々「Sonnetがdescribe/criteriaを
+     * 契約として書き出す」段階として設計されているため、ここに実データを乗せるのが筋。
+     * 他の3ステージ（Design/Execution/Failure Handling）は当面静的なまま。
      */
     selectedNode?: ContextGraphNode
 }
@@ -53,6 +56,7 @@ export function ContextPipelineView({
     selectedNode,
 }: ContextPipelineViewProps) {
     const activeId = resolveActiveContextId(visibleIds)
+    const effectiveStages = selectedNode ? applyNodeToTaskSplitting(stages, selectedNode) : stages
 
     return (
         <div
@@ -93,20 +97,16 @@ export function ContextPipelineView({
                         )}
                     </div>
 
-                    {selectedNode ? (
-                        <NodeDetailCard node={selectedNode} />
-                    ) : (
-                        <div className="relative">
-                            {stages.map((stage, index) => (
-                                <div key={stage.id}>
-                                    <PipelineStageCard stage={stage} />
-                                    {index < stages.length - 1 && (
-                                        <div className="w-px h-5 bg-[#3a4048] ml-5" />
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    <div className="relative">
+                        {effectiveStages.map((stage, index) => (
+                            <div key={stage.id}>
+                                <PipelineStageCard stage={stage} />
+                                {index < effectiveStages.length - 1 && (
+                                    <div className="w-px h-5 bg-[#3a4048] ml-5" />
+                                )}
+                            </div>
+                        ))}
+                    </div>
                 </>
             )}
         </div>
@@ -114,39 +114,21 @@ export function ContextPipelineView({
 }
 
 /**
- * NodeDetailCard
- * グラフでクリックされたノード自身の describe/criteria（ZTE抽出由来）を表示する。
- * 静的な PipelineStageCard とは別系統（Zizhou自身のロードマップではなく、
- * 開いているプロジェクトのContextMapに書かれた仕様そのもの）。
+ * Task Splittingステージ（id: 'task-splitting'）のdescription/checklistだけを、
+ * 選ばれたノードのdescribe/criteriaに差し替える。他のステージはそのまま。
  */
-function NodeDetailCard({ node }: { node: ContextGraphNode }) {
-    return (
-        <div
-            data-testid="pipeline-node-detail"
-            className="rounded-[10px] px-3.5 py-3 border border-border bg-card"
-        >
-            <div className="text-sm font-semibold mb-1.5">{node.label}</div>
-            {node.describe && (
-                <div className="text-xs text-[#a3a8b0] leading-relaxed mb-2">
-                    {node.describe}
-                </div>
-            )}
-            {node.checklist?.map((item) => (
-                <div
-                    key={item.label}
-                    className="flex items-start gap-1.5 text-xs text-[#a3a8b0] mb-1 last:mb-0 leading-snug"
-                >
-                    <input
-                        type="checkbox"
-                        checked={item.done}
-                        disabled
-                        readOnly
-                        className="mt-0.5"
-                    />
-                    <span>{item.label}</span>
-                </div>
-            ))}
-        </div>
+function applyNodeToTaskSplitting(
+    stages: readonly PipelineStage[],
+    node: ContextGraphNode,
+): readonly PipelineStage[] {
+    return stages.map((stage) =>
+        stage.id === 'task-splitting'
+            ? {
+                  ...stage,
+                  description: node.describe ?? stage.description,
+                  checklist: node.checklist,
+              }
+            : stage,
     )
 }
 

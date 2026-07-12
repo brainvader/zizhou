@@ -99,46 +99,22 @@ export function WorkspaceRoute({
     const hasProjectContext = sidebarItems.length > 0
     const items = hasProjectContext ? sidebarItems : WORKSPACE_SIDEBAR_ITEMS
     // 今可視になっているコンテキストが UI / Contexts どちらのセクションから
-    // 選ばれたものかを判定する。ノードクリックでPipelineに飛ぶのは
-    // Contextsセクションから選んだときだけ（UIは構造だけを見る場所のため）。
+    // 選ばれたものかを判定する。
     const activeSection = items.find((item) => visibleIds.includes(item.id))?.section
-    // UI: 構造グラフ（component/hook/external/state個別ノード、依存関係の線）
-    // Contexts: data-contextごとに集約した1ノード（criteria checklist直付き、feature扱い）
-    // 抽出結果が無い（プロジェクト未選択/抽出前）ときは、Zizhou自身の静的デモにフォールバックする。
-    const showContextSummary = hasProjectContext && activeSection === 'contexts'
-    const mergedNodes = showContextSummary
-        ? contextNodes
-        : hasProjectContext
-          ? nodes
-          : [...STATIC_CONTEXT_NODES, ...nodes]
-    const mergedEdges = showContextSummary
-        ? []
-        : hasProjectContext
-          ? edges
-          : [...STATIC_CONTEXT_EDGES, ...edges]
-
-    // グラフでノードをクリックしたときの選択状態。選択中は view を問答無用で
-    // pipeline に切り替え、そのノード自身の describe/criteria を表示する
-    // （view の search param 自体は書き換えない。ローカルな一時オーバーライド）。
-    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
-    const effectiveView: WorkspaceView = selectedNodeId ? 'pipeline' : view
-    const selectedNode = selectedNodeId
-        ? mergedNodes.find((n) => n.id === selectedNodeId)
+    // Contexts（ノード単位の管理単位）を選んだら、グラフを介さず即座にPipelineへ飛ぶ。
+    // UIで全体像はすでに見えているので、Contextsはそこからさらにグラフを見せる意味が無い。
+    // 静的デモ（foundation/source/project）は当面この対象外（従来通り単一featureノードの
+    // グラフとして見せる）。
+    const jumpToPipeline = hasProjectContext && activeSection === 'contexts'
+    const effectiveView: WorkspaceView = jumpToPipeline ? 'pipeline' : view
+    const pipelineNode = jumpToPipeline
+        ? contextNodes.find((n) => graphVisibleIds.includes(n.id))
         : undefined
-    const handleNodeClick = useCallback(
-        (nodeId: string) => {
-            // UI（構造グラフ、Storybookで検証）からのクリックはPipelineに飛ばない。
-            // Contexts（Vitest/RTLで検証するcriteriaの実体）から選んでいるときだけ、
-            // そのノードの詳細（describe/criteria）を見るためにPipelineへ遷移する。
-            if (activeSection !== 'contexts') return
-            setSelectedNodeId(nodeId)
-        },
-        [activeSection],
-    )
-    // サイドバーで別のコンテキストに切り替えたら、選択中ノードの詳細表示は解除する
-    // （別コンテキストを見ているのに前のノード詳細が残り続けるのを防ぐ）
+
+    const mergedNodes = hasProjectContext ? nodes : [...STATIC_CONTEXT_NODES, ...nodes]
+    const mergedEdges = hasProjectContext ? edges : [...STATIC_CONTEXT_EDGES, ...edges]
+
     const handleVisibilityChange = useCallback((next: ContextNodeId[]) => {
-        setSelectedNodeId(null)
         setManualVisibleIds(next)
     }, [])
 
@@ -206,8 +182,7 @@ export function WorkspaceRoute({
                         visibleIds={graphVisibleIds}
                         nodes={mergedNodes}
                         edges={mergedEdges}
-                        selectedNode={selectedNode}
-                        onNodeClick={handleNodeClick}
+                        selectedNode={pipelineNode}
                     />
                 </div>
                 {effectiveView === 'pipeline' && <ContextChatPanel />}
@@ -222,24 +197,15 @@ function WorkspaceViewArea({
     nodes,
     edges,
     selectedNode,
-    onNodeClick,
 }: {
     view: WorkspaceView
     visibleIds: readonly ContextNodeId[]
     nodes: ContextGraphNode[]
     edges: ContextGraphEdge[]
     selectedNode?: ContextGraphNode
-    onNodeClick: (nodeId: string) => void
 }) {
     if (view === 'pipeline') {
         return <ContextPipelineView visibleIds={visibleIds} selectedNode={selectedNode} />
     }
-    return (
-        <ComponentGraphEditor
-            visibleIds={visibleIds}
-            nodes={nodes}
-            edges={edges}
-            onNodeClick={onNodeClick}
-        />
-    )
+    return <ComponentGraphEditor visibleIds={visibleIds} nodes={nodes} edges={edges} />
 }

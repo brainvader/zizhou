@@ -80,20 +80,31 @@ describe('コンテキストの作業パイプラインを表示する', () => {
         expect(screen.queryByTestId('pipeline-empty')).not.toBeInTheDocument()
     })
 
-    it('selectedNode があるとき、静的な4ステージの代わりにそのノードの詳細（describe/criteria）を表示する', () => {
+    it('selectedNode があっても4ステージは表示され続ける（Task Splittingの中身だけ差し替わる）', () => {
         render(<ContextPipelineView visibleIds={['todo']} selectedNode={SELECTED_NODE} />)
 
-        const detail = screen.getByTestId('pipeline-node-detail')
-        expect(detail).toBeInTheDocument()
-        expect(detail).toHaveTextContent('AddTodoForm')
-        expect(screen.getByText('テキストを入力してTodoを追加する')).toBeInTheDocument()
+        expect(screen.getByTestId('pipeline-stage-design')).toBeInTheDocument()
+        expect(screen.getByTestId('pipeline-stage-task-splitting')).toBeInTheDocument()
+        expect(screen.getByTestId('pipeline-stage-execution')).toBeInTheDocument()
+        expect(screen.getByTestId('pipeline-stage-failure-handling')).toBeInTheDocument()
+    })
+
+    it('selectedNode があるとき、Task Splittingステージの中身がそのノードのdescribe/criteriaになる', () => {
+        render(<ContextPipelineView visibleIds={['todo']} selectedNode={SELECTED_NODE} />)
+
+        const taskSplitting = screen.getByTestId('pipeline-stage-task-splitting')
+        expect(taskSplitting).toHaveTextContent('テキストを入力してTodoを追加する')
 
         const done = screen.getByText('Enterキーで追加できる')
         const notDone = screen.getByText('空文字では追加ボタンが disabled になる')
         expect(done.parentElement?.querySelector('input[type="checkbox"]')).toBeChecked()
         expect(notDone.parentElement?.querySelector('input[type="checkbox"]')).not.toBeChecked()
+    })
 
-        expect(screen.queryByTestId('pipeline-stage-design')).not.toBeInTheDocument()
+    it('selectedNode が無いとき、Task Splittingステージは静的な例文のまま', () => {
+        render(<ContextPipelineView visibleIds={['foundation']} />)
+        const taskSplitting = screen.getByTestId('pipeline-stage-task-splitting')
+        expect(taskSplitting).toHaveTextContent('SurrealDBのnode/edgeスキーマを定義する')
     })
 
     it('selectedNode のパンくずにノード名まで表示される', () => {
@@ -104,6 +115,6 @@ describe('コンテキストの作業パイプラインを表示する', () => {
     it('selectedNode に checklist が無くてもエラーにならない', () => {
         const node: ContextGraphNode = { ...SELECTED_NODE, checklist: undefined }
         render(<ContextPipelineView visibleIds={['todo']} selectedNode={node} />)
-        expect(screen.getByTestId('pipeline-node-detail')).toBeInTheDocument()
+        expect(screen.getByTestId('pipeline-stage-task-splitting')).toBeInTheDocument()
     })
 })
