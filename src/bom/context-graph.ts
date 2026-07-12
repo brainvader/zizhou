@@ -47,7 +47,6 @@ export type BaseNodeData = {
     contextId: ContextNodeId
     label: string
     accent?: 'primary' | 'dashed'
-    checklist?: readonly ContextGraphChecklistItem[]
 }
 
 export type ComponentNodeData = BaseNodeData & { kind: 'component' }
@@ -75,19 +74,27 @@ export type CustomNodeData =
  * accent（枠線の視覚強調）は React Flow 公式の BaseNode パターンに倣い、
  * data 経由でカスタムノード内部から参照する。
  */
+/**
+ * ContextGraphNode を CustomNode 用の narrow な data 型に変換する。
+ * kind === 'feature' のとき checklist が無ければ空配列にフォールバックする。
+ * それ以外の kind（component/hook/external/state）は checklist を含めない。
+ * グラフは依存関係の構造（label・kind・edge）だけを見せる場所であり、
+ * criteria の検証は Vitest/RTL や Storybook 側の責務のため
+ * （feature は ZTE 抽出とは別系統の、Zizhou自身のロードマップ用チェックリスト）。
+ * accent（枠線の視覚強調）は React Flow 公式の BaseNode パターンに倣い、
+ * data 経由でカスタムノード内部から参照する。
+ */
 export function toCustomNodeData(node: ContextGraphNode): CustomNodeData {
     const base: BaseNodeData = {
         id: node.id,
         contextId: node.contextId,
         label: node.label,
         accent: node.accent,
-        ...(node.kind === 'feature'
-            ? { checklist: node.checklist ?? [] }
-            : node.checklist && node.checklist.length > 0
-              ? { checklist: node.checklist }
-              : {}),
     }
-    return { ...base, kind: node.kind } as CustomNodeData
+    if (node.kind === 'feature') {
+        return { ...base, kind: 'feature', checklist: node.checklist ?? [] }
+    }
+    return { ...base, kind: node.kind }
 }
 
 /** ContextMap モック相当のノード定義 */

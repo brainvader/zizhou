@@ -27,31 +27,6 @@ describe('CustomNode共通のカード外観を描画する', () => {
         )
     })
 
-    it('component kind でも checklist があれば種別テキストと併せて表示される（ZTE抽出由来のcriteria）', () => {
-        const data: CustomNodeData = {
-            id: 'add-todo-form',
-            contextId: 'todo',
-            label: 'AddTodoForm',
-            kind: 'component',
-            checklist: [
-                { label: '空文字では追加ボタンが disabled になる', done: false },
-                { label: 'Enterキーで追加できる', done: true },
-            ],
-        }
-        render(<GraphNodeCard data={data} />)
-
-        expect(screen.getByText('AddTodoForm')).toBeInTheDocument()
-        expect(screen.getByText('component')).toBeInTheDocument()
-        const doneItem = screen.getByText('Enterキーで追加できる')
-        const todoItem = screen.getByText('空文字では追加ボタンが disabled になる')
-        expect(
-            doneItem.parentElement?.querySelector('input[type="checkbox"]'),
-        ).toBeChecked()
-        expect(
-            todoItem.parentElement?.querySelector('input[type="checkbox"]'),
-        ).not.toBeChecked()
-    })
-
     it('feature kind のとき checklist が表示され、種別テキストは表示されない', () => {
         const data: CustomNodeData = {
             id: 'foundation',

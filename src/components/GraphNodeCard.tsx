@@ -22,9 +22,7 @@ export type GraphNodeCardProps = {
  */
 export function GraphNodeCard({ data, selected }: GraphNodeCardProps) {
     const isFeature = data.kind === 'feature'
-    // checklist は kind を問わず data にあれば表示する
-    // （component/hook/external/state は ZTE 抽出由来の criteria、feature は静的デモの手動チェックリスト）
-    const checklist = data.checklist
+    const checklist = data.kind === 'feature' ? data.checklist : undefined
 
     return (
         <div

@@ -59,7 +59,7 @@ describe('ContextGraphNode を CustomNode 用の narrow な data 型に変換す
         })
     })
 
-    it('kind が hook/external/state で checklist があれば含む', () => {
+    it('kind が hook/external/state のとき、ノード側に checklist があっても含まない（グラフは依存関係の構造のみ。criteriaの検証はVitest/RTL・Storybook側の責務）', () => {
         const node: ContextGraphNode = {
             id: 'add-todo-form',
             contextId: 'todo',
@@ -70,15 +70,14 @@ describe('ContextGraphNode を CustomNode 用の narrow な data 型に変換す
                 { label: '空文字では追加ボタンが disabled になる', done: false },
             ],
         }
-        expect(toCustomNodeData(node)).toEqual({
+        const result = toCustomNodeData(node)
+        expect(result).toEqual({
             id: 'add-todo-form',
             contextId: 'todo',
             label: 'AddTodoForm',
             kind: 'component',
-            checklist: [
-                { label: '空文字では追加ボタンが disabled になる', done: false },
-            ],
         })
+        expect('checklist' in result).toBe(false)
     })
 
     it('kind が hook/external/state で checklist が無いときキー自体を含まない', () => {
