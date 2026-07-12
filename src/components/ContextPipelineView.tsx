@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { ReactFlow, Background, useReactFlow } from '@xyflow/react'
+import { useCallback, useEffect, useState } from 'react'
+import { ReactFlow, Background, applyNodeChanges, useReactFlow, type NodeChange } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
     CONTEXT_PIPELINE_STAGES,
@@ -7,7 +7,9 @@ import {
     resolveActiveContextId,
     toPipelineFlow,
     type PipelineStage,
+    type PipelineFlowNode,
 } from '@/bom/context-pipeline'
+import { reconcileNodes } from '@/bom/graph-editor'
 import { PIPELINE_NODE_TYPES } from '@/bom/pipeline-node-types'
 import type { ContextNodeId } from '@/bom/workspace'
 import type { ContextGraphNode } from '@/bom/context-graph'
@@ -29,20 +31,24 @@ export type ContextPipelineViewProps = {
 
 /**
  * ContextPipelineView
- * コンテキストの作業パイプラインを React Flow で表示する（縦一列の固定シーケンス）。
- * ノードの並び順自体がパイプラインの意味そのものであり、ドラッグでの並べ替えは
- * 対象外（nodesDraggable={false}）。依存関係グラフ（ComponentGraphEditor）とは違い、
- * 自動レイアウト（dagre）は使わず toPipelineFlow() の固定縦一列配置を使う。
+ * コンテキストの作業パイプラインを React Flow で表示する（縦一列の初期配置）。
+ * ドラッグでの移動は可能（nodesDraggable、既定でtrue）。ComponentGraphEditorと同じ
+ * controlled mode を採用し、ドラッグ位置をローカル state で保持する
+ * （ステージ集合が変わっていなければ reconcileNodes で state を維持し、
+ * 毎レンダーの再構築でドラッグ位置が消えるのを防ぐ）。
+ * 依存関係グラフ（ComponentGraphEditor）とは違い、自動レイアウト（dagre）は使わず
+ * toPipelineFlow() の初期配置（縦一列、checklist量に応じた可変間隔）を使う。
  *
  * fitView（ReactFlowのbool prop）は初回マウント時にしか効かず、かつ親コンテナが
  * flex-1で高さが動的に決まる関係でマウント直後はまだレイアウトが確定していないことがある
  * （ComponentGraphEditorと同じ既知の制約）。ステージ集合（id列）が変わるたびに
- * FitViewOnChange が useReactFlow().fitView() を呼び直して中央寄せし直す。
+ * FitViewOnChange が useReactFlow().fitView() を呼び直して中央寄せし直す
+ * （rfNodes自体を依存にするとドラッグのたびに再フィットしてしまうため、id集合のみで判定）。
  *
  * @see docs/context/ContextMap.pipeline.html
  * @see src/bom/context-pipeline.ts
  * @see src/bom/pipeline-node-types.ts
- * @see src/components/ComponentGraphEditor.tsx (同じFitViewOnChangeパターン)
+ * @see src/components/ComponentGraphEditor.tsx (同じcontrolled mode / FitViewOnChangeパターン)
  */
 export function ContextPipelineView({
     visibleIds,
@@ -51,8 +57,21 @@ export function ContextPipelineView({
 }: ContextPipelineViewProps) {
     const activeId = resolveActiveContextId(visibleIds)
     const effectiveStages = selectedNode ? applyNodeToTaskSplitting(stages, selectedNode) : stages
-    const { nodes, edges } = toPipelineFlow(effectiveStages)
-    const nodeIds = nodes.map((n) => n.id).join(',')
+    const { nodes: baseNodes, edges } = toPipelineFlow(effectiveStages)
+
+    const [rfNodes, setRfNodes] = useState(baseNodes)
+
+    useEffect(() => {
+        setRfNodes((prev) => [...reconcileNodes(prev, baseNodes)])
+        // baseNodes はレンダーごとに新しい配列参照になるため、内容（visibleIds/selectedNode）で比較する
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [visibleIds, selectedNode])
+
+    const handleNodesChange = useCallback((changes: NodeChange<PipelineFlowNode>[]) => {
+        setRfNodes((nds) => applyNodeChanges(changes, nds))
+    }, [])
+
+    const nodeIds = rfNodes.map((n) => n.id).join(',')
 
     return (
         <div
@@ -95,10 +114,10 @@ export function ContextPipelineView({
 
                     <div className="relative flex-1 min-h-0 w-full">
                         <ReactFlow
-                            nodes={nodes}
+                            nodes={rfNodes}
                             edges={edges}
                             nodeTypes={PIPELINE_NODE_TYPES}
-                            nodesDraggable={false}
+                            onNodesChange={handleNodesChange}
                             nodesConnectable={false}
                             fitView
                         >
@@ -134,8 +153,9 @@ function applyNodeToTaskSplitting(
 /**
  * FitViewOnChange
  * nodeIds（ノードid集合を join した文字列）が変わったときだけ fitView() を呼び直す。
- * ContextPipelineView自体はステージのドラッグを許可していない（nodesDraggable={false}）ため、
- * position変化による誤発火は起きない。
+ * rfNodes自体を依存にするとドラッグによるposition変化のたびにも発火してしまうため、
+ * id集合の文字列だけを依存にして、ステージの入れ替わり時のみ再フィットする
+ * （ComponentGraphEditorのFitViewOnChangeと同じ理由）。
  *
  * @see src/components/ComponentGraphEditor.tsx (同じパターンの元ネタ)
  */
