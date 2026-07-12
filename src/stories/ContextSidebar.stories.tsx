@@ -47,14 +47,14 @@ export const Default: Story = {
     },
 }
 
-/** @story Contexts は独立トグル（複数同時 ON 可） */
-export const ContextsIndependentToggle: Story = {
+/** @story Contexts は排他選択（1つ選ぶと他の Contexts も OFF） */
+export const ContextsExclusiveSelect: Story = {
     play: async ({ canvasElement }) => {
         await userEvent.click(getRow(canvasElement, 'source'))
 
         await expect(getRow(canvasElement, 'foundation')).toHaveAttribute(
             'data-visible',
-            'true',
+            'false',
         )
         await expect(getRow(canvasElement, 'source')).toHaveAttribute(
             'data-visible',
@@ -150,8 +150,6 @@ export const VisibilityChangeCallback: Story = {
         await expect(args.onVisibilityChange).toHaveBeenCalled()
         const calls = (args.onVisibilityChange as ReturnType<typeof fn>).mock.calls
         const last = calls[calls.length - 1]?.[0] as ContextNodeId[]
-        await expect(last).toContain('foundation')
-        await expect(last).toContain('source')
-        await expect(last).toHaveLength(2)
+        await expect(last).toEqual(['source'])
     },
 }

@@ -35,7 +35,7 @@ describe('コンテキストの表示を切り替える', () => {
         expect(screen.getByText('ログイン画面')).toBeInTheDocument()
     })
 
-    it('Contexts は独立トグル（複数同時 ON 可）', async () => {
+    it('Contexts は排他選択（1つ選ぶと他の Contexts も OFF）', async () => {
         const user = userEvent.setup()
         render(
             <ContextSidebar
@@ -46,7 +46,7 @@ describe('コンテキストの表示を切り替える', () => {
 
         await user.click(getRow('source'))
 
-        expect(getRow('foundation')).toHaveAttribute('data-visible', 'true')
+        expect(getRow('foundation')).toHaveAttribute('data-visible', 'false')
         expect(getRow('source')).toHaveAttribute('data-visible', 'true')
         expect(getRow('project')).toHaveAttribute('data-visible', 'false')
     })
@@ -136,7 +136,6 @@ describe('コンテキストの表示を切り替える', () => {
         expect(onVisibilityChange).toHaveBeenCalled()
         const calls = onVisibilityChange.mock.calls
         const last = calls[calls.length - 1]?.[0] as ContextNodeId[]
-        expect(last).toEqual(expect.arrayContaining(['foundation', 'source']))
-        expect(last).toHaveLength(2)
+        expect(last).toEqual(['source'])
     })
 })
