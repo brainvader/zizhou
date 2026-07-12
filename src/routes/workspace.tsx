@@ -14,6 +14,7 @@ import {
     type MkdirFn,
 } from '@/lib/ensureZizhouContext'
 import { useContextGraph } from '@/hooks/useContextGraph'
+import { UI_WHOLE_PROJECT_ID } from '@/bom/extracted-graph'
 import {
     CONTEXT_GRAPH_NODES,
     CONTEXT_GRAPH_EDGES,
@@ -83,8 +84,14 @@ export function WorkspaceRoute({
     const visibleIds = manualVisibleIds ?? autoVisibleIds
     // グラフのノードフィルタリング（contextIdとの突き合わせ）では、Contexts専用の
     // 区別用サフィックス（例: "todo:ctx"）を剥がした本来のcontextIdを使う。
-    // UI/Contextsどちらから選んでも、同じノード集合を表示するため。
-    const graphVisibleIds = visibleIds.map(baseContextId)
+    // ただしUIの「プロジェクト全体」エントリ（UI_WHOLE_PROJECT_ID）が選ばれているときは
+    // 話が別で、ノードごとのcontextIdがバラバラ（1ノード1管理単位）でも全ノードを見せたいので、
+    // 抽出結果に実際に存在する contextId を丸ごと可視集合として使う
+    // （UIは「アプリ全体のつながり」を見る場所で、Contexts単位の粒度とは無関係のため）。
+    const isWholeProjectUi = visibleIds.includes(UI_WHOLE_PROJECT_ID)
+    const graphVisibleIds = isWholeProjectUi
+        ? [...new Set(nodes.map((n) => n.contextId))]
+        : visibleIds.map(baseContextId)
     const [needsSetup, setNeedsSetup] = useState(false)
     const [isCreating, setIsCreating] = useState(false)
     const [error, setError] = useState<string | null>(null)

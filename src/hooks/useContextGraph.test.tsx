@@ -117,7 +117,7 @@ describe('useContextGraph: logic', () => {
             { id: 'add-todo-form-use-todo-store', source: 'add-todo-form', target: 'use-todo-store' },
         ])
         expect(result.current.sidebarItems).toEqual([
-            { id: 'todo', section: 'ui', label: 'Todo' },
+            { id: '__structure__', section: 'ui', label: 'Todo' },
             { id: 'todo:ctx', section: 'contexts', label: 'Todo' },
         ])
         expect(result.current.contextNodes).toEqual([

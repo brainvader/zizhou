@@ -156,26 +156,60 @@ export function toContextSummaryNodes(result: ExtractResult): ContextGraphNode[]
 }
 
 /**
- * Extractorの出力から、ユニークな context（data-context値）ごとに
- * サイドバー項目を導出する。
- * UI（構造グラフ、checkboxなし・Storybookで検証）と
- * Contexts（同じノード集合。クリックでPipelineに飛びdescribe/criteriaを見る・Vitest/RTLで検証）
- * は同じデータの2つの見せ方であり、両セクションに同じcontextを出す。
- * Contexts側はサイドバー行として一意なidが要るため toContextsSectionId() で区別する
- * （グラフのノードフィルタリングでは baseContextId() で元のcontextIdに戻す）。
- * ラベルは context id の先頭文字を大文字化した程度の簡易整形に留める。
+ * UIセクション（依存関係グラフ全体）用の固定id。
+ * data-context の値がノードごとにいくつあっても、UIは常にこの1件のみを指す
+ * （「アプリ全体のつながり」と「1 data-context = 1管理単位」は別の軸のため）。
+ */
+export const UI_WHOLE_PROJECT_ID = '__structure__'
+
+/**
+ * 最頻出の sourceContextMap（例: "ContextMap.todo.html"）から、
+ * UIセクションの表示ラベルを導出する（"ContextMap." と ".html" を除いて先頭大文字化）。
+ * 同数タイの場合は先に出現したものを優先する。
+ */
+function deriveWholeProjectLabel(result: ExtractResult): string {
+    const counts = new Map<string, number>()
+    for (const n of result.nodes) {
+        counts.set(n.sourceContextMap, (counts.get(n.sourceContextMap) ?? 0) + 1)
+    }
+    let best = ''
+    let bestCount = -1
+    for (const [key, count] of counts) {
+        if (count > bestCount) {
+            best = key
+            bestCount = count
+        }
+    }
+    const stripped = best.replace(/^ContextMap\./, '').replace(/\.html$/, '')
+    return stripped.charAt(0).toUpperCase() + stripped.slice(1)
+}
+
+/**
+ * Extractorの出力から、サイドバー項目を導出する。
+ * UI（依存関係グラフ全体、Storybookで検証）は data-context の値によらず常に1件。
+ * Contexts（ノード単位の管理単位、criteria/describeをVitest/RTLで検証）は
+ * ユニークな data-context ごとに1件（サイドバー行として一意にするため
+ * toContextsSectionId() で区別用idを付与する）。
  */
 export function sidebarItemsFromExtracted(result: ExtractResult): ContextSidebarItem[] {
+    if (result.nodes.length === 0) return []
+
     const contextIds = [
         ...new Set(
             result.nodes.map((n) => n.context).filter((c): c is string => Boolean(c)),
         ),
     ]
-    return contextIds.flatMap((id) => {
-        const label = id.charAt(0).toUpperCase() + id.slice(1)
-        return [
-            { id, section: 'ui' as const, label },
-            { id: toContextsSectionId(id), section: 'contexts' as const, label },
-        ]
-    })
+
+    const uiItem: ContextSidebarItem = {
+        id: UI_WHOLE_PROJECT_ID,
+        section: 'ui',
+        label: deriveWholeProjectLabel(result),
+    }
+    const contextItems: ContextSidebarItem[] = contextIds.map((id) => ({
+        id: toContextsSectionId(id),
+        section: 'contexts' as const,
+        label: id.charAt(0).toUpperCase() + id.slice(1),
+    }))
+
+    return [uiItem, ...contextItems]
 }
