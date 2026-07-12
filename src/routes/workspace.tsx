@@ -66,8 +66,7 @@ export function WorkspaceRoute({
     const project = useProjectStore((s) =>
         projectId ? s.projects.find((p) => p.id === projectId) : undefined,
     )
-    const { nodes, edges, sidebarItems, isLoading, error: extractError, extractContextGraph } =
-        useContextGraph()
+    const { nodes, edges, sidebarItems, extractContextGraph } = useContextGraph()
 
     // 可視コンテキストのSSOT。ユーザーが手動でサイドバーを操作するまでは
     // 抽出結果（sidebarItems）から自動導出し、操作後はその選択を優先する。
@@ -85,24 +84,20 @@ export function WorkspaceRoute({
     const [isCreating, setIsCreating] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    // contexts セクション（foundation/source/project）は常に静的デモから、
-    // ui セクションは常に抽出結果（nodes/edges）から取り、両方を合成する。
-    // 以前は「抽出結果があれば丸ごと置き換える」実装だったため、抽出成功直後に
-    // foundation/source/project が消えて既定表示（visibleIds:['foundation']）が
-    // 空になる不具合があった。
-    const mergedNodes = [...STATIC_CONTEXT_NODES, ...nodes]
-    const mergedEdges = [...STATIC_CONTEXT_EDGES, ...edges]
-
-    // contexts セクション（foundation/source/project = Zizhou自身の固定グラフ）は常に残し、
-    // ui セクションだけ抽出結果（sidebarItems）に差し替える。抽出結果が無い（未選択/抽出前）
-    // ときは、従来の静的 ui 項目（todo/settings/login のモック）にフォールバックする。
-    const items =
-        sidebarItems.length > 0
-            ? [
-                  ...WORKSPACE_SIDEBAR_ITEMS.filter((item) => item.section === 'contexts'),
-                  ...sidebarItems,
-              ]
-            : WORKSPACE_SIDEBAR_ITEMS
+    // 「CONTEXTS」という見出し自体は ContextSidebar 側で常に表示される（0件でもラベルは残る）。
+    // その下の行（foundation/source/project = Zizhou自身の固定グラフ）は、今開いている
+    // プロジェクトに対象となるコンテキストが無いとき（＝抽出結果が無いとき）だけ出す。
+    // 抽出結果（sidebarItems）があるときは、そのプロジェクトと無関係な行なので出さない
+    // （グラフ側も同様に、対応する行が無い静的ノードは合成しない）。
+    const hasProjectContext = sidebarItems.length > 0
+    const mergedNodes = hasProjectContext ? nodes : [...STATIC_CONTEXT_NODES, ...nodes]
+    const mergedEdges = hasProjectContext ? edges : [...STATIC_CONTEXT_EDGES, ...edges]
+    const items = [
+        ...(hasProjectContext
+            ? []
+            : WORKSPACE_SIDEBAR_ITEMS.filter((item) => item.section === 'contexts')),
+        ...(hasProjectContext ? sidebarItems : WORKSPACE_SIDEBAR_ITEMS.filter((item) => item.section === 'ui')),
+    ]
 
     useEffect(() => {
         if (!projectId || !isHydrated || !project) {
@@ -153,21 +148,6 @@ export function WorkspaceRoute({
                     onVisibilityChange={setManualVisibleIds}
                 />
                 <div className="flex flex-1 self-stretch min-h-0 flex-col gap-3 min-w-0">
-                    {project && (
-                        <div
-                            data-testid="context-graph-debug"
-                            className="text-[11px] font-mono bg-muted/50 border border-border rounded-md px-3 py-2 whitespace-pre-wrap break-all"
-                        >
-                            {[
-                                `rootPath: ${project.rootPath}`,
-                                `needsSetup: ${needsSetup}`,
-                                `isLoading: ${isLoading}`,
-                                `error: ${extractError ?? '(なし)'}`,
-                                `extracted nodes: ${nodes.length} / edges: ${edges.length}`,
-                                `sidebarItems: ${sidebarItems.map((i) => i.id).join(', ') || '(なし)'}`,
-                            ].join('\n')}
-                        </div>
-                    )}
                     {needsSetup && project && (
                         <ProjectContextSetup
                             projectName={project.name}

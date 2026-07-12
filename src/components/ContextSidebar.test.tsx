@@ -110,6 +110,17 @@ describe('コンテキストの表示を切り替える', () => {
         expect(hidden.querySelector('[data-eye="open"]')).not.toBeInTheDocument()
     })
 
+    it('items に contexts セクションの項目が無くても、CONTEXTSラベルは常に表示する', () => {
+        render(
+            <ContextSidebar
+                items={[{ id: 'todo', section: 'ui', label: 'Todo' }]}
+                defaultVisibleIds={['todo']}
+            />,
+        )
+        expect(screen.getByText('Contexts')).toBeInTheDocument()
+        expect(screen.getByText('Todo')).toBeInTheDocument()
+    })
+
     it('可視変化で onVisibilityChange(visibleIds) が呼ばれる', async () => {
         const user = userEvent.setup()
         const onVisibilityChange = vi.fn()

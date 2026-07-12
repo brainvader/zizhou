@@ -47,6 +47,7 @@ export type BaseNodeData = {
     contextId: ContextNodeId
     label: string
     accent?: 'primary' | 'dashed'
+    checklist?: readonly ContextGraphChecklistItem[]
 }
 
 export type ComponentNodeData = BaseNodeData & { kind: 'component' }
@@ -68,6 +69,9 @@ export type CustomNodeData =
 /**
  * ContextGraphNode を CustomNode 用の narrow な data 型に変換する。
  * kind === 'feature' のとき checklist が無ければ空配列にフォールバックする。
+ * それ以外の kind（component/hook/external/state）は、checklist があれば
+ * そのまま引き継ぐ（ZTE抽出由来のcriteriaをグラフ上に表示するため）。
+ * 無ければキー自体を含めない。
  * accent（枠線の視覚強調）は React Flow 公式の BaseNode パターンに倣い、
  * data 経由でカスタムノード内部から参照する。
  */
@@ -77,11 +81,13 @@ export function toCustomNodeData(node: ContextGraphNode): CustomNodeData {
         contextId: node.contextId,
         label: node.label,
         accent: node.accent,
+        ...(node.kind === 'feature'
+            ? { checklist: node.checklist ?? [] }
+            : node.checklist && node.checklist.length > 0
+              ? { checklist: node.checklist }
+              : {}),
     }
-    if (node.kind === 'feature') {
-        return { ...base, kind: 'feature', checklist: node.checklist ?? [] }
-    }
-    return { ...base, kind: node.kind }
+    return { ...base, kind: node.kind } as CustomNodeData
 }
 
 /** ContextMap モック相当のノード定義 */
