@@ -1,10 +1,13 @@
+import { ReactFlow, Background } from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
 import {
     CONTEXT_PIPELINE_STAGES,
     labelForContextId,
     resolveActiveContextId,
+    toPipelineFlow,
     type PipelineStage,
-    type PipelineStageStatus,
 } from '@/bom/context-pipeline'
+import { PIPELINE_NODE_TYPES } from '@/bom/pipeline-node-types'
 import type { ContextNodeId } from '@/bom/workspace'
 import type { ContextGraphNode } from '@/bom/context-graph'
 import { cn } from '@/lib/utils'
@@ -23,32 +26,16 @@ export type ContextPipelineViewProps = {
     selectedNode?: ContextGraphNode
 }
 
-const STATUS_STYLES: Record<
-    PipelineStageStatus,
-    { border: string; badge: string; muted?: boolean }
-> = {
-    done: {
-        border: 'border-[#3f9161]',
-        badge: 'text-[#3f9161] bg-[#3f916122]',
-    },
-    doing: {
-        border: 'border-[#b8862f]',
-        badge: 'text-[#b8862f] bg-[#b8862f22]',
-        muted: false,
-    },
-    todo: {
-        border: 'border-dashed border-[#4a4f58]',
-        badge: 'text-[#4a4f58] bg-[#4a4f5822]',
-        muted: true,
-    },
-}
-
 /**
  * ContextPipelineView
- * コンテキストの作業パイプラインを静的ステージで表示する。
+ * コンテキストの作業パイプラインを React Flow で表示する（縦一列の固定シーケンス）。
+ * ノードの並び順自体がパイプラインの意味そのものであり、ドラッグでの並べ替えは
+ * 対象外（nodesDraggable={false}）。依存関係グラフ（ComponentGraphEditor）とは違い、
+ * 自動レイアウト（dagre）は使わず toPipelineFlow() の固定縦一列配置を使う。
  *
  * @see docs/context/ContextMap.pipeline.html
  * @see src/bom/context-pipeline.ts
+ * @see src/bom/pipeline-node-types.ts
  */
 export function ContextPipelineView({
     visibleIds,
@@ -57,6 +44,7 @@ export function ContextPipelineView({
 }: ContextPipelineViewProps) {
     const activeId = resolveActiveContextId(visibleIds)
     const effectiveStages = selectedNode ? applyNodeToTaskSplitting(stages, selectedNode) : stages
+    const { nodes, edges } = toPipelineFlow(effectiveStages)
 
     return (
         <div
@@ -97,15 +85,17 @@ export function ContextPipelineView({
                         )}
                     </div>
 
-                    <div className="relative">
-                        {effectiveStages.map((stage, index) => (
-                            <div key={stage.id}>
-                                <PipelineStageCard stage={stage} />
-                                {index < effectiveStages.length - 1 && (
-                                    <div className="w-px h-5 bg-[#3a4048] ml-5" />
-                                )}
-                            </div>
-                        ))}
+                    <div className="h-[520px]">
+                        <ReactFlow
+                            nodes={nodes}
+                            edges={edges}
+                            nodeTypes={PIPELINE_NODE_TYPES}
+                            nodesDraggable={false}
+                            nodesConnectable={false}
+                            fitView
+                        >
+                            <Background />
+                        </ReactFlow>
                     </div>
                 </>
             )}
@@ -129,58 +119,5 @@ function applyNodeToTaskSplitting(
                   checklist: node.checklist,
               }
             : stage,
-    )
-}
-
-function PipelineStageCard({ stage }: { stage: PipelineStage }) {
-    const style = STATUS_STYLES[stage.status]
-    const isDoing = stage.status === 'doing'
-
-    return (
-        <div
-            data-testid={`pipeline-stage-${stage.id}`}
-            data-status={stage.status}
-            className={cn(
-                'rounded-[10px] px-3.5 py-3 border',
-                isDoing ? 'bg-[#1a1712]' : 'bg-card',
-                style.border,
-                style.muted && 'opacity-75',
-            )}
-        >
-            <div className="flex items-center justify-between mb-1.5">
-                <span className="text-sm font-semibold">{stage.title}</span>
-                <span
-                    className={cn(
-                        'font-mono text-[9px] px-1.5 py-0.5 rounded-full',
-                        style.badge,
-                    )}
-                >
-                    {stage.status}
-                </span>
-            </div>
-            <div
-                className={cn(
-                    'text-xs text-[#a3a8b0] leading-relaxed',
-                    stage.checklist?.length ? 'mb-2' : undefined,
-                )}
-            >
-                {stage.description}
-            </div>
-            {stage.checklist?.map((item) => (
-                <div
-                    key={item.label}
-                    className="flex items-start gap-1.5 text-xs text-[#a3a8b0] mb-1 last:mb-0 leading-snug"
-                >
-                    <input
-                        type="checkbox"
-                        checked={item.done}
-                        disabled
-                        readOnly
-                        className="mt-0.5"
-                    />
-                    <span>{item.label}</span>
-                </div>
-            ))}
-        </div>
     )
 }

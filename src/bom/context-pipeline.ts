@@ -78,3 +78,38 @@ export function resolveActiveContextId(
 export function labelForContextId(id: ContextNodeId): string {
     return WORKSPACE_SIDEBAR_ITEMS.find((item) => item.id === id)?.label ?? id
 }
+
+export type PipelineFlowNodeData = { stage: PipelineStage }
+export type PipelineFlowNode = {
+    id: string
+    type: 'stage'
+    position: { x: number; y: number }
+    data: PipelineFlowNodeData
+}
+export type PipelineFlowEdge = { id: string; source: string; target: string }
+
+const PIPELINE_NODE_HEIGHT = 160
+
+/**
+ * PipelineStage[] を React Flow の Node[]/Edge[] に変換する。
+ * 段階は縦一列の固定レイアウト（x=0固定、yはインデックス×一定間隔）とし、
+ * dagre等の自動レイアウトは使わない（並び順自体がパイプラインの意味そのものであり、
+ * 依存関係グラフのような自動配置は不要なため）。隣接ステージ間に1本ずつedgeを張る。
+ */
+export function toPipelineFlow(stages: readonly PipelineStage[]): {
+    nodes: PipelineFlowNode[]
+    edges: PipelineFlowEdge[]
+} {
+    const nodes: PipelineFlowNode[] = stages.map((stage, index) => ({
+        id: stage.id,
+        type: 'stage',
+        position: { x: 0, y: index * PIPELINE_NODE_HEIGHT },
+        data: { stage },
+    }))
+    const edges: PipelineFlowEdge[] = stages.slice(1).map((stage, index) => ({
+        id: `${stages[index].id}-${stage.id}`,
+        source: stages[index].id,
+        target: stage.id,
+    }))
+    return { nodes, edges }
+}
