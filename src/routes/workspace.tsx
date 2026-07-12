@@ -14,12 +14,36 @@ import {
     type MkdirFn,
 } from '@/lib/ensureZizhouContext'
 import { useContextGraph } from '@/hooks/useContextGraph'
-import type { ContextGraphNode, ContextGraphEdge } from '@/bom/context-graph'
+import { UI_WHOLE_PROJECT_ID } from '@/bom/extracted-graph'
+import {
+    CONTEXT_GRAPH_NODES,
+    CONTEXT_GRAPH_EDGES,
+    type ContextGraphNode,
+    type ContextGraphEdge,
+} from '@/bom/context-graph'
 import {
     DEFAULT_VISIBLE_CONTEXT_IDS,
+    WORKSPACE_SIDEBAR_ITEMS,
+    baseContextId,
     type ContextNodeId,
     type WorkspaceView,
 } from '@/bom/workspace'
+
+// contexts セクション（foundation/source/project = Zizhou自身の固定グラフ）に属する
+// ノード/エッジだけを静的デモから取り出す。ui セクション（抽出結果由来）とは独立して
+// 常に表示できるようにするため。
+const CONTEXTS_SECTION_IDS = new Set(
+    WORKSPACE_SIDEBAR_ITEMS.filter((item) => item.section === 'contexts').map(
+        (item) => item.id,
+    ),
+)
+const STATIC_CONTEXT_NODES = CONTEXT_GRAPH_NODES.filter((n) =>
+    CONTEXTS_SECTION_IDS.has(n.contextId),
+)
+const staticContextNodeIds = new Set(STATIC_CONTEXT_NODES.map((n) => n.id))
+const STATIC_CONTEXT_EDGES = CONTEXT_GRAPH_EDGES.filter(
+    (e) => staticContextNodeIds.has(e.source) && staticContextNodeIds.has(e.target),
+)
 
 export type WorkspaceRouteProps = {
     onExists?: ExistsFn
@@ -44,13 +68,55 @@ export function WorkspaceRoute({
     const project = useProjectStore((s) =>
         projectId ? s.projects.find((p) => p.id === projectId) : undefined,
     )
-    const [visibleIds, setVisibleIds] = useState<ContextNodeId[]>(() => [
-        ...DEFAULT_VISIBLE_CONTEXT_IDS,
-    ])
+    const { nodes, edges, sidebarItems, contextNodes, extractContextGraph } = useContextGraph()
+
+    // 可視コンテキストのSSOT。ユーザーが手動でサイドバーを操作するまでは
+    // 抽出結果（sidebarItems）から自動導出し、操作後はその選択を優先する。
+    // 以前は useEffect で setVisibleIds していたため、ContextSidebar を
+    // key で再マウントするタイミングと1レンダー分ズレ、再マウント時点で
+    // まだ古い visibleIds を defaultVisibleIds として渡してしまうバグがあった。
+    // レンダー中に同期的に導出することでズレを無くす。
+    const [manualVisibleIds, setManualVisibleIds] = useState<ContextNodeId[] | null>(null)
+    const autoVisibleIds =
+        sidebarItems.length > 0
+            ? sidebarItems.filter((item) => item.section === 'ui').map((item) => item.id)
+            : [...DEFAULT_VISIBLE_CONTEXT_IDS]
+    const visibleIds = manualVisibleIds ?? autoVisibleIds
+    // グラフのノードフィルタリング（contextIdとの突き合わせ）では、Contexts専用の
+    // 区別用サフィックス（例: "todo:ctx"）を剥がした本来のcontextIdを使う。
+    // ただしUIの「プロジェクト全体」エントリ（UI_WHOLE_PROJECT_ID）が選ばれているときは
+    // 話が別で、ノードごとのcontextIdがバラバラ（1ノード1管理単位）でも全ノードを見せたいので、
+    // 抽出結果に実際に存在する contextId を丸ごと可視集合として使う
+    // （UIは「アプリ全体のつながり」を見る場所で、Contexts単位の粒度とは無関係のため）。
+    const isWholeProjectUi = visibleIds.includes(UI_WHOLE_PROJECT_ID)
+    const graphVisibleIds = isWholeProjectUi
+        ? [...new Set(nodes.map((n) => n.contextId))]
+        : visibleIds.map(baseContextId)
     const [needsSetup, setNeedsSetup] = useState(false)
     const [isCreating, setIsCreating] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const { nodes, edges, extractContextGraph } = useContextGraph()
+
+    const hasProjectContext = sidebarItems.length > 0
+    const items = hasProjectContext ? sidebarItems : WORKSPACE_SIDEBAR_ITEMS
+    // 今可視になっているコンテキストが UI / Contexts どちらのセクションから
+    // 選ばれたものかを判定する。
+    const activeSection = items.find((item) => visibleIds.includes(item.id))?.section
+    // Contexts（ノード単位の管理単位）を選んだら、グラフを介さず即座にPipelineへ飛ぶ。
+    // UIで全体像はすでに見えているので、Contextsはそこからさらにグラフを見せる意味が無い。
+    // 静的デモ（foundation/source/project）は当面この対象外（従来通り単一featureノードの
+    // グラフとして見せる）。
+    const jumpToPipeline = hasProjectContext && activeSection === 'contexts'
+    const effectiveView: WorkspaceView = jumpToPipeline ? 'pipeline' : view
+    const pipelineNode = jumpToPipeline
+        ? contextNodes.find((n) => graphVisibleIds.includes(n.id))
+        : undefined
+
+    const mergedNodes = hasProjectContext ? nodes : [...STATIC_CONTEXT_NODES, ...nodes]
+    const mergedEdges = hasProjectContext ? edges : [...STATIC_CONTEXT_EDGES, ...edges]
+
+    const handleVisibilityChange = useCallback((next: ContextNodeId[]) => {
+        setManualVisibleIds(next)
+    }, [])
 
     useEffect(() => {
         if (!projectId || !isHydrated || !project) {
@@ -95,8 +161,10 @@ export function WorkspaceRoute({
             <WorkspaceTopbar />
             <div className="flex flex-1 min-h-0 items-start p-6 gap-6">
                 <ContextSidebar
+                    key={sidebarItems.length > 0 ? 'extracted' : 'static'}
+                    items={items}
                     defaultVisibleIds={visibleIds}
-                    onVisibilityChange={setVisibleIds}
+                    onVisibilityChange={handleVisibilityChange}
                 />
                 <div className="flex flex-1 self-stretch min-h-0 flex-col gap-3 min-w-0">
                     {needsSetup && project && (
@@ -110,13 +178,14 @@ export function WorkspaceRoute({
                         />
                     )}
                     <WorkspaceViewArea
-                        view={view}
-                        visibleIds={visibleIds}
-                        nodes={nodes}
-                        edges={edges}
+                        view={effectiveView}
+                        visibleIds={graphVisibleIds}
+                        nodes={mergedNodes}
+                        edges={mergedEdges}
+                        selectedNode={pipelineNode}
                     />
                 </div>
-                {view === 'pipeline' && <ContextChatPanel />}
+                {effectiveView === 'pipeline' && <ContextChatPanel />}
             </div>
         </div>
     )
@@ -127,22 +196,16 @@ function WorkspaceViewArea({
     visibleIds,
     nodes,
     edges,
+    selectedNode,
 }: {
     view: WorkspaceView
     visibleIds: readonly ContextNodeId[]
     nodes: ContextGraphNode[]
     edges: ContextGraphEdge[]
+    selectedNode?: ContextGraphNode
 }) {
     if (view === 'pipeline') {
-        return <ContextPipelineView visibleIds={visibleIds} />
+        return <ContextPipelineView visibleIds={visibleIds} selectedNode={selectedNode} />
     }
-    // 抽出結果が空（未取得/抽出0件）のときは ComponentGraphEditor 側の
-    // デフォルト値（CONTEXT_GRAPH_NODES/EDGES）にフォールバックさせる。
-    return (
-        <ComponentGraphEditor
-            visibleIds={visibleIds}
-            nodes={nodes.length > 0 ? nodes : undefined}
-            edges={edges.length > 0 ? edges : undefined}
-        />
-    )
+    return <ComponentGraphEditor visibleIds={visibleIds} nodes={nodes} edges={edges} />
 }

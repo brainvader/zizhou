@@ -14,7 +14,7 @@ import {
     type ContextGraphEdge,
     type ContextGraphNode,
 } from '@/bom/context-graph'
-import { toReactFlowNodes, toReactFlowEdges, reconcileNodes } from '@/bom/graph-editor'
+import { toReactFlowNodes, toReactFlowEdges, reconcileNodes, type GraphEditorNode } from '@/bom/graph-editor'
 import { GRAPH_NODE_TYPES } from '@/bom/graph-node-types'
 import type { ContextNodeId } from '@/bom/workspace'
 
@@ -22,6 +22,7 @@ export type ComponentGraphEditorProps = {
     visibleIds: readonly ContextNodeId[]
     nodes?: readonly ContextGraphNode[]
     edges?: readonly ContextGraphEdge[]
+    onNodeClick?: (nodeId: string) => void
 }
 
 /**
@@ -45,6 +46,7 @@ export function ComponentGraphEditor({
     visibleIds,
     nodes = CONTEXT_GRAPH_NODES,
     edges = CONTEXT_GRAPH_EDGES,
+    onNodeClick,
 }: ComponentGraphEditorProps) {
     const baseNodes = toReactFlowNodes(nodes, visibleIds)
     const rfEdges = toReactFlowEdges(edges, nodes, visibleIds)
@@ -52,12 +54,12 @@ export function ComponentGraphEditor({
     const [rfNodes, setRfNodes] = useState(baseNodes)
 
     useEffect(() => {
-        setRfNodes((prev) => reconcileNodes(prev, baseNodes))
+        setRfNodes((prev) => [...reconcileNodes(prev, baseNodes)])
         // baseNodes はレンダーごとに新しい配列参照になるため、内容（visibleIds/nodes/edges）で比較する
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [visibleIds, nodes, edges])
 
-    const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    const handleNodesChange = useCallback((changes: NodeChange<GraphEditorNode>[]) => {
         setRfNodes((nds) => applyNodeChanges(changes, nds))
     }, [])
 
@@ -82,6 +84,7 @@ export function ComponentGraphEditor({
                     edges={rfEdges}
                     nodeTypes={GRAPH_NODE_TYPES}
                     onNodesChange={handleNodesChange}
+                    onNodeClick={(_event, node) => onNodeClick?.(node.id)}
                     nodesConnectable={false}
                     fitView
                 >

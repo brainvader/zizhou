@@ -17,6 +17,7 @@ import type {
     NodeKind,
 } from '@/bom/context-graph'
 import type { ContextSidebarItem } from '@/bom/workspace'
+import { toContextsSectionId } from '@/bom/workspace'
 import { layoutWithDagre } from '@/bom/graph-layout'
 
 export type ExtractedCriteriaItem = { label: string; done: boolean }
@@ -102,6 +103,7 @@ export function toContextGraph(result: ExtractResult): {
         label: labelFromFile(n),
         kind: resolveKind(n.kind),
         checklist: toChecklist(n.criteria),
+        describe: n.describe,
         position: layout[n.id] ?? { x: 0, y: 0 },
         width: DEFAULT_NODE_WIDTH,
         accent: n.kind === 'service' || n.kind === 'schema' ? 'dashed' : undefined,
@@ -117,19 +119,97 @@ export function toContextGraph(result: ExtractResult): {
 }
 
 /**
- * Extractorの出力から、ユニークな context（data-context値）ごとに
- * UIセクションのサイドバー項目を導出する。
- * ラベルは context id の先頭文字を大文字化した程度の簡易整形に留める。
+ * Extractorの出力から、data-contextごとに集約した1ノードを作る（Contextsセクション用）。
+ * UIセクション（構造グラフ、component/hook/external/state個別ノード）とは別物で、
+ * 同じcontext配下の全ノードのcriteriaを、Zizhou自身のfeatureノード（foundation等）と
+ * 同じ見た目（kind: 'feature'、checklist直付き）の1ノードに集約する。
+ * どのノード由来か分かるよう、各criteriaラベルの先頭に元ノード名を添える。
+ * ノード間の依存関係は表現しない（1 context = 1 node のため edges は無し）。
+ */
+export function toContextSummaryNodes(result: ExtractResult): ContextGraphNode[] {
+    const byContext = new Map<string, ExtractedNode[]>()
+    for (const n of result.nodes) {
+        const ctx = n.context ?? DEFAULT_CONTEXT_ID
+        const list = byContext.get(ctx)
+        if (list) {
+            list.push(n)
+        } else {
+            byContext.set(ctx, [n])
+        }
+    }
+
+    return [...byContext.entries()].map(([ctx, nodesInContext], index) => {
+        const checklist: ContextGraphChecklistItem[] = nodesInContext.flatMap((n) => {
+            if (!n.criteria || n.criteria.length === 0) return []
+            const nodeLabel = labelFromFile(n)
+            return n.criteria.map((c) => ({ label: `${nodeLabel}: ${c.label}`, done: c.done }))
+        })
+        return {
+            id: ctx,
+            contextId: ctx,
+            label: ctx.charAt(0).toUpperCase() + ctx.slice(1),
+            kind: 'feature',
+            checklist,
+            position: { x: index * 220, y: 0 },
+        }
+    })
+}
+
+/**
+ * UIセクション（依存関係グラフ全体）用の固定id。
+ * data-context の値がノードごとにいくつあっても、UIは常にこの1件のみを指す
+ * （「アプリ全体のつながり」と「1 data-context = 1管理単位」は別の軸のため）。
+ */
+export const UI_WHOLE_PROJECT_ID = '__structure__'
+
+/**
+ * 最頻出の sourceContextMap（例: "ContextMap.todo.html"）から、
+ * UIセクションの表示ラベルを導出する（"ContextMap." と ".html" を除いて先頭大文字化）。
+ * 同数タイの場合は先に出現したものを優先する。
+ */
+function deriveWholeProjectLabel(result: ExtractResult): string {
+    const counts = new Map<string, number>()
+    for (const n of result.nodes) {
+        counts.set(n.sourceContextMap, (counts.get(n.sourceContextMap) ?? 0) + 1)
+    }
+    let best = ''
+    let bestCount = -1
+    for (const [key, count] of counts) {
+        if (count > bestCount) {
+            best = key
+            bestCount = count
+        }
+    }
+    const stripped = best.replace(/^ContextMap\./, '').replace(/\.html$/, '')
+    return stripped.charAt(0).toUpperCase() + stripped.slice(1)
+}
+
+/**
+ * Extractorの出力から、サイドバー項目を導出する。
+ * UI（依存関係グラフ全体、Storybookで検証）は data-context の値によらず常に1件。
+ * Contexts（ノード単位の管理単位、criteria/describeをVitest/RTLで検証）は
+ * ユニークな data-context ごとに1件（サイドバー行として一意にするため
+ * toContextsSectionId() で区別用idを付与する）。
  */
 export function sidebarItemsFromExtracted(result: ExtractResult): ContextSidebarItem[] {
+    if (result.nodes.length === 0) return []
+
     const contextIds = [
         ...new Set(
             result.nodes.map((n) => n.context).filter((c): c is string => Boolean(c)),
         ),
     ]
-    return contextIds.map((id) => ({
-        id,
-        section: 'ui' as const,
+
+    const uiItem: ContextSidebarItem = {
+        id: UI_WHOLE_PROJECT_ID,
+        section: 'ui',
+        label: deriveWholeProjectLabel(result),
+    }
+    const contextItems: ContextSidebarItem[] = contextIds.map((id) => ({
+        id: toContextsSectionId(id),
+        section: 'contexts' as const,
         label: id.charAt(0).toUpperCase() + id.slice(1),
     }))
+
+    return [uiItem, ...contextItems]
 }

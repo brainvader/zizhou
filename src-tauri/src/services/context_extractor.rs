@@ -444,4 +444,46 @@ mod tests {
         assert!(ids.contains(&"add-todo-form"));
         assert!(ids.contains(&"todo-record"));
     }
+
+    /// 診断用テスト。TauriのIPCを一切介さず、実際のプロジェクトの rootPath に対して
+    /// extract_project() を直接叩いて結果と [WARN] を印字する。
+    ///
+    /// 使い方（src-tauri ディレクトリで実行）:
+    ///   ZIZHOU_DEBUG_ROOT="C:\Users\brainvader\Documents\workspaces\todo-app-sample" \
+    ///     cargo test debug_real_project -- --ignored --nocapture
+    ///
+    /// PowerShellの場合:
+    ///   $env:ZIZHOU_DEBUG_ROOT="C:\Users\brainvader\Documents\workspaces\todo-app-sample"
+    ///   cargo test debug_real_project -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn debug_real_project() {
+        let root = std::env::var("ZIZHOU_DEBUG_ROOT")
+            .expect("ZIZHOU_DEBUG_ROOT を実プロジェクトの rootPath に設定してください");
+        let root_path = Path::new(&root);
+
+        println!("--- root_path ---");
+        println!("{}", root_path.display());
+
+        let context_dir = root_path.join(".zizhou").join("context");
+        println!("--- context_dir (存在するか) ---");
+        println!("{} exists={}", context_dir.display(), context_dir.exists());
+        if context_dir.exists() {
+            for entry in std::fs::read_dir(&context_dir).unwrap() {
+                println!("  found: {}", entry.unwrap().path().display());
+            }
+        }
+
+        println!("--- extract_project 結果 ---");
+        match extract_project(root_path) {
+            Ok(result) => {
+                println!("nodes: {}", result.nodes.len());
+                println!("edges: {}", result.edges.len());
+                println!("{:#?}", result);
+            }
+            Err(e) => {
+                println!("Err: {e}");
+            }
+        }
+    }
 }

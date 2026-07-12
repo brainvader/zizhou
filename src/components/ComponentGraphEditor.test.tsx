@@ -4,8 +4,8 @@
  * @see src/bom/graph-editor.ts
  * @see src/bom/graph-node-types.ts
  */
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 
 import { ComponentGraphEditor } from './ComponentGraphEditor'
 
@@ -31,5 +31,14 @@ describe('React Flow ベースでグラフを表示する', () => {
         expect(screen.getByTestId('component-graph-empty')).toHaveTextContent(
             '表示中のコンテクストがありません',
         )
+    })
+
+    it('ノードをクリックすると onNodeClick にそのノードのidが渡される', () => {
+        const onNodeClick = vi.fn()
+        render(<ComponentGraphEditor visibleIds={['foundation']} onNodeClick={onNodeClick} />)
+
+        fireEvent.click(screen.getByTestId('graph-node-foundation'))
+
+        expect(onNodeClick).toHaveBeenCalledWith('foundation')
     })
 })

@@ -24,6 +24,8 @@ export type ContextGraphNode = {
     label: string
     kind: NodeKind
     checklist?: readonly ContextGraphChecklistItem[]
+    /** ZTE抽出由来の説明文。グラフのカードには出さず、クリック後のPipeline詳細表示で使う */
+    describe?: string
     position: { x: number; y: number }
     width?: number
     accent?: 'primary' | 'dashed'
@@ -68,6 +70,19 @@ export type CustomNodeData =
 /**
  * ContextGraphNode を CustomNode 用の narrow な data 型に変換する。
  * kind === 'feature' のとき checklist が無ければ空配列にフォールバックする。
+ * それ以外の kind（component/hook/external/state）は、checklist があれば
+ * そのまま引き継ぐ（ZTE抽出由来のcriteriaをグラフ上に表示するため）。
+ * 無ければキー自体を含めない。
+ * accent（枠線の視覚強調）は React Flow 公式の BaseNode パターンに倣い、
+ * data 経由でカスタムノード内部から参照する。
+ */
+/**
+ * ContextGraphNode を CustomNode 用の narrow な data 型に変換する。
+ * kind === 'feature' のとき checklist が無ければ空配列にフォールバックする。
+ * それ以外の kind（component/hook/external/state）は checklist を含めない。
+ * グラフは依存関係の構造（label・kind・edge）だけを見せる場所であり、
+ * criteria の検証は Vitest/RTL や Storybook 側の責務のため
+ * （feature は ZTE 抽出とは別系統の、Zizhou自身のロードマップ用チェックリスト）。
  * accent（枠線の視覚強調）は React Flow 公式の BaseNode パターンに倣い、
  * data 経由でカスタムノード内部から参照する。
  */
