@@ -13,8 +13,7 @@
   testing:  Vitest + RTL + Storybook + Playwright
   package:  pnpm
 
-  第1スライス: Workspace シェル（Topbar + ContextSidebar）のみ。
-  Pipeline / Chat は後続コンテキスト。
+  Workspace シェル（Topbar + ContextSidebar + Graph + Pipeline + Chat）まで実装済み。
   共通シェルは ContextMap.graph.html と同一。
 -->
 
@@ -54,14 +53,14 @@
       describe: コンテキストの表示を切り替える
         [✓] Contexts セクションにグラフ基盤・ソース解析・プロジェクト管理が表示される
         [✓] UI セクションに Todo・設定画面・ログイン画面が表示される
-        [✓] Contexts は独立トグル（複数同時 ON 可）
+        [✓] Contexts は排他選択（1つ選ぶと他の Contexts も OFF）
         [✓] UI は排他選択（1つ選ぶと他が OFF）
         [✓] Contexts を ON にすると UI は全 OFF
         [✓] UI を選ぶと Contexts は全 OFF
         [✓] 可視行は data-visible="true" と開いた目アイコン、非可視は false と閉じた目
         [✓] 可視変化で onVisibilityChange(visibleIds) が呼ばれる
 
-      Contexts: 独立トグル（複数同時ON可）
+      Contexts: 排他選択（1つ選ぶと他のContextsも自動でOFF）
       UI:       排他選択（1つ選ぶと他が自動でOFF）
       セクション間: どちらか一方を選ぶと、もう一方は全OFFになる
     -->
@@ -123,14 +122,27 @@
     </nav>
 
     <!-- src/components/ContextPipelineView.tsx
-      describe: コンテキストの作業パイプラインを表示する
+      describe: コンテキストの作業パイプラインを React Flow で表示する
         [✓] パンくずにアクティブコンテキスト名が表示される
-        [✓] Design / Task Splitting / Execution / Failure Handling の4ステージが表示される
+        [✓] Design / 仕様 / Execution / Failure Handling の4ステージが表示される
         [✓] 各ステージに status（done/doing/todo）が表示される
         [✓] visibleIds が空のとき空状態を表示する
         [✓] 初期表示（foundation）では「グラフ基盤」のパイプラインになる
+        [✓] Contextsでノード（選ばれたコンテキスト自身）をクリックすると、
+            グラフを介さず直接この画面に遷移する
+        [✓] 選ばれたノードがあるとき、4ステージは表示され続けたまま
+            「仕様」ステージの中身（description/checklist）だけがそのノードの
+            describe/criteria（ZTE抽出由来）に差し替わる。他の3ステージは静的なまま
+        [✓] 選ばれたノードがあるとき、パンくずにノード名まで表示される
+            （例: ‹ Contexts / filter-tabs / Filter-tabs）
+        [✓] ノードはドラッグで移動できる（並び順自体の意味は変わらない、位置の保持のみ）
+        [✓] ステージ集合が変わるたびに Fit View が再実行される
+        [✓] エッジは各ステージの下端から出て、次のステージの上端に入る
+            （4方向自動選択ではなく、上から下への一直線を明示）
+        [✓] checklistが多いステージの直後は、その分ノード間の間隔が自動的に広がる
+            （重なり防止）
     -->
-    <div id="workspace-view-pipeline" data-testid="workspace-view-pipeline" style="width:400px; flex-shrink:0;">
+    <div id="workspace-view-pipeline" data-testid="workspace-view-pipeline" style="flex:1; min-width:0; display:flex; flex-direction:column;">
 
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; font-size:12px; color:#6b7280;">
         <span style="cursor:pointer;">‹ Contexts</span>
@@ -139,20 +151,26 @@
         <span>の作業パイプライン</span>
       </div>
 
-      <div style="position:relative;">
+      <!-- 以下は React Flow キャンバス上のノード配置イメージ（実際はドラッグ可能・ズーム/パン可能）。
+           ノードの縦間隔は各ステージのcheckbox件数から見積もった高さの累積で決まる（固定値ではない）。
+           エッジは各カードの下端中央から出て、次のカードの上端中央に入る。 -->
+      <div style="position:relative; flex:1; min-height:0;">
 
-        <div style="background:#13161a; border:1px solid #3f9161; border-radius:10px; padding:12px 14px;">
+        <div style="background:#13161a; border:1px solid #3f9161; border-radius:10px; padding:12px 14px; width:340px;">
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
             <span style="font-size:14px; font-weight:600;">Design（設計）</span>
             <span style="font-family:'JetBrains Mono',monospace; font-size:9px; padding:2px 7px; border-radius:999px; color:#3f9161; background:#3f916122;">done</span>
           </div>
           <div style="font-size:12px; color:#a3a8b0; line-height:1.5;">人間とSonnetの対話で要件を固める。</div>
         </div>
-        <div style="width:1px; height:20px; background:#3a4048; margin-left:20px;"></div>
+        <div style="width:1px; height:20px; background:#3a4048; margin-left:170px;"></div>
 
-        <div style="background:#1a1712; border:1px solid #b8862f; border-radius:10px; padding:12px 14px;">
+        <!-- 「仕様」ステージ。Contextsでノードが選ばれているときは、
+             ここのdescription/checklistだけがそのノードのdescribe/criteriaに差し替わる。
+             （id自体は task-splitting のまま、表示名だけ「仕様」に変更済み） -->
+        <div style="background:#1a1712; border:1px solid #b8862f; border-radius:10px; padding:12px 14px; width:340px;">
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-            <span style="font-size:14px; font-weight:600;">Task Splitting（契約定義）</span>
+            <span style="font-size:14px; font-weight:600;">仕様</span>
             <span style="font-family:'JetBrains Mono',monospace; font-size:9px; padding:2px 7px; border-radius:999px; color:#b8862f; background:#b8862f22;">doing</span>
           </div>
           <div style="font-size:12px; color:#a3a8b0; line-height:1.5; margin-bottom:8px;">Sonnetがdescribe/criteriaを契約として書き出す。</div>
@@ -163,18 +181,18 @@
             <input type="checkbox" disabled style="margin-top:2px;">React Flowでグラフを描画する
           </div>
         </div>
-        <div style="width:1px; height:20px; background:#3a4048; margin-left:20px;"></div>
+        <div style="width:1px; height:20px; background:#3a4048; margin-left:170px;"></div>
 
-        <div style="background:#13161a; border:1px dashed #4a4f58; border-radius:10px; padding:12px 14px; opacity:0.75;">
+        <div style="background:#13161a; border:1px dashed #4a4f58; border-radius:10px; padding:12px 14px; opacity:0.75; width:340px;">
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
             <span style="font-size:14px; font-weight:600;">Execution（実装: Haiku）</span>
             <span style="font-family:'JetBrains Mono',monospace; font-size:9px; padding:2px 7px; border-radius:999px; color:#4a4f58; background:#4a4f5822;">todo</span>
           </div>
           <div style="font-size:12px; color:#a3a8b0; line-height:1.5;">契約（criteria）に基づいてHaikuが機械的に実装する。</div>
         </div>
-        <div style="width:1px; height:20px; background:#3a4048; margin-left:20px;"></div>
+        <div style="width:1px; height:20px; background:#3a4048; margin-left:170px;"></div>
 
-        <div style="background:#13161a; border:1px dashed #4a4f58; border-radius:10px; padding:12px 14px; opacity:0.75;">
+        <div style="background:#13161a; border:1px dashed #4a4f58; border-radius:10px; padding:12px 14px; opacity:0.75; width:340px;">
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
             <span style="font-size:14px; font-weight:600;">Failure Handling（失敗対応）</span>
             <span style="font-family:'JetBrains Mono',monospace; font-size:9px; padding:2px 7px; border-radius:999px; color:#4a4f58; background:#4a4f5822;">todo</span>
@@ -239,9 +257,10 @@
     }
 
     function toggleContext(el) {
-      var nowVisible = el.getAttribute('data-visible') !== 'true';
-      if (nowVisible) clearSection('ui');
-      setIcon(el, nowVisible);
+      clearSection('ui');
+      document.querySelectorAll('.ctx-row[data-section="contexts"]').forEach(function (row) {
+        setIcon(row, row === el);
+      });
     }
 
     function toggleUi(el) {

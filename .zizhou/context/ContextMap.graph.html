@@ -13,8 +13,9 @@
   testing:  Vitest + RTL + Storybook + Playwright
   package:  pnpm
 
-  第1スライス: Workspace シェル（Topbar + ContextSidebar）のみ。
-  Graph キャンバス / Pipeline / Chat は後続コンテキスト。
+  Workspace シェル（Topbar + ContextSidebar + Graph + Pipeline + Chat）まで実装済み。
+  Graph キャンバス / Pipeline / Chat は独立したコンテキストのままだが、
+  シェル自体は共通（ContextMap.pipeline.html と同一）。
 -->
 
 <!-- src/router.tsx
@@ -53,14 +54,14 @@
       describe: コンテキストの表示を切り替える
         [✓] Contexts セクションにグラフ基盤・ソース解析・プロジェクト管理が表示される
         [✓] UI セクションに Todo・設定画面・ログイン画面が表示される
-        [✓] Contexts は独立トグル（複数同時 ON 可）
+        [✓] Contexts は排他選択（1つ選ぶと他の Contexts も OFF）
         [✓] UI は排他選択（1つ選ぶと他が OFF）
         [✓] Contexts を ON にすると UI は全 OFF
         [✓] UI を選ぶと Contexts は全 OFF
         [✓] 可視行は data-visible="true" と開いた目アイコン、非可視は false と閉じた目
         [✓] 可視変化で onVisibilityChange(visibleIds) が呼ばれる
 
-      Contexts: 独立トグル（複数同時ON可）
+      Contexts: 排他選択（1つ選ぶと他のContextsも自動でOFF）
       UI:       排他選択（1つ選ぶと他が自動でOFF）
       セクション間: どちらか一方を選ぶと、もう一方は全OFFになる
     -->
@@ -274,9 +275,10 @@
     }
 
     function toggleContext(el) {
-      var nowVisible = el.getAttribute('data-visible') !== 'true';
-      if (nowVisible) clearSection('ui');
-      setIcon(el, nowVisible);
+      clearSection('ui');
+      document.querySelectorAll('.ctx-row[data-section="contexts"]').forEach(function (row) {
+        setIcon(row, row === el);
+      });
       refreshGraph();
     }
 
