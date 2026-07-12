@@ -67,7 +67,7 @@ export function WorkspaceRoute({
     const project = useProjectStore((s) =>
         projectId ? s.projects.find((p) => p.id === projectId) : undefined,
     )
-    const { nodes, edges, sidebarItems, extractContextGraph } = useContextGraph()
+    const { nodes, edges, sidebarItems, contextNodes, extractContextGraph } = useContextGraph()
 
     // 可視コンテキストのSSOT。ユーザーが手動でサイドバーを操作するまでは
     // 抽出結果（sidebarItems）から自動導出し、操作後はその選択を優先する。
@@ -90,13 +90,25 @@ export function WorkspaceRoute({
     const [error, setError] = useState<string | null>(null)
 
     const hasProjectContext = sidebarItems.length > 0
-    const mergedNodes = hasProjectContext ? nodes : [...STATIC_CONTEXT_NODES, ...nodes]
-    const mergedEdges = hasProjectContext ? edges : [...STATIC_CONTEXT_EDGES, ...edges]
     const items = hasProjectContext ? sidebarItems : WORKSPACE_SIDEBAR_ITEMS
     // 今可視になっているコンテキストが UI / Contexts どちらのセクションから
     // 選ばれたものかを判定する。ノードクリックでPipelineに飛ぶのは
     // Contextsセクションから選んだときだけ（UIは構造だけを見る場所のため）。
     const activeSection = items.find((item) => visibleIds.includes(item.id))?.section
+    // UI: 構造グラフ（component/hook/external/state個別ノード、依存関係の線）
+    // Contexts: data-contextごとに集約した1ノード（criteria checklist直付き、feature扱い）
+    // 抽出結果が無い（プロジェクト未選択/抽出前）ときは、Zizhou自身の静的デモにフォールバックする。
+    const showContextSummary = hasProjectContext && activeSection === 'contexts'
+    const mergedNodes = showContextSummary
+        ? contextNodes
+        : hasProjectContext
+          ? nodes
+          : [...STATIC_CONTEXT_NODES, ...nodes]
+    const mergedEdges = showContextSummary
+        ? []
+        : hasProjectContext
+          ? edges
+          : [...STATIC_CONTEXT_EDGES, ...edges]
 
     // グラフでノードをクリックしたときの選択状態。選択中は view を問答無用で
     // pipeline に切り替え、そのノード自身の describe/criteria を表示する

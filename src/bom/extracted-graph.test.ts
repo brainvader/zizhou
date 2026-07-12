@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest'
 
-import { toContextGraph, sidebarItemsFromExtracted, type ExtractResult } from './extracted-graph'
+import { toContextGraph, sidebarItemsFromExtracted, toContextSummaryNodes, type ExtractResult } from './extracted-graph'
 
 const SAMPLE: ExtractResult = {
     nodes: [
@@ -126,6 +126,41 @@ describe('Extractorの出力を ContextGraphEdge[] に変換する', () => {
             { id: 'add-todo-form-use-todo-store', source: 'add-todo-form', target: 'use-todo-store' },
             { id: 'use-todo-store-persist-todos', source: 'use-todo-store', target: 'persist-todos' },
         ])
+    })
+})
+
+describe('Extractorの出力から、data-contextごとに集約した1ノードを作る（Contextsセクション用）', () => {
+    it('ユニークなcontextごとに1ノードだけ作る（4ノード→1ノードに集約される）', () => {
+        const nodes = toContextSummaryNodes(SAMPLE)
+        expect(nodes).toHaveLength(1)
+        expect(nodes[0]).toMatchObject({
+            id: 'todo',
+            contextId: 'todo',
+            label: 'Todo',
+            kind: 'feature',
+        })
+    })
+
+    it('そのcontext配下の全ノードのcriteriaを、ノード名を添えて1つのchecklistに集約する', () => {
+        const nodes = toContextSummaryNodes(SAMPLE)
+        expect(nodes[0].checklist).toEqual([
+            { label: 'AddTodoForm: 空文字では追加ボタンが disabled になる', done: false },
+            { label: 'AddTodoForm: Enterキーで追加できる', done: true },
+        ])
+    })
+
+    it('criteriaを持たないノード（use-todo-store等）は空扱いで、他ノード分のcriteriaに影響しない', () => {
+        const nodes = toContextSummaryNodes(SAMPLE)
+        // SAMPLE中、criteriaを持つのは add-todo-form のみ（2件）。他は[]や未指定。
+        expect(nodes[0].checklist).toHaveLength(2)
+    })
+
+    it('全ノードに有限のposition（dagre不要、単純配置）が設定される', () => {
+        const nodes = toContextSummaryNodes(SAMPLE)
+        for (const node of nodes) {
+            expect(Number.isFinite(node.position.x)).toBe(true)
+            expect(Number.isFinite(node.position.y)).toBe(true)
+        }
     })
 })
 
