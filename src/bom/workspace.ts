@@ -64,3 +64,26 @@ export const WORKSPACE_SIDEBAR_ITEMS: readonly ContextSidebarItem[] = [
 
 /** ContextMap 初期表示: グラフ基盤のみ ON */
 export const DEFAULT_VISIBLE_CONTEXT_IDS: readonly ContextNodeId[] = ['foundation']
+
+/**
+ * 同一のcontextId（例: "todo"）を UI/Contexts 両セクションのサイドバー項目として
+ * 出すための区別用サフィックス。ContextSidebarの行id（key/data-testid/選択状態の
+ * 一意キー）はセクションを跨いで重複できないため、Contexts側だけ内部的に別idを振る。
+ * グラフ側のノードフィルタリングでは baseContextId() で剥がして本来のcontextIdに戻す。
+ */
+const CONTEXTS_SECTION_ID_SUFFIX = ':ctx'
+
+/** contextId（例: "todo"）から、Contextsセクション用の一意なidを作る */
+export function toContextsSectionId(id: string): ContextNodeId {
+    return `${id}${CONTEXTS_SECTION_ID_SUFFIX}`
+}
+
+/**
+ * Contextsセクション用id（例: "todo:ctx"）を元のcontextId（"todo"）に戻す。
+ * サフィックスが無いid（foundation等、Zizhou自身の固定コンテキスト）はそのまま返す。
+ */
+export function baseContextId(id: ContextNodeId): ContextNodeId {
+    return id.endsWith(CONTEXTS_SECTION_ID_SUFFIX)
+        ? id.slice(0, -CONTEXTS_SECTION_ID_SUFFIX.length)
+        : id
+}

@@ -23,6 +23,7 @@ import {
 import {
     DEFAULT_VISIBLE_CONTEXT_IDS,
     WORKSPACE_SIDEBAR_ITEMS,
+    baseContextId,
     type ContextNodeId,
     type WorkspaceView,
 } from '@/bom/workspace'
@@ -77,45 +78,50 @@ export function WorkspaceRoute({
     const [manualVisibleIds, setManualVisibleIds] = useState<ContextNodeId[] | null>(null)
     const autoVisibleIds =
         sidebarItems.length > 0
-            ? sidebarItems.map((item) => item.id)
+            ? sidebarItems.filter((item) => item.section === 'ui').map((item) => item.id)
             : [...DEFAULT_VISIBLE_CONTEXT_IDS]
     const visibleIds = manualVisibleIds ?? autoVisibleIds
+    // グラフのノードフィルタリング（contextIdとの突き合わせ）では、Contexts専用の
+    // 区別用サフィックス（例: "todo:ctx"）を剥がした本来のcontextIdを使う。
+    // UI/Contextsどちらから選んでも、同じノード集合を表示するため。
+    const graphVisibleIds = visibleIds.map(baseContextId)
     const [needsSetup, setNeedsSetup] = useState(false)
     const [isCreating, setIsCreating] = useState(false)
     const [error, setError] = useState<string | null>(null)
+
+    const hasProjectContext = sidebarItems.length > 0
+    const mergedNodes = hasProjectContext ? nodes : [...STATIC_CONTEXT_NODES, ...nodes]
+    const mergedEdges = hasProjectContext ? edges : [...STATIC_CONTEXT_EDGES, ...edges]
+    const items = hasProjectContext ? sidebarItems : WORKSPACE_SIDEBAR_ITEMS
+    // 今可視になっているコンテキストが UI / Contexts どちらのセクションから
+    // 選ばれたものかを判定する。ノードクリックでPipelineに飛ぶのは
+    // Contextsセクションから選んだときだけ（UIは構造だけを見る場所のため）。
+    const activeSection = items.find((item) => visibleIds.includes(item.id))?.section
 
     // グラフでノードをクリックしたときの選択状態。選択中は view を問答無用で
     // pipeline に切り替え、そのノード自身の describe/criteria を表示する
     // （view の search param 自体は書き換えない。ローカルな一時オーバーライド）。
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
     const effectiveView: WorkspaceView = selectedNodeId ? 'pipeline' : view
-    const handleNodeClick = useCallback((nodeId: string) => {
-        setSelectedNodeId(nodeId)
-    }, [])
+    const selectedNode = selectedNodeId
+        ? mergedNodes.find((n) => n.id === selectedNodeId)
+        : undefined
+    const handleNodeClick = useCallback(
+        (nodeId: string) => {
+            // UI（構造グラフ、Storybookで検証）からのクリックはPipelineに飛ばない。
+            // Contexts（Vitest/RTLで検証するcriteriaの実体）から選んでいるときだけ、
+            // そのノードの詳細（describe/criteria）を見るためにPipelineへ遷移する。
+            if (activeSection !== 'contexts') return
+            setSelectedNodeId(nodeId)
+        },
+        [activeSection],
+    )
     // サイドバーで別のコンテキストに切り替えたら、選択中ノードの詳細表示は解除する
     // （別コンテキストを見ているのに前のノード詳細が残り続けるのを防ぐ）
     const handleVisibilityChange = useCallback((next: ContextNodeId[]) => {
         setSelectedNodeId(null)
         setManualVisibleIds(next)
     }, [])
-
-    // 「CONTEXTS」という見出し自体は ContextSidebar 側で常に表示される（0件でもラベルは残る）。
-    // その下の行（foundation/source/project = Zizhou自身の固定グラフ）は、今開いている
-    // プロジェクトに対象となるコンテキストが無いとき（＝抽出結果が無いとき）だけ出す。
-    // 抽出結果（sidebarItems）があるときは、そのプロジェクトと無関係な行なので出さない
-    // （グラフ側も同様に、対応する行が無い静的ノードは合成しない）。
-    const hasProjectContext = sidebarItems.length > 0
-    const mergedNodes = hasProjectContext ? nodes : [...STATIC_CONTEXT_NODES, ...nodes]
-    const mergedEdges = hasProjectContext ? edges : [...STATIC_CONTEXT_EDGES, ...edges]
-    const items = [
-        ...(hasProjectContext
-            ? []
-            : WORKSPACE_SIDEBAR_ITEMS.filter((item) => item.section === 'contexts')),
-        ...(hasProjectContext ? sidebarItems : WORKSPACE_SIDEBAR_ITEMS.filter((item) => item.section === 'ui')),
-    ]
-    const selectedNode = selectedNodeId
-        ? mergedNodes.find((n) => n.id === selectedNodeId)
-        : undefined
 
     useEffect(() => {
         if (!projectId || !isHydrated || !project) {
@@ -178,7 +184,7 @@ export function WorkspaceRoute({
                     )}
                     <WorkspaceViewArea
                         view={effectiveView}
-                        visibleIds={visibleIds}
+                        visibleIds={graphVisibleIds}
                         nodes={mergedNodes}
                         edges={mergedEdges}
                         selectedNode={selectedNode}

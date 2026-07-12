@@ -130,13 +130,16 @@ describe('Extractorの出力を ContextGraphEdge[] に変換する', () => {
 })
 
 describe('Extractorの出力からサイドバー項目を導出する', () => {
-    it('ユニークなcontextごとにUIセクションの項目を1つ作る', () => {
+    it('ユニークなcontextごとに UI と Contexts 両方の項目を作る（同じデータの2つの見せ方のため）', () => {
         const items = sidebarItemsFromExtracted(SAMPLE)
-        expect(items).toEqual([{ id: 'todo', section: 'ui', label: 'Todo' }])
+        expect(items).toEqual([
+            { id: 'todo', section: 'ui', label: 'Todo' },
+            { id: 'todo:ctx', section: 'contexts', label: 'Todo' },
+        ])
     })
 
-    it('全ノードが同一contextのとき、重複せず1件だけ返す', () => {
+    it('全ノードが同一contextのとき、UI/Contexts合わせて2件だけ返す（重複しない）', () => {
         const items = sidebarItemsFromExtracted(SAMPLE)
-        expect(items).toHaveLength(1)
+        expect(items).toHaveLength(2)
     })
 })

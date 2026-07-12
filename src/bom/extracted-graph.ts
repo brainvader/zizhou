@@ -17,6 +17,7 @@ import type {
     NodeKind,
 } from '@/bom/context-graph'
 import type { ContextSidebarItem } from '@/bom/workspace'
+import { toContextsSectionId } from '@/bom/workspace'
 import { layoutWithDagre } from '@/bom/graph-layout'
 
 export type ExtractedCriteriaItem = { label: string; done: boolean }
@@ -119,7 +120,12 @@ export function toContextGraph(result: ExtractResult): {
 
 /**
  * Extractorの出力から、ユニークな context（data-context値）ごとに
- * UIセクションのサイドバー項目を導出する。
+ * サイドバー項目を導出する。
+ * UI（構造グラフ、checkboxなし・Storybookで検証）と
+ * Contexts（同じノード集合。クリックでPipelineに飛びdescribe/criteriaを見る・Vitest/RTLで検証）
+ * は同じデータの2つの見せ方であり、両セクションに同じcontextを出す。
+ * Contexts側はサイドバー行として一意なidが要るため toContextsSectionId() で区別する
+ * （グラフのノードフィルタリングでは baseContextId() で元のcontextIdに戻す）。
  * ラベルは context id の先頭文字を大文字化した程度の簡易整形に留める。
  */
 export function sidebarItemsFromExtracted(result: ExtractResult): ContextSidebarItem[] {
@@ -128,9 +134,11 @@ export function sidebarItemsFromExtracted(result: ExtractResult): ContextSidebar
             result.nodes.map((n) => n.context).filter((c): c is string => Boolean(c)),
         ),
     ]
-    return contextIds.map((id) => ({
-        id,
-        section: 'ui' as const,
-        label: id.charAt(0).toUpperCase() + id.slice(1),
-    }))
+    return contextIds.flatMap((id) => {
+        const label = id.charAt(0).toUpperCase() + id.slice(1)
+        return [
+            { id, section: 'ui' as const, label },
+            { id: toContextsSectionId(id), section: 'contexts' as const, label },
+        ]
+    })
 }
