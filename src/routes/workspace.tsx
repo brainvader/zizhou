@@ -84,6 +84,21 @@ export function WorkspaceRoute({
     const [isCreating, setIsCreating] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
+    // グラフでノードをクリックしたときの選択状態。選択中は view を問答無用で
+    // pipeline に切り替え、そのノード自身の describe/criteria を表示する
+    // （view の search param 自体は書き換えない。ローカルな一時オーバーライド）。
+    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+    const effectiveView: WorkspaceView = selectedNodeId ? 'pipeline' : view
+    const handleNodeClick = useCallback((nodeId: string) => {
+        setSelectedNodeId(nodeId)
+    }, [])
+    // サイドバーで別のコンテキストに切り替えたら、選択中ノードの詳細表示は解除する
+    // （別コンテキストを見ているのに前のノード詳細が残り続けるのを防ぐ）
+    const handleVisibilityChange = useCallback((next: ContextNodeId[]) => {
+        setSelectedNodeId(null)
+        setManualVisibleIds(next)
+    }, [])
+
     // 「CONTEXTS」という見出し自体は ContextSidebar 側で常に表示される（0件でもラベルは残る）。
     // その下の行（foundation/source/project = Zizhou自身の固定グラフ）は、今開いている
     // プロジェクトに対象となるコンテキストが無いとき（＝抽出結果が無いとき）だけ出す。
@@ -98,6 +113,9 @@ export function WorkspaceRoute({
             : WORKSPACE_SIDEBAR_ITEMS.filter((item) => item.section === 'contexts')),
         ...(hasProjectContext ? sidebarItems : WORKSPACE_SIDEBAR_ITEMS.filter((item) => item.section === 'ui')),
     ]
+    const selectedNode = selectedNodeId
+        ? mergedNodes.find((n) => n.id === selectedNodeId)
+        : undefined
 
     useEffect(() => {
         if (!projectId || !isHydrated || !project) {
@@ -145,7 +163,7 @@ export function WorkspaceRoute({
                     key={sidebarItems.length > 0 ? 'extracted' : 'static'}
                     items={items}
                     defaultVisibleIds={visibleIds}
-                    onVisibilityChange={setManualVisibleIds}
+                    onVisibilityChange={handleVisibilityChange}
                 />
                 <div className="flex flex-1 self-stretch min-h-0 flex-col gap-3 min-w-0">
                     {needsSetup && project && (
@@ -159,13 +177,15 @@ export function WorkspaceRoute({
                         />
                     )}
                     <WorkspaceViewArea
-                        view={view}
+                        view={effectiveView}
                         visibleIds={visibleIds}
                         nodes={mergedNodes}
                         edges={mergedEdges}
+                        selectedNode={selectedNode}
+                        onNodeClick={handleNodeClick}
                     />
                 </div>
-                {view === 'pipeline' && <ContextChatPanel />}
+                {effectiveView === 'pipeline' && <ContextChatPanel />}
             </div>
         </div>
     )
@@ -176,14 +196,25 @@ function WorkspaceViewArea({
     visibleIds,
     nodes,
     edges,
+    selectedNode,
+    onNodeClick,
 }: {
     view: WorkspaceView
     visibleIds: readonly ContextNodeId[]
     nodes: ContextGraphNode[]
     edges: ContextGraphEdge[]
+    selectedNode?: ContextGraphNode
+    onNodeClick: (nodeId: string) => void
 }) {
     if (view === 'pipeline') {
-        return <ContextPipelineView visibleIds={visibleIds} />
+        return <ContextPipelineView visibleIds={visibleIds} selectedNode={selectedNode} />
     }
-    return <ComponentGraphEditor visibleIds={visibleIds} nodes={nodes} edges={edges} />
+    return (
+        <ComponentGraphEditor
+            visibleIds={visibleIds}
+            nodes={nodes}
+            edges={edges}
+            onNodeClick={onNodeClick}
+        />
+    )
 }

@@ -6,11 +6,18 @@ import {
     type PipelineStageStatus,
 } from '@/bom/context-pipeline'
 import type { ContextNodeId } from '@/bom/workspace'
+import type { ContextGraphNode } from '@/bom/context-graph'
 import { cn } from '@/lib/utils'
 
 export type ContextPipelineViewProps = {
     visibleIds: readonly ContextNodeId[]
     stages?: readonly PipelineStage[]
+    /**
+     * グラフ側でノードをクリックしたときに渡される、そのノード自身の詳細。
+     * 指定されているときは、静的な4ステージパイプラインの代わりに
+     * そのノードの describe/criteria（ZTE抽出由来）を表示する。
+     */
+    selectedNode?: ContextGraphNode
 }
 
 const STATUS_STYLES: Record<
@@ -43,6 +50,7 @@ const STATUS_STYLES: Record<
 export function ContextPipelineView({
     visibleIds,
     stages = CONTEXT_PIPELINE_STAGES,
+    selectedNode,
 }: ContextPipelineViewProps) {
     const activeId = resolveActiveContextId(visibleIds)
 
@@ -66,24 +74,78 @@ export function ContextPipelineView({
                     >
                         <span>‹ Contexts</span>
                         <span>/</span>
-                        <span className="text-foreground font-semibold">
+                        <span
+                            className={cn(
+                                selectedNode ? undefined : 'text-foreground font-semibold',
+                            )}
+                        >
                             {labelForContextId(activeId)}
                         </span>
-                        <span>の作業パイプライン</span>
+                        {selectedNode ? (
+                            <>
+                                <span>/</span>
+                                <span className="text-foreground font-semibold">
+                                    {selectedNode.label}
+                                </span>
+                            </>
+                        ) : (
+                            <span>の作業パイプライン</span>
+                        )}
                     </div>
 
-                    <div className="relative">
-                        {stages.map((stage, index) => (
-                            <div key={stage.id}>
-                                <PipelineStageCard stage={stage} />
-                                {index < stages.length - 1 && (
-                                    <div className="w-px h-5 bg-[#3a4048] ml-5" />
-                                )}
-                            </div>
-                        ))}
-                    </div>
+                    {selectedNode ? (
+                        <NodeDetailCard node={selectedNode} />
+                    ) : (
+                        <div className="relative">
+                            {stages.map((stage, index) => (
+                                <div key={stage.id}>
+                                    <PipelineStageCard stage={stage} />
+                                    {index < stages.length - 1 && (
+                                        <div className="w-px h-5 bg-[#3a4048] ml-5" />
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </>
             )}
+        </div>
+    )
+}
+
+/**
+ * NodeDetailCard
+ * グラフでクリックされたノード自身の describe/criteria（ZTE抽出由来）を表示する。
+ * 静的な PipelineStageCard とは別系統（Zizhou自身のロードマップではなく、
+ * 開いているプロジェクトのContextMapに書かれた仕様そのもの）。
+ */
+function NodeDetailCard({ node }: { node: ContextGraphNode }) {
+    return (
+        <div
+            data-testid="pipeline-node-detail"
+            className="rounded-[10px] px-3.5 py-3 border border-border bg-card"
+        >
+            <div className="text-sm font-semibold mb-1.5">{node.label}</div>
+            {node.describe && (
+                <div className="text-xs text-[#a3a8b0] leading-relaxed mb-2">
+                    {node.describe}
+                </div>
+            )}
+            {node.checklist?.map((item) => (
+                <div
+                    key={item.label}
+                    className="flex items-start gap-1.5 text-xs text-[#a3a8b0] mb-1 last:mb-0 leading-snug"
+                >
+                    <input
+                        type="checkbox"
+                        checked={item.done}
+                        disabled
+                        readOnly
+                        className="mt-0.5"
+                    />
+                    <span>{item.label}</span>
+                </div>
+            ))}
         </div>
     )
 }

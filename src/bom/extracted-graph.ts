@@ -102,6 +102,7 @@ export function toContextGraph(result: ExtractResult): {
         label: labelFromFile(n),
         kind: resolveKind(n.kind),
         checklist: toChecklist(n.criteria),
+        describe: n.describe,
         position: layout[n.id] ?? { x: 0, y: 0 },
         width: DEFAULT_NODE_WIDTH,
         accent: n.kind === 'service' || n.kind === 'schema' ? 'dashed' : undefined,

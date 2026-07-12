@@ -104,6 +104,12 @@ describe('Extractorの出力を ContextGraphNode[] に変換する', () => {
         expect(useTodoStore?.accent).toBeUndefined()
     })
 
+    it('describe をそのまま運ぶ（ノードクリック詳細表示で使うため）', () => {
+        const { nodes } = toContextGraph(SAMPLE)
+        const addTodoForm = nodes.find((n) => n.id === 'add-todo-form')
+        expect(addTodoForm?.describe).toBe('テキストを入力してTodoを追加する')
+    })
+
     it('全ノードに dagre 由来の position（有限の数値）が設定される', () => {
         const { nodes } = toContextGraph(SAMPLE)
         for (const node of nodes) {

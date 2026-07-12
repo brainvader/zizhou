@@ -9,6 +9,20 @@ import { render, screen } from '@testing-library/react'
 
 import { ContextPipelineView } from './ContextPipelineView'
 import { DEFAULT_VISIBLE_CONTEXT_IDS } from '@/bom/workspace'
+import type { ContextGraphNode } from '@/bom/context-graph'
+
+const SELECTED_NODE: ContextGraphNode = {
+    id: 'add-todo-form',
+    contextId: 'todo',
+    label: 'AddTodoForm',
+    kind: 'component',
+    describe: 'テキストを入力してTodoを追加する',
+    checklist: [
+        { label: '空文字では追加ボタンが disabled になる', done: false },
+        { label: 'Enterキーで追加できる', done: true },
+    ],
+    position: { x: 0, y: 0 },
+}
 
 describe('コンテキストの作業パイプラインを表示する', () => {
     it('パンくずにアクティブコンテキスト名が表示される', () => {
@@ -64,5 +78,32 @@ describe('コンテキストの作業パイプラインを表示する', () => {
         expect(screen.getByTestId('pipeline-breadcrumb')).toHaveTextContent('グラフ基盤')
         expect(screen.getByTestId('pipeline-stage-design')).toBeInTheDocument()
         expect(screen.queryByTestId('pipeline-empty')).not.toBeInTheDocument()
+    })
+
+    it('selectedNode があるとき、静的な4ステージの代わりにそのノードの詳細（describe/criteria）を表示する', () => {
+        render(<ContextPipelineView visibleIds={['todo']} selectedNode={SELECTED_NODE} />)
+
+        const detail = screen.getByTestId('pipeline-node-detail')
+        expect(detail).toBeInTheDocument()
+        expect(detail).toHaveTextContent('AddTodoForm')
+        expect(screen.getByText('テキストを入力してTodoを追加する')).toBeInTheDocument()
+
+        const done = screen.getByText('Enterキーで追加できる')
+        const notDone = screen.getByText('空文字では追加ボタンが disabled になる')
+        expect(done.parentElement?.querySelector('input[type="checkbox"]')).toBeChecked()
+        expect(notDone.parentElement?.querySelector('input[type="checkbox"]')).not.toBeChecked()
+
+        expect(screen.queryByTestId('pipeline-stage-design')).not.toBeInTheDocument()
+    })
+
+    it('selectedNode のパンくずにノード名まで表示される', () => {
+        render(<ContextPipelineView visibleIds={['todo']} selectedNode={SELECTED_NODE} />)
+        expect(screen.getByTestId('pipeline-breadcrumb')).toHaveTextContent('AddTodoForm')
+    })
+
+    it('selectedNode に checklist が無くてもエラーにならない', () => {
+        const node: ContextGraphNode = { ...SELECTED_NODE, checklist: undefined }
+        render(<ContextPipelineView visibleIds={['todo']} selectedNode={node} />)
+        expect(screen.getByTestId('pipeline-node-detail')).toBeInTheDocument()
     })
 })

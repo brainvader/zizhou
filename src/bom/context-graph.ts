@@ -24,6 +24,8 @@ export type ContextGraphNode = {
     label: string
     kind: NodeKind
     checklist?: readonly ContextGraphChecklistItem[]
+    /** ZTE抽出由来の説明文。グラフのカードには出さず、クリック後のPipeline詳細表示で使う */
+    describe?: string
     position: { x: number; y: number }
     width?: number
     accent?: 'primary' | 'dashed'
